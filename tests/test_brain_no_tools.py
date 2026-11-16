@@ -2,7 +2,7 @@
 
 Prompts carry untrusted text (prospect replies, scraped pages). If Claude had
 tools, an instruction hidden in that text could run commands or reach the
-operator's connectors. Harvey only needs text back, so it gets none. And the
+operator's connectors. Prospector only needs text back, so it gets none. And the
 output is an email to a third party, so the operator's CLAUDE.md, hooks,
 skills, plugins and settings must not load into the call either.
 """

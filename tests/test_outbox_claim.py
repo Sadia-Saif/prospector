@@ -165,7 +165,7 @@ async def test_an_email_stuck_sending_is_failed_after_a_while_never_resent(state
     await state.claim_outbox_item(fresh)
     long_ago = (datetime.now(timezone.utc).replace(tzinfo=None)
                 - timedelta(hours=1)).isoformat()
-    async with state._connect() as db:  # backdate the claim (Harvey crashed)
+    async with state._connect() as db:  # backdate the claim (Prospector crashed)
         await db.execute("UPDATE outbox SET updated_at = ? WHERE id = ?", (long_ago, stuck))
         await db.commit()
 

@@ -6,11 +6,11 @@ Setup (one-time):
    type "Desktop app". Put its id/secret in .env as GMAIL_CLIENT_ID /
    GMAIL_CLIENT_SECRET.
 3. Run ``harvey gmail auth`` — opens a browser, stores the refresh token
-   in data/gmail_token.json. Done: Harvey can send and read.
+   in data/gmail_token.json. Done: Prospector can send and read.
 
 Deliverability notes: use a mailbox on a dedicated SECONDARY domain (never
 your main one), configure SPF/DKIM/DMARC, ramp volume slowly, and watch
-Google Postmaster Tools. Harvey's outbox pacing + kill switches handle the
+Google Postmaster Tools. Prospector's outbox pacing + kill switches handle the
 rest.
 """
 
@@ -125,7 +125,7 @@ class GmailProvider(MailProvider):
             return None
         # Why there's no token, for whoever asked (get_replies says it).
         unreachable = ("couldn't reach Google to refresh the Gmail sign-in{}; "
-                       "Harvey tries again next cycle.")
+                       "Prospector tries again next cycle.")
         try:
             async with httpx.AsyncClient(timeout=TIMEOUT) as client:
                 resp = await client.post(TOKEN_URL, data={
@@ -403,7 +403,7 @@ class GmailProvider(MailProvider):
             if got is _GONE:
                 continue
             msg, labels = got
-            # Harvey's own mail and drafts aren't replies; a message added
+            # Prospector's own mail and drafts aren't replies; a message added
             # outside the inbox counts once it's moved in (labelsAdded).
             if labels & _NOT_REPLIES or (not moved_in and "INBOX" not in labels):
                 continue
@@ -516,7 +516,7 @@ class GmailProvider(MailProvider):
                     charset = "utf-8"
             except (LookupError, ValueError, TypeError):   # unknown, or a null in the name
                 charset = "utf-8"
-            # Harvey keeps 5,000 characters of a body; decode no further than
+            # Prospector keeps 5,000 characters of a body; decode no further than
             # that could need.
             raw = raw[:MAX_DECODE_BYTES]
             try:
@@ -588,7 +588,7 @@ def run_auth_flow(client_id: str, client_secret: str) -> bool:
             self.send_header("Content-Type", "text/html")
             self.end_headers()
             self.wfile.write(
-                b"<h2>Harvey is connected to Gmail.</h2>You can close this tab.")
+                b"<h2>Prospector is connected to Gmail.</h2>You can close this tab.")
             done.set()
 
         def log_message(self, *args):
@@ -622,7 +622,7 @@ def run_auth_flow(client_id: str, client_secret: str) -> bool:
         return False
     data = resp.json()
     if not data.get("refresh_token"):
-        print("  Google returned no refresh token. Remove Harvey from your"
+        print("  Google returned no refresh token. Remove Prospector from your"
               " account's third-party access list and retry.")
         return False
     _save_token({

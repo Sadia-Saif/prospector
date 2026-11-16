@@ -30,7 +30,7 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setattr(dash, "PID_FILE", tmp_path / "data" / "harvey.pid")
     monkeypatch.setattr(dash, "LOG_FILE", tmp_path / "data" / "harvey.log")
     dash.token_store.configure(tmp_path / "data" / "dashboard-token")
-    # No mailbox connected: the user sends by hand. Tests that need Harvey
+    # No mailbox connected: the user sends by hand. Tests that need Prospector
     # to be able to send set this back.
     monkeypatch.setattr(dash, "_harvey_can_send", lambda: False)
     async def _init():
@@ -157,7 +157,7 @@ def _outbox(env, oid, pid, status):
 
 def test_drafts_waiting_in_the_outbox_point_there_not_at_gmail(client, env, monkeypatch):
     monkeypatch.setattr(dash, "_harvey_can_send", lambda: True)
-    # Harvey is sending these itself: telling the user to send them from
+    # Prospector is sending these itself: telling the user to send them from
     # Campaigns by hand would email the same person twice.
     _prospect(env, "p1", "a@acme.test", status="queued")
     _campaign(env, "c1", ["p1"])

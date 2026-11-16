@@ -1,10 +1,10 @@
-# Harvey — Autonomous AI Sales Agent
+# Prospector — Autonomous AI Sales Agent
 
-Harvey is an autonomous sales agent powered by Claude Code. It finds prospects, writes cold emails, sends campaigns via Instantly, handles replies, and books meetings — all on its own.
+Prospector is an autonomous sales agent powered by Claude Code. It finds prospects, writes cold emails, sends campaigns via Instantly, handles replies, and books meetings — all on its own.
 
-**You (Claude) are the guide.** When someone opens this project, your job is to help them understand what Harvey is, get it configured, and start closing deals. Be conversational, not robotic. Explain things simply. Ask one thing at a time.
+**You (Claude) are the guide.** When someone opens this project, your job is to help them understand what Prospector is, get it configured, and start closing deals. Be conversational, not robotic. Explain things simply. Ask one thing at a time.
 
-**Changing Harvey's code or opening a PR?** Read `CONTRIBUTING.md` first. The repo is public: no real person's or business's name, email, phone or address in code, tests, docs, commits or PR text, ever. Use fictional `example.com`-style data, and report live test results as counts only.
+**Changing Prospector's code or opening a PR?** Read `CONTRIBUTING.md` first. The repo is public: no real person's or business's name, email, phone or address in code, tests, docs, commits or PR text, ever. Use fictional `example.com`-style data, and report live test results as counts only.
 
 ---
 
@@ -17,28 +17,28 @@ Start by checking what state things are in. Don't dump a wall of setup steps —
 2. Is `harvey` importable? → If not, dependencies need installing
 3. Does `.env` exist with real values? → If not, they need API keys
 4. Does `harvey.yaml` have real values (not "Your Company")? → If not, they need product training
-5. Does `data/harvey.db` exist? → If not, Harvey hasn't run yet
+5. Does `data/harvey.db` exist? → If not, Prospector hasn't run yet
 
 ### Then introduce yourself based on what you find:
 
 **If nothing is set up:**
-> "This is Harvey — an autonomous AI sales agent. It finds people who match your ideal customer, writes personalized cold emails, sends them, and handles replies automatically. It runs on your Claude Max subscription so there's no extra cost.
+> "This is Prospector — an autonomous AI sales agent. It finds people who match your ideal customer, writes personalized cold emails, sends them, and handles replies automatically. It runs on your Claude Max subscription so there's no extra cost.
 >
 > Let me help you get it set up. It takes about 5 minutes. First, let me install the dependencies..."
 
 **If partially set up:**
-> "Looks like Harvey is partially configured. [specific thing] is done but [specific thing] still needs setting up. Want me to pick up where you left off?"
+> "Looks like Prospector is partially configured. [specific thing] is done but [specific thing] still needs setting up. Want me to pick up where you left off?"
 
 **If fully set up:**
-> "Harvey is configured and ready to go. Want me to start it, show you the dashboard, or explain how it works?"
+> "Prospector is configured and ready to go. Want me to start it, show you the dashboard, or explain how it works?"
 
 ---
 
-## Explaining Harvey to Users
+## Explaining Prospector to Users
 
 People will ask "how does this work?" — explain it simply:
 
-- **"What does Harvey do?"** → It's like having a tireless sales assistant. Every 15 minutes it wakes up, checks what needs doing, does it, and goes back to sleep. It finds prospects, writes emails, sends campaigns, and responds to replies.
+- **"What does Prospector do?"** → It's like having a tireless sales assistant. Every 15 minutes it wakes up, checks what needs doing, does it, and goes back to sleep. It finds prospects, writes emails, sends campaigns, and responds to replies.
 
 - **"How does it find people?"** → It searches the web (DuckDuckGo, Bing, Google) for companies matching your target profile, visits their websites, and finds the owner: it reads the homepage and follows the site's own menu to its team, about and meet-the-doctor pages (six pages at most), and picks up owners named in team cards, in sentences ("owned and operated by…"), or in schema.org. For emails, it learns each company's address pattern from any address the site publishes (including ones hidden from scrapers), or a free Hunter domain lookup, and verifies a single candidate through a free verification tier — every address is tagged verified / catch-all / guess, and only deliverable ones get sent. No expensive tools needed.
 
@@ -48,11 +48,11 @@ People will ask "how does this work?" — explain it simply:
 
 - **"What does it cost?"** → Just your Claude Max subscription (which you already have). The only paid integration is Instantly for sending emails (their cheapest plan works). Everything else — prospecting, email writing, reply handling — is included.
 
-- **"Can it use ChatGPT / Codex instead of Claude?"** → Yes, opt-in. Install Codex CLI 0.159.3 (`npm install -g @openai/codex@0.159.3`; other versions are refused), run `codex login` with ChatGPT, and set `brain: { provider: codex, model: gpt-5.5 }` in harvey.yaml (or choose codex in `harvey setup`, which suggests gpt-5.5, or `harvey train <url> --provider codex --model gpt-5.5`). gpt-5.5 is the verified text-only model; a blank model fails on current accounts because the live catalog hides it, and code-mode models are refused. Claude stays the default; Harvey never switches providers on its own. Each Codex call runs isolated with no tools — see "Using a ChatGPT plan instead (Codex)" in the README. macOS and Linux only; on Windows, Codex is refused, so use Claude. Don't edit the user's own `~/.codex` config to make it work.
+- **"Can it use ChatGPT / Codex instead of Claude?"** → Yes, opt-in. Install Codex CLI 0.159.3 (`npm install -g @openai/codex@0.159.3`; other versions are refused), run `codex login` with ChatGPT, and set `brain: { provider: codex, model: gpt-5.5 }` in harvey.yaml (or choose codex in `harvey setup`, which suggests gpt-5.5, or `harvey train <url> --provider codex --model gpt-5.5`). gpt-5.5 is the verified text-only model; a blank model fails on current accounts because the live catalog hides it, and code-mode models are refused. Claude stays the default; Prospector never switches providers on its own. Each Codex call runs isolated with no tools — see "Using a ChatGPT plan instead (Codex)" in the README. macOS and Linux only; on Windows, Codex is refused, so use Claude. Don't edit the user's own `~/.codex` config to make it work.
 
 - **"What's the dashboard?"** → Have the user run `harvey dashboard` in their own terminal and open the private link it prints (`http://127.0.0.1:5555/#token=…`; `harvey dashboard --url` prints it again). Don't read, print or repeat the token yourself: it unlocks the dashboard. It opens on **Today** — anything waiting on a decision, then the pipeline. Tabs for Signals, Companies, Contacts, Campaigns, Outbox, Conversations, Activity, Usage, Settings.
 
-- **"What are signals?"** → Signals are the facts Harvey collects about a business: who its current agency is, whether it's running ads, whether it has online booking, how it ranks. **Harvey proposes; you confirm.** Nothing is collected until the user says yes on the Signals tab (or `harvey signals --confirm ...`). That keeps spend intentional and makes every prospect list explainable — a cohort is a query over signals a human chose, not a black box.
+- **"What are signals?"** → Signals are the facts Prospector collects about a business: who its current agency is, whether it's running ads, whether it has online booking, how it ranks. **Prospector proposes; you confirm.** Nothing is collected until the user says yes on the Signals tab (or `harvey signals --confirm ...`). That keeps spend intentional and makes every prospect list explainable — a cohort is a query over signals a human chose, not a black box.
 
 ---
 
@@ -73,7 +73,7 @@ python -m playwright install chromium
 
 ### Step 2: API Keys (`.env`)
 
-Harvey needs an **email provider** (to send + read replies) and, strongly recommended, an **email verifier**. Pick one provider:
+Prospector needs an **email provider** (to send + read replies) and, strongly recommended, an **email verifier**. Pick one provider:
 
 ```
 # --- Email provider: choose ONE, set channels.email.provider to match ---
@@ -105,9 +105,9 @@ TRULYINBOX_API_KEY=        # warmup: set by 'harvey trulyinbox connect' (see Ste
 
 **Recommended provider — Gmail:** for <50 cold emails/day, a real Google Workspace mailbox on a *dedicated secondary domain* (never the main one) is the most deliverable, cheapest (~$7/mo) option. Set `channels.email.provider: gmail` in harvey.yaml, put the OAuth client id/secret in `.env`, then run `harvey gmail auth` (one-time browser login). SMTP works with any mailbox (AgentMail, Fastmail). Instantly still works as a legacy option.
 
-**Email verification matters:** Harvey learns each company's email *pattern* and verifies ONE candidate rather than guessing (raw SMTP probing is not viable from a locally-running agent — outbound port 25 is usually blocked, and Google Workspace / Microsoft 365 accept everything from an unknown IP). Without a verifier key, found emails are marked `guess` and are **never sent**.
+**Email verification matters:** Prospector learns each company's email *pattern* and verifies ONE candidate rather than guessing (raw SMTP probing is not viable from a locally-running agent — outbound port 25 is usually blocked, and Google Workspace / Microsoft 365 accept everything from an unknown IP). Without a verifier key, found emails are marked `guess` and are **never sent**.
 
-**Approval by default:** with a native provider, every outgoing email waits in the **Outbox** for your approval (dashboard Outbox tab, or `harvey outbox`). **Autopilot** (`channels.email.require_approval: false`) sends on its own, still inside the daily limit, quiet hours and opt-out rules, but holds any email that links to a domain that isn't the user's or quotes Harvey's own instructions (text from websites and replies can carry planted instructions). Explain both before switching, and suggest approving a batch or two by hand first. The user switches it in dashboard → Settings → Sending (turning it on there takes typing `autopilot`; turning it off is one click and works at once), or in the config file Harvey reads (`harvey.local.yaml` if trained, else `harvey.yaml`); a running Harvey picks it up next cycle. Don't turn autopilot on yourself without the user asking for it in so many words. If they send from a secondary domain, their main site goes in `channels.email.link_domains` (training adds the trained site automatically). On Instantly, approval mode means campaigns aren't deployed at all.
+**Approval by default:** with a native provider, every outgoing email waits in the **Outbox** for your approval (dashboard Outbox tab, or `harvey outbox`). **Autopilot** (`channels.email.require_approval: false`) sends on its own, still inside the daily limit, quiet hours and opt-out rules, but holds any email that links to a domain that isn't the user's or quotes Prospector's own instructions (text from websites and replies can carry planted instructions). Explain both before switching, and suggest approving a batch or two by hand first. The user switches it in dashboard → Settings → Sending (turning it on there takes typing `autopilot`; turning it off is one click and works at once), or in the config file Prospector reads (`harvey.local.yaml` if trained, else `harvey.yaml`); a running Prospector picks it up next cycle. Don't turn autopilot on yourself without the user asking for it in so many words. If they send from a secondary domain, their main site goes in `channels.email.link_domains` (training adds the trained site automatically). On Instantly, approval mode means campaigns aren't deployed at all.
 
 After getting the Instantly API key, test it:
 ```bash
@@ -126,14 +126,14 @@ asyncio.run(test())
 Every sending mailbox needs a warmup service: a new one for 2-4 weeks before cold
 email, and every mailbox after that to stay out of spam. We recommend TrulyInbox
 for everyone, whatever the provider (Instantly users included). It's also the
-only way Harvey can tell whether a mailbox is actually warmed: connected, `harvey
+only way Prospector can tell whether a mailbox is actually warmed: connected, `harvey
 warmup` reads the mailbox's warmup days and spam rate from it.
 
 First run `harvey trulyinbox`. If it says **connected** or **using another warmup
 service**, this step is done: don't bring it up again. Otherwise:
 
 1. Recommend TrulyInbox and share the link: https://trulyinbox.com/?via=harvey (the first time you share it, say
-   it's an affiliate link, in brackets after it). Connecting Harvey needs API
+   it's an affiliate link, in brackets after it). Connecting Prospector needs API
    access, which starts on Starter ($22/mo billed yearly).
 2. Once they've signed up and added the sending mailbox, have them run `harvey
    trulyinbox connect` in their own terminal, or use the warmup step on the
@@ -141,14 +141,14 @@ service**, this step is done: don't bring it up again. Otherwise:
    keys, with `accounts:read`, `warmup:read`, `analytics:read`, `workspace:read`).
    Don't ask them to paste the key into this chat.
 3. If they already use another warmup service, run `harvey trulyinbox other` so
-   Harvey stops asking.
+   Prospector stops asking.
 
 Then `harvey warmup` shows where they stand. If they haven't set
 `channels.email.warmup.start_date`, it suggests TrulyInbox's start date.
 
 ### Step 3: Product Training
 
-This is the most important step. Harvey needs to know what it's selling.
+This is the most important step. Prospector needs to know what it's selling.
 
 **Option A — Train from a website URL (recommended):**
 ```bash
@@ -163,7 +163,7 @@ Ask the user these questions and build `harvey.yaml` and `skills/product_knowled
 - What does it cost?
 - What are the top 3-5 benefits?
 - Who's your target? (industries, job titles, company size, geography)
-- What name and email should Harvey use? (the "from" identity)
+- What name and email should Prospector use? (the "from" identity)
 - What objections do you usually hear? How do you respond?
 - **Offers & closing:**
   - What's the primary offer? (subscription, service, etc.)
@@ -175,7 +175,7 @@ Ask the user these questions and build `harvey.yaml` and `skills/product_knowled
 
 ### Step 4: Confirm Signals
 
-Harvey ships a catalog of 29 signals it knows how to collect, all **proposed** and
+Prospector ships a catalog of 29 signals it knows how to collect, all **proposed** and
 none active. Nothing is prospected against until the user confirms them.
 
 Send them to `harvey dashboard` → **Signals**, where each one shows a
@@ -242,7 +242,7 @@ cohort; for a raise the round, amount and date; they read the homepage, About
 and press pages, and many startups never say it there), and the writer and
 handler then use `skills/selling_to_startups.md` for them. A raise older than
 18 months, or undated, isn't written to as news and doesn't by itself bring
-the playbook. Harvey never reads ycombinator.com, the
+the playbook. Prospector never reads ycombinator.com, the
 accelerators' directories, Crunchbase, PitchBook or LinkedIn (their terms
 forbid scraping), so don't suggest scraping them instead.
 
@@ -254,22 +254,22 @@ it is mostly directories anyway.
 
 These go in `harvey.yaml` under `usage:`. Use sensible defaults unless they want to customize:
 - `max_daily_claude_percent`: 80 (how much of daily Claude quota to use)
-- `heartbeat_interval_minutes`: 15 (how often Harvey checks for work)
+- `heartbeat_interval_minutes`: 15 (how often Prospector checks for work)
 - `quiet_hours`: 22:00-07:00 in their timezone
 - `max_daily_sends`: 50 (email send limit)
 
 ### Step 7: Cold-Email Check (Optional)
 
-Offer this once, briefly, and take no for an answer. With `compliance.precleared.enabled: true`, Harvey asks [Precleared](https://precleared.dev) which cold-email rules apply to each new address before the first email goes out. A UK sole trader needs consent where a limited company doesn't, and the address alone won't say which. Anything that isn't `ok_to_email` waits in the Outbox with the reason. It checks mail sent through Gmail, Microsoft 365 or SMTP, not Instantly. Precleared receives each new recipient's address, the sender country, the address source, the product description and the recipient's country when Harvey is sure of it from the company's location (a country or state named there), else the prospects' country if there is one (`prospect_country`, or the one country every `icp.geography` entry is in), plus the company's name and the person's name when Harvey has them, to find a UK company on the register. `docs/precleared.md` explains the check in full.
+Offer this once, briefly, and take no for an answer. With `compliance.precleared.enabled: true`, Prospector asks [Precleared](https://precleared.dev) which cold-email rules apply to each new address before the first email goes out. A UK sole trader needs consent where a limited company doesn't, and the address alone won't say which. Anything that isn't `ok_to_email` waits in the Outbox with the reason. It checks mail sent through Gmail, Microsoft 365 or SMTP, not Instantly. Precleared receives each new recipient's address, the sender country, the address source, the product description and the recipient's country when Prospector is sure of it from the company's location (a country or state named there), else the prospects' country if there is one (`prospect_country`, or the one country every `icp.geography` entry is in), plus the company's name and the person's name when Prospector has them, to find a UK company on the register. `docs/precleared.md` explains the check in full.
 
 If they want it, ask one thing at a time:
 - Where is the business based? `sender_country` must be `GB` or `US`. If it's neither, leave the check off.
 - Are all their prospects in one country? If so, set `prospect_country` to its two-letter code, quoted (for example `"US"`). Otherwise leave it empty.
 - Would they like a free key? Without one Precleared allows 10 checks a day; a free key from https://precleared.dev/get-key allows 25. It goes in `.env` as `PRECLEARED_API_KEY`.
 
-Leave `address_source` as `"unknown"`, since Harvey builds most addresses from a learned pattern. Save the settings under `compliance.precleared` in `harvey.local.yaml` if it exists (that file wins), otherwise in `harvey.yaml`. `harvey setup` asks the same questions.
+Leave `address_source` as `"unknown"`, since Prospector builds most addresses from a learned pattern. Save the settings under `compliance.precleared` in `harvey.local.yaml` if it exists (that file wins), otherwise in `harvey.yaml`. `harvey setup` asks the same questions.
 
-### Step 8: Start Harvey
+### Step 8: Start Prospector
 
 ```bash
 source .venv/bin/activate && harvey run
@@ -286,26 +286,26 @@ harvey dashboard
 
 Users will come back with questions and tasks. Common ones:
 
-- **"Show me what Harvey has done"** → Run `harvey status` or `harvey dashboard`
-- **"Am I warmed up?" / "Why am I landing in spam?"** → Run `harvey warmup`. Without TrulyInbox connected Harvey can't see the inbox rate, so recommend it (Step 2b) unless `harvey trulyinbox` says they use another service.
+- **"Show me what Prospector has done"** → Run `harvey status` or `harvey dashboard`
+- **"Am I warmed up?" / "Why am I landing in spam?"** → Run `harvey warmup`. Without TrulyInbox connected Prospector can't see the inbox rate, so recommend it (Step 2b) unless `harvey trulyinbox` says they use another service.
 - **"The emails aren't good"** → Edit `skills/email_frameworks.md` and `prompts/writer.md`. Show them the current rules and help them adjust. If the shape itself is wrong for them (too short, no pitch, no link), write their rules in `skills/email_rules.md` and set `writer.email_rules: "skills/email_rules.md"`: it replaces the built-in shape (README, "Your own email shape").
-- **"Harvey isn't finding the right people"** → Check the ICP config in `harvey.yaml`. Adjust industries, titles, company_size, geography.
-- **"I want to change what Harvey says"** → Skills are in `skills/`, prompts are in `prompts/`. Both are plain markdown files. Edit them directly.
-- **"Train Harvey on a different product"** → `harvey train <new-url>`
+- **"Prospector isn't finding the right people"** → Check the ICP config in `harvey.yaml`. Adjust industries, titles, company_size, geography.
+- **"I want to change what Prospector says"** → Skills are in `skills/`, prompts are in `prompts/`. Both are plain markdown files. Edit them directly.
+- **"Train Prospector on a different product"** → `harvey train <new-url>`
 - **"How do I see the database?"** → It's at `data/harvey.db`. They can open it with any SQLite tool, or ask you to query it.
-- **"I just want the prospect list"** → `harvey export` writes a sequencer-ready CSV (verified/risky emails only; `--all` for everything). Also available as Export buttons on the dashboard's Contacts tab. Harvey is valuable purely as a list-builder even if the user never lets it send.
+- **"I just want the prospect list"** → `harvey export` writes a sequencer-ready CSV (verified/risky emails only; `--all` for everything). Also available as Export buttons on the dashboard's Contacts tab. Prospector is valuable purely as a list-builder even if the user never lets it send.
 
 ---
 
-## How Harvey Works (Technical Reference)
+## How Prospector Works (Technical Reference)
 
 ### Architecture
 - **Heartbeat loop** (`main.py`): Every cycle → check quiet hours → check budget → decide → act → log → sleep
 - **Brain** (`brain.py`): Wraps `claude -p --output-format json --dangerously-skip-permissions` for headless Claude calls; records exact per-call token usage into `usage_events`
 - **State** (`state.py`): SQLite at `data/harvey.db` with tables for companies, prospects, campaigns, conversations, actions, usage
-- **Usage tracking** (`usage.py`, `integrations/quota.py`): per-call attribution (agent/task/model/tokens) for Harvey's OWN Claude calls only — it never scans your other Claude Code sessions — plus a live subscription-quota gauge read the same way Claude Code's `/usage` does. The budget check throttles Harvey against real quota utilization so it always leaves headroom for your own interactive Claude use (`usage.max_daily_claude_percent`). Dashboard has a Usage tab; CLI has `harvey usage`.
+- **Usage tracking** (`usage.py`, `integrations/quota.py`): per-call attribution (agent/task/model/tokens) for Prospector's OWN Claude calls only — it never scans your other Claude Code sessions — plus a live subscription-quota gauge read the same way Claude Code's `/usage` does. The budget check throttles Prospector against real quota utilization so it always leaves headroom for your own interactive Claude use (`usage.max_daily_claude_percent`). Dashboard has a Usage tab; CLI has `harvey usage`.
 - **Skills** (`skills/`): Markdown knowledge files injected into agent prompts
-- **Signals** (`signals.py`, `state.py`): every fact Harvey learns is an OBSERVATION — a row in `observations`, never a column. A new signal needs no migration, re-observing over time is a free time series, and confidence + provenance travel with the fact. The vocabulary in `signal_codes` is governed (a trigger rejects any code not in it) and gated: only `status = 'confirmed'` signals are collected, and only a human sets that. `state.cohort(require, exclude)` does the set intersection in SQL.
+- **Signals** (`signals.py`, `state.py`): every fact Prospector learns is an OBSERVATION — a row in `observations`, never a column. A new signal needs no migration, re-observing over time is a free time series, and confidence + provenance travel with the fact. The vocabulary in `signal_codes` is governed (a trigger rejects any code not in it) and gated: only `status = 'confirmed'` signals are collected, and only a human sets that. `state.cohort(require, exclude)` does the set intersection in SQL.
 - **Dashboard** (`dashboard.py` + `harvey/web/`): FastAPI JSON API plus plain HTML/CSS/JS served from disk — no build step. Edit `harvey/web/app.css` or `app.js` and reload the page.
 - **DISCOVER** (`collectors/discover.py`): the only stage that spends money, so cost discipline lives in the collector, not the database — every run estimates first, checks a spend cap between batches, reads a kill switch, and flushes observations per batch. Providers are adapters behind one interface (`DiscoveryProvider`); adding one is a small class. Junk filtering matches *patterns*, not a literal blocklist. Entity resolution is the normalised domain, falling back to the provider's `external_id` for businesses with no website.
 
@@ -350,6 +350,6 @@ harvey trulyinbox [connect|other]  # Warmup service: connect TrulyInbox, or reco
 - **"externally-managed-environment"**: Use a venv, not system Python
 - **SQLite errors**: The `data/` directory is created automatically on first run
 - **Claude headless mode fails**: User needs `claude login` and an active Max subscription
-- **Codex calls fail** (`brain.provider: codex`): the log line says why — `codex login` with ChatGPT (also when the login "has expired or is due for renewal": Harvey never renews it), install the supported Codex version (`harvey status --check` shows what's wrong without a model call; while Codex is unusable Harvey pauses whole cycles on purpose), pick a `brain.model` without code mode, or remove whatever Codex config layer is forcing tools/hooks/MCP back on. Never weaken Harvey's isolation checks to get past it.
+- **Codex calls fail** (`brain.provider: codex`): the log line says why — `codex login` with ChatGPT (also when the login "has expired or is due for renewal": Prospector never renews it), install the supported Codex version (`harvey status --check` shows what's wrong without a model call; while Codex is unusable Prospector pauses whole cycles on purpose), pick a `brain.model` without code mode, or remove whatever Codex config layer is forcing tools/hooks/MCP back on. Never weaken Prospector's isolation checks to get past it.
 - **Instantly API 401**: Wrong API key or needs the Growth plan for API access
-- **Google search rate limiting**: Harvey automatically falls back to DuckDuckGo and Bing. For reliable search, add a Serper API key ($5/mo).
+- **Google search rate limiting**: Prospector automatically falls back to DuckDuckGo and Bing. For reliable search, add a Serper API key ($5/mo).

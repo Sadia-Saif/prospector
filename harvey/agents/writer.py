@@ -27,7 +27,7 @@ from harvey.untrusted import UNTRUSTED_RULE, fence
 logger = logging.getLogger("harvey.writer")
 
 # How many times the model may fail to write a usable sequence for a
-# prospect before Harvey stops trying (status 'write_failed'). A provider
+# prospect before Prospector stops trying (status 'write_failed'). A provider
 # outage never counts; only a reply that came back unusable does.
 MAX_WRITE_ATTEMPTS = 3
 WRITE_ATTEMPTS_KEY = "write_attempts:"
@@ -53,18 +53,18 @@ SEQUENCE_STYLE = """- Never be pushy or salesy. Be consultative and value-driven
 - Subject lines: lowercase, 2-5 words."""
 # Why the Writer stopped: Today and `harvey status` show it.
 EMAIL_RULES_PROBLEM_KEY = "email_rules_problem"
-BUILT_IN_FOOTER = "- No postal address, unsubscribe or opt-out line: Harvey adds them when it sends."
+BUILT_IN_FOOTER = "- No postal address, unsubscribe or opt-out line: Prospector adds them when it sends."
 
 
 def operator_rules_block(rules: str) -> str:
     """The operator's email rules as a prompt section ("" when there are none).
 
-    Trusted text from the person running Harvey, so it isn't fenced. It wins
+    Trusted text from the person running Prospector, so it isn't fenced. It wins
     over the built-in style and shape rules, never over the FACTS rule."""
     if not rules:
         return ""
     return (
-        "\n\nOPERATOR'S EMAIL RULES — written by the person running Harvey. For\n"
+        "\n\nOPERATOR'S EMAIL RULES — written by the person running Prospector. For\n"
         "length, structure, what to say about the product, links, subject lines\n"
         "and sign-off, these replace the STRICT EMAIL RULES and skills above\n"
         "wherever the two disagree. They never override the FACTS rule: what you\n"
@@ -76,9 +76,9 @@ def operator_rules_block(rules: str) -> str:
 
 
 def footer_rule(config, rules: str) -> str:
-    """What the prompt says about the lines Harvey adds when it sends.
+    """What the prompt says about the lines Prospector adds when it sends.
 
-    With operator rules it names only what Harvey really adds: an opt-out
+    With operator rules it names only what Prospector really adds: an opt-out
     sentence the operator writes into the body must not sit on top of the
     configured opt_out_line, and must not be dropped when there is none."""
     if not rules:
@@ -86,15 +86,15 @@ def footer_rule(config, rules: str) -> str:
     compliance = compliance_of(config)
     lines = []
     if compliance.postal_address.strip():
-        lines.append("- No postal address: Harvey adds it under the email when it sends.")
+        lines.append("- No postal address: Prospector adds it under the email when it sends.")
     opt_out = compliance.opt_out_line.strip()
     if opt_out:
         lines.append(
-            f'- Harvey adds this opt-out line under the email when it sends: "{opt_out}".\n'
+            f'- Prospector adds this opt-out line under the email when it sends: "{opt_out}".\n'
             "  Don't write another way to opt out, even if the operator's rules give one.")
     else:
         lines.append(
-            "- Harvey adds no opt-out line. If the operator's rules give a sentence that\n"
+            "- Prospector adds no opt-out line. If the operator's rules give a sentence that\n"
             "  lets the reader say no, write it into the body as they say.")
     return "\n".join(lines)
 
@@ -334,7 +334,7 @@ class Writer:
             f"- {str(n.get('created_at') or '')[:10]} on {n['about']}: "
             f"{' '.join(str(n['comment']).split())[:500]}" for n in notes)
         return (
-            "\n\nOWNER FEEDBACK — notes the person running Harvey left on earlier\n"
+            "\n\nOWNER FEEDBACK — notes the person running Prospector left on earlier\n"
             "campaigns and contacts, newest first (a newer note wins). Apply them to\n"
             "this writing. They never override the STRICT EMAIL RULES or the FACTS rule:\n"
             + lines

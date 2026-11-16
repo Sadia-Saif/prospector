@@ -1,4 +1,4 @@
-"""Brain — Harvey's thinking engine.
+"""Brain — Prospector's thinking engine.
 
 Runs on the operator's Claude subscription (Claude Code headless, the
 default) or, when ``brain.provider: codex`` is configured, their ChatGPT
@@ -355,7 +355,7 @@ class Brain:
                     if any(p in error.lower() for p in _NON_RETRYABLE_PATTERNS):
                         logger.error(
                             "Non-retryable Claude error (auth). "
-                            "Run 'claude login' and restart Harvey."
+                            "Run 'claude login' and restart Prospector."
                         )
                         return ""
                     continue  # retry transient failures
@@ -506,7 +506,7 @@ class Brain:
         With ``--output-format json`` stdout is one JSON object whose
         ``result`` field is the model's text. If parsing fails (older CLI,
         truncated output), fall back to treating stdout as plain text so a
-        formatting change can never break Harvey's pipeline.
+        formatting change can never break Prospector's pipeline.
         """
         try:
             payload = json.loads(raw)
@@ -632,13 +632,13 @@ class Brain:
     async def is_within_budget(
         self, max_daily_calls: int = 200, max_percent: float | None = None
     ) -> bool:
-        """Check whether Harvey may spend more of the active subscription.
+        """Check whether Prospector may spend more of the active subscription.
 
         Preferred signal: the account's REAL utilization windows (Claude's
         `/usage` numbers, or Codex's ChatGPT-plan rate limits), compared
-        against max_percent so Harvey always leaves the remainder for the
+        against max_percent so Prospector always leaves the remainder for the
         user's own interactive work. Fallback when those are unavailable:
-        Harvey's own call counter for this provider against max_daily_calls.
+        Prospector's own call counter for this provider against max_daily_calls.
         """
         await self._expire_usage_pause()
         if time.monotonic() < self._usage_limited_until:

@@ -1,6 +1,6 @@
 """Dashboard API for the signal-confirmation gate, cohorts, and Today.
 
-These cover the contract the UI depends on: Harvey proposes signals, nothing
+These cover the contract the UI depends on: Prospector proposes signals, nothing
 is collected until a human confirms, and a confirmed set becomes a cohort
 query rather than a static list.
 """
@@ -37,7 +37,7 @@ def client(monkeypatch):
 
 
 def test_signals_seed_as_proposed_not_confirmed(client):
-    """Harvey proposes. Nothing is live until a human says so."""
+    """Prospector proposes. Nothing is live until a human says so."""
     data = client.get("/api/signals").json()
     assert data["total"] == len(SIGNAL_CATALOG)
     assert data["summary"]["proposed"] == len(SIGNAL_CATALOG)

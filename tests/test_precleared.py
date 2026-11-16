@@ -335,8 +335,8 @@ async def test_a_new_confident_country_forces_one_fresh_check_then_caches(state)
 
 @pytest.mark.asyncio
 async def test_a_verdict_precleared_decided_for_the_same_country_is_kept(state):
-    # Cached before Harvey sent countries, with the one Precleared found
-    # itself: Harvey now knowing the same one asks the same question.
+    # Cached before Prospector sent countries, with the one Precleared found
+    # itself: Prospector now knowing the same one asks the same question.
     calls = []
     client = PreclearedClient("US", transport=mock_precleared(calls, FOUND_GB))
     await client.clear("jane@acme.com", state)
@@ -450,7 +450,7 @@ async def test_a_verdict_with_names_keeps_the_country_precleared_found(state):
     client = PreclearedClient("GB", transport=mock_precleared(calls, FOUND_GB))
     await client.clear("jane@acme.com", state, company="Acme", name="Jane Doe")
     assert await client.known_country("jane@acme.com", state, company="Acme", name="Jane Doe") == "GB"
-    # Harvey later sure of the same country: the same question, still cached.
+    # Prospector later sure of the same country: the same question, still cached.
     again = await client.clear("jane@acme.com", state, country="GB", company="Acme", name="Jane Doe")
     assert again.cached and len(calls) == 1
 
@@ -793,7 +793,7 @@ async def test_key_out_of_checks_points_to_its_checkout_link_not_a_free_key(stat
     assert "pack" in result.reason
     assert f"({checkout})" in result.reason
     assert "add PRECLEARED_API_KEY" not in result.reason
-    # Harvey's own wording, not the API's free text.
+    # Prospector's own wording, not the API's free text.
     assert "Buy a pack to continue" not in result.reason
     # Nothing cached, so the next cycle asks again.
     assert await state.get_setting(SETTINGS_PREFIX + "person@example.com") == ""

@@ -147,7 +147,7 @@ async def test_what_counts_as_an_inbox_reply():
     await p.get_replies()
     p.confirm_read()
     fake.messages = {
-        "mine": message("mine", labels=("SENT",)),                    # Harvey's own email
+        "mine": message("mine", labels=("SENT",)),                    # Prospector's own email
         "draft": message("draft", labels=("DRAFT",)),
         "skipped": message("skipped", labels=("CATEGORY_UPDATES",)),  # never reached the inbox
         "moved": message("moved", labels=("CATEGORY_UPDATES",)),     # later moved in
@@ -300,7 +300,7 @@ async def test_a_reply_moved_back_into_the_inbox_is_judged_on_its_labels_now():
     p.confirm_read()
     fake.messages = {"r": message("r", body="stop", labels=("TRASH",))}
     fake.history = {"100": [{"history": [added("r")], "historyId": "101"}]}
-    assert await p.get_replies() == []                        # trashed before Harvey looked
+    assert await p.get_replies() == []                        # trashed before Prospector looked
     p.confirm_read()
     fake.messages["r"] = message("r", body="stop", labels=("INBOX",))   # moved back
     fake.history["101"] = [{"history": [added("r", key="labelsAdded", labels=["INBOX"])],

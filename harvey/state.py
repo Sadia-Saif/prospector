@@ -1,4 +1,4 @@
-"""SQLite state manager. All of Harvey's memory lives here.
+"""SQLite state manager. All of Prospector's memory lives here.
 
 Concurrency: the DB runs in WAL mode (set persistently at init) so the
 dashboard can read while the agent writes. Every connection gets a busy
@@ -40,7 +40,7 @@ WRITABLE_EMAIL_STATUSES = ("verified", "risky")
 MANUAL_SEND_KEY = "manual_send:"
 # Outbox cancel reason for mail the user sent by hand instead; undo restores it.
 HAND_SENT_REASON = "sent_by_hand"
-# Set when you undo someone's opt-out: Harvey's first reply to them after
+# Set when you undo someone's opt-out: Prospector's first reply to them after
 # that waits for your approval, even on autopilot. Cleared once it has.
 REVIEW_NEXT_REPLY_KEY = "review_next_reply:"
 # Outbox error prefix for an email autopilot held for a human (gate.
@@ -107,11 +107,11 @@ AUTOPILOT_OFF_REASON = "waiting for you: autopilot was turned off before it went
 # for: it was moved back and is tried again then (sender: _retry_later).
 RECHECK_PREFIX = "Precleared couldn't check this address; trying again after "
 # Outbox errors starting with this: the send was cut off and the email may
-# have reached them. Never retried, and counted as Harvey's mail, so the
+# have reached them. Never retried, and counted as Prospector's mail, so the
 # dashboard never offers a second one by hand.
 MAYBE_SENT_PREFIX = "may have gone out: "
 STALE_SENDING_ERROR = (
-    MAYBE_SENT_PREFIX + "Harvey stopped in the middle of sending it; check "
+    MAYBE_SENT_PREFIX + "Prospector stopped in the middle of sending it; check "
     "your Sent folder before emailing them again"
 )
 # A claimed email still not finished after this long was cut off mid-send (a
@@ -385,7 +385,7 @@ MIGRATIONS: list[str] = [
     -- The governed vocabulary. A collector may only emit a code that exists
     -- here (enforced by the observations FK), so a typo fails loudly instead
     -- of quietly inventing a junk signal. `status` is the user-confirmation
-    -- gate: Harvey PROPOSES signals, the user confirms which ones to
+    -- gate: Prospector PROPOSES signals, the user confirms which ones to
     -- prospect against, and only confirmed signals get collected.
     CREATE TABLE IF NOT EXISTS signal_codes (
         code TEXT PRIMARY KEY,
@@ -515,7 +515,7 @@ MIGRATIONS: list[str] = [
     """,
     # ── v14: each recipient's time zone, for the send window ──
     """
-    -- An IANA name such as 'Europe/Oslo', worked out once from what Harvey
+    -- An IANA name such as 'Europe/Oslo', worked out once from what Prospector
     -- knows about the recipient. Empty until then.
     ALTER TABLE prospects ADD COLUMN timezone TEXT DEFAULT '';
     """,
@@ -835,7 +835,7 @@ class StateManager:
             await db.commit()
 
     async def update_prospect_status(self, prospect_id: str, status: str):
-        # An opt-out is permanent: nothing Harvey does later (a reply, a
+        # An opt-out is permanent: nothing Prospector does later (a reply, a
         # send, a retry) may move someone off it and back into outreach.
         async with self._connect() as db:
             await db.execute(
@@ -848,9 +848,9 @@ class StateManager:
     async def undo_opt_out(self, prospect_id: str, details: dict | None = None) -> bool:
         """A human's undo of an opt-out: the one way off 'opted_out'.
 
-        They go to 'replied', not back into the sequence: Harvey sends
+        They go to 'replied', not back into the sequence: Prospector sends
         nothing new on its own (the sender never stages 'replied'), and what
-        the opt-out cancelled stays cancelled. Harvey's first reply to them
+        the opt-out cancelled stays cancelled. Prospector's first reply to them
         after this waits for approval even on autopilot (REVIEW_NEXT_REPLY_KEY).
         The status, that flag and the opt_out_undone log entry are one write.
         False, and nothing written, when they weren't opted out."""
@@ -1080,7 +1080,7 @@ class StateManager:
                 return [dict(r) for r in await cursor.fetchall()]
 
     async def get_texts_for_prospect(self, prospect_id: str, limit: int = 50) -> list[str]:
-        """Everything Harvey wrote for this person, which a reply may quote
+        """Everything Prospector wrote for this person, which a reply may quote
         back: their Outbox emails (a sent one with its footer, whatever it
         said then) and the templates of campaigns they're in (Instantly and
         hand sends never pass through the Outbox; merge tags unfilled)."""
@@ -1214,7 +1214,7 @@ class StateManager:
     async def fail_stale_sending_outbox(
         self, older_than: timedelta = STALE_SENDING_AFTER
     ) -> int:
-        """Items claimed long ago and never finished (Harvey stopped mid-send).
+        """Items claimed long ago and never finished (Prospector stopped mid-send).
 
         Whether they went out is unknown, so they are never retried: they
         become failed with a note to check the Sent folder.
@@ -1323,7 +1323,7 @@ class StateManager:
     async def note_sends_held(self, reason: str):
         """The heartbeat held sending this cycle. Keeps when it started."""
         now = _utcnow().isoformat()
-        # A hold that went stale (Harvey stopped) doesn't date a new one.
+        # A hold that went stale (Prospector stopped) doesn't date a new one.
         since = ((await self.current_sends_held()) or {}).get("since") or now
         await self.set_setting(SENDS_HELD_KEY, json.dumps(
             {"since": since, "last_seen": now, "reason": str(reason)[:500]}))
@@ -1333,7 +1333,7 @@ class StateManager:
             await self.delete_setting(SENDS_HELD_KEY)
 
     async def current_sends_held(self, max_age_hours: float = 12) -> dict | None:
-        """The hold, unless Harvey hasn't seen it for ``max_age_hours`` (it
+        """The hold, unless Prospector hasn't seen it for ``max_age_hours`` (it
         stopped, or the hold lifted without a cycle saying so)."""
         try:
             hold = json.loads(await self.get_setting(SENDS_HELD_KEY) or "null")
@@ -1347,7 +1347,7 @@ class StateManager:
     async def requeue_autopilot_approved(self) -> int:
         """Autopilot was turned off: everything it approved that hasn't gone
         out waits for you instead, and so does what was approved before
-        Harvey recorded who approved ('earlier'; it can't tell). Yours stays
+        Prospector recorded who approved ('earlier'; it can't tell). Yours stays
         approved. Returns how many."""
         async with self._connect() as db:
             cursor = await db.execute(
@@ -1383,7 +1383,7 @@ class StateManager:
 
     async def stop_company(self, prospect_id: str) -> int:
         """Someone replied: mark their company as answered and cancel the
-        sequence emails queued for everyone else there. Replies Harvey owes
+        sequence emails queued for everyone else there. Replies Prospector owes
         a colleague who wrote in themselves are not touched."""
         async with self._connect() as db:
             db.row_factory = aiosqlite.Row
@@ -1540,7 +1540,7 @@ class StateManager:
 
     async def set_signal_status(self, code: str, status: str) -> bool:
         """Confirm / reject a proposed signal. Only confirmed signals are
-        collected — Harvey proposes, the user decides."""
+        collected — Prospector proposes, the user decides."""
         if status not in ("proposed", "confirmed", "rejected"):
             raise ValueError(f"invalid signal status: {status}")
         async with self._connect() as db:
@@ -2034,7 +2034,7 @@ class StateManager:
     FOOTER_HISTORY_KEY = "compliance_footer_history"
 
     async def remember_footer_lines(self, lines) -> None:
-        """Keep every footer line Harvey has sent under a cold email, so a
+        """Keep every footer line Prospector has sent under a cold email, so a
         reply quoting an old one (since reworded) is still known as ours."""
         lines = [l.strip() for l in lines if l and l.strip()]
         if not lines:

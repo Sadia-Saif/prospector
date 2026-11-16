@@ -18,7 +18,7 @@ class Env:
 
 
 class Graph:
-    """A tiny fake of the Graph + login endpoints Harvey uses."""
+    """A tiny fake of the Graph + login endpoints Prospector uses."""
 
     def __init__(self):
         self.requests = []

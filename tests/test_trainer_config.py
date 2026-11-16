@@ -13,7 +13,7 @@ from harvey.trainer import write_trained_config
 
 LEARNED = {
     "persona": {
-        "name": "Harvey", "company": "Acme Roofing", "role": "Business Development",
+        "name": "Prospector", "company": "Acme Roofing", "role": "Business Development",
         "email": "harvey@acme.com", "linkedin": "linkedin.com/in/harvey-acme-com",
         "tone": "warm, direct",
     },
@@ -168,7 +168,7 @@ def test_an_empty_config_needs_no_backup(tmp_path):
 
 def test_first_training_ignores_configs_outside_harveys_folder(tmp_path, monkeypatch):
     # Running `harvey train` from another project's folder must not copy that
-    # project's provider or sender identity into Harvey.
+    # project's provider or sender identity into Prospector.
     elsewhere = tmp_path / "other-project"
     elsewhere.mkdir()
     write(elsewhere / "harvey.local.yaml", TUNED)

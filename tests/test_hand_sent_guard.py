@@ -1,7 +1,7 @@
-"""Harvey never emails someone the user already emailed by hand.
+"""Prospector never emails someone the user already emailed by hand.
 
 Marking a prospect sent from the dashboard leaves a durable marker. Whatever
-Harvey staged before, during or after that (the Writer's personal draft, the
+Prospector staged before, during or after that (the Writer's personal draft, the
 Sender's template staging, a mailbox connected later) must not go out.
 """
 

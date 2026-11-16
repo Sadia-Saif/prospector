@@ -1,6 +1,6 @@
 """Company fit: one 0-100 number per company, with the reasons behind it.
 
-Worked out on read from what Harvey already holds (the company's industry,
+Worked out on read from what Prospector already holds (the company's industry,
 its contacts and their email status, and its observations), weighed against
 the ICP in the config. Nothing is stored, so the score follows the config
 the moment it changes.
@@ -77,7 +77,7 @@ def company_fit(company: dict, prospects: list[dict], observations: list[dict],
     named = [p for p in live if (p.get("first_name") or "").strip()]
     makers = [p for p in named if icp.titles and title_matches(p.get("title") or "", icp.titles)]
     if not makers:
-        # Names the site lists that Harvey didn't turn into contacts.
+        # Names the site lists that Prospector didn't turn into contacts.
         for o in observations:
             if o.get("signal_code") == "DECISION_MAKER_TITLE":
                 title = (o.get("value_text") or "").split("—", 1)[-1].strip(" ~()")

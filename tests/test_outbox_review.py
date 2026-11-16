@@ -1,6 +1,6 @@
 """The Outbox review desk: the facts behind each draft, and editing it.
 
-Reviewing a cold email means checking its claims against what Harvey actually
+Reviewing a cold email means checking its claims against what Prospector actually
 found. The desk shows that next to the draft, and lets a reviewer fix a draft
 that is nearly right instead of throwing the lead away.
 """

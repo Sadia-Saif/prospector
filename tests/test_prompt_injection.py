@@ -1,10 +1,10 @@
 """Text from outside (websites, search results, the emails people send) can't
-steer what Harvey sends on its own.
+steer what Prospector sends on its own.
 
 Two layers. Prompts fence that text as untrusted data, which makes a model
 less likely to follow instructions hidden in it, but guarantees nothing. So
 on autopilot, an email is also checked before it goes: a link or address on
-a domain that isn't yours, or a passage copied from Harvey's own
+a domain that isn't yours, or a passage copied from Prospector's own
 instructions, sends it back to the Outbox for a human (issue #66).
 """
 

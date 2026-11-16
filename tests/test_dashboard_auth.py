@@ -1,7 +1,7 @@
 """Who may use the dashboard API (harvey/dashboard_auth.py).
 
 Everything here runs against throwaway paths: the token, .env, database and
-PID/log files are all redirected into tmp_path, and starting Harvey is
+PID/log files are all redirected into tmp_path, and starting Prospector is
 stubbed. Covers: every route needs the token (enumerated, so a new route
 can't slip through), the public shell carries no data, Host/Origin/fetch
 metadata checks, cross-site "simple" requests, token storage, .env
@@ -50,7 +50,7 @@ def env(tmp_path, monkeypatch):
     class NoPopen:
         def __init__(self, *a, **k):
             spawned.append(a)
-            raise AssertionError("Harvey must not be started by this request")
+            raise AssertionError("Prospector must not be started by this request")
 
     monkeypatch.setattr(dash.subprocess, "Popen", NoPopen)
     return {"dir": tmp_path, "spawned": spawned, "token": dash.token_store.get()}
@@ -189,7 +189,7 @@ def test_only_get_and_head_of_the_shell_are_public(anon):
     "127.0.0.1:abc", "127.0.0.1:99999", "127.0.0.1:", "[::1", "::1", "[127.0.0.1]",
     "127.1", "0.0.0.0", "0x7f000001", "2130706433", "192.168.1.10", "localhost:5555:1",
     "localhost:5555 ", "local%68ost", "[::1]x", "[fe80::1%25lo0]:5555",
-    # Zone IDs on loopback: ipaddress calls "::1%lo0" loopback, Harvey doesn't.
+    # Zone IDs on loopback: ipaddress calls "::1%lo0" loopback, Prospector doesn't.
     "[::1%lo0]:5555", "[::1%lo0]", "[::1%25lo0]:5555", "[::1%1]", "[0:0:0:0:0:0:0:1%lo0]",
 ])
 def test_non_loopback_or_malformed_hosts_are_refused(env, host):
@@ -396,7 +396,7 @@ def test_new_env_file_is_owner_only_whatever_the_umask(authed):
 
 @POSIX
 def test_existing_env_file_is_tightened_and_its_other_lines_kept(authed, env):
-    original = ("# Harvey settings\n"
+    original = ("# Prospector settings\n"
                 "INSTANTLY_API_KEY=keep-me\n"
                 "\n"
                 "export SMTP_HOST=old.example.test\n"
@@ -407,7 +407,7 @@ def test_existing_env_file_is_tightened_and_its_other_lines_kept(authed, env):
     assert authed.post("/api/settings/env",
                        json={"SMTP_HOST": "new.example.test", "SMTP_PORT": 587}).json()["success"]
     text = dash.ENV_FILE.read_text()
-    assert text == ("# Harvey settings\n"
+    assert text == ("# Prospector settings\n"
                     "INSTANTLY_API_KEY=keep-me\n"
                     "\n"
                     "SMTP_HOST=new.example.test\n"

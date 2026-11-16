@@ -2,7 +2,7 @@
 
 Stop-on-reply used to be per person: the owner wrote back "not interested"
 and the office manager got the follow-up the next morning. Colleagues are
-the same company (company_id), or, for people Harvey has no company for,
+the same company (company_id), or, for people Prospector has no company for,
 the same email domain, never a shared free-mail one.
 """
 

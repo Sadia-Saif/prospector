@@ -2,7 +2,7 @@
 recipient's zone, the window maths (DST, weekends, windows that cross UTC
 midnight), staging and draining through the outbox, Precleared's country
 filling a gap, and quiet hours that no longer hold due mail. Also the
-country Harvey works out the same way and gives Precleared, when it is sure.
+country Prospector works out the same way and gives Precleared, when it is sure.
 
 No network and no real clock where it matters: the sender's clock is pinned
 with monkeypatch, and Precleared calls go to an httpx.MockTransport.
@@ -660,7 +660,7 @@ async def test_precleared_keeps_the_country_with_the_cached_verdict(state):
     assert (await odd.clear("x@y.co.uk", state)).country == ""
 
 
-# ── The country Harvey gives Precleared ──
+# ── The country Prospector gives Precleared ──
 
 def checked_sender(state, provider, calls, body=OK_GB, **client):
     """A sender without a window, so only the check matters, on a mocked Precleared."""
@@ -675,7 +675,7 @@ async def test_sender_passes_the_company_country_to_precleared(state):
     await approved(state, pid, "jane@tx-acme.com")
     calls, provider = [], FakeProvider()
     ok_us = {**OK_GB, "facts": {"recipient_country": "US"}}
-    # Even with a default configured, a country Harvey is sure of goes instead.
+    # Even with a default configured, a country Prospector is sure of goes instead.
     await checked_sender(state, provider, calls, ok_us, prospect_country="GB")._drain_due()
     assert [m["to"] for m in provider.sent] == ["jane@tx-acme.com"]
     assert calls[0]["recipient_country"] == "US"

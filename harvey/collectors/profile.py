@@ -264,7 +264,7 @@ _WEAK_BLOCK_MARKERS = (
 def looks_like_challenge(text: str, status: int = 200) -> bool:
     """A bot challenge or block page — not a real page that happens to load
     reCAPTCHA for its contact form (which used to read as "blocked" and
-    cost Harvey the whole site). Ordinary words ("access denied", "protected
+    cost Prospector the whole site). Ordinary words ("access denied", "protected
     by reCAPTCHA") only count on a short page served as an error or 202."""
     if not text:
         return False
@@ -617,7 +617,7 @@ _NOT_THEIR_RAISE = re.compile(
 # With no round named, money is a raise only when the sentence says so
 # (funding, investors, led by) or "we raised $XM" says it plainly; never
 # loans, verdicts, deals or donations (law firms, brokers and builders
-# are Harvey's prospects too), or money raised for someone.
+# are Prospector's prospects too), or money raised for someone.
 _NOT_FUNDING_MONEY = re.compile(
     r"\b(?:arr|mrr|revenue|sales|bookings|pipeline|contracts?|deals?|orders?|savings|grants?|loans?|mortgages?"
     r"|verdicts?|settlements?|judgments?|transactions?|projects?|volume|worth|donations?|donated|charity"

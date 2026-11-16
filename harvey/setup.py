@@ -1,4 +1,4 @@
-"""Interactive setup wizard — walks you through everything Harvey needs."""
+"""Interactive setup wizard — walks you through everything Prospector needs."""
 
 import asyncio
 import getpass
@@ -25,8 +25,8 @@ CONFIG_FILE = PROJECT_ROOT / "harvey.yaml"
 
 
 def _print_harvey(message: str):
-    """Print a message as Harvey."""
-    print(f"\n  Harvey: {message}")
+    """Print a message as Prospector."""
+    print(f"\n  Prospector: {message}")
 
 
 def _print_step(step: int, total: int, title: str):
@@ -82,9 +82,9 @@ def _read_env_file() -> dict[str, str]:
 
 
 def _config_file() -> Path:
-    """The config Harvey loads: harvey.local.yaml (what `harvey train` writes)
+    """The config Prospector loads: harvey.local.yaml (what `harvey train` writes)
     wins over harvey.yaml when it exists, as in config._find_config_file.
-    Setup reads and writes this file, so its answers are the ones Harvey uses."""
+    Setup reads and writes this file, so its answers are the ones Prospector uses."""
     local = CONFIG_FILE.with_name("harvey.local.yaml")
     return local if local.exists() else CONFIG_FILE
 
@@ -131,7 +131,7 @@ async def _test_claude(brain: Brain) -> bool:
 
 
 def _ask_brain_config() -> BrainConfig:
-    """Ask which subscription Harvey thinks with. Claude is the default."""
+    """Ask which subscription Prospector thinks with. Claude is the default."""
     _print_harvey("I think with an AI subscription you already pay for:")
     print("    claude — your Claude plan, via Claude Code (default)")
     print("    codex  — your ChatGPT plan, via the Codex CLI")
@@ -149,7 +149,7 @@ def _ask_brain_config() -> BrainConfig:
         print("    (type claude or codex)")
     if provider == "codex":
         from harvey.codex import SUGGESTED_MODEL
-        print(f"    {SUGGESTED_MODEL} is the Codex model Harvey has verified as text-only")
+        print(f"    {SUGGESTED_MODEL} is the Codex model Prospector has verified as text-only")
         print("    (no code-execution tools). Press Enter to use it, or type another.")
     while True:
         if provider == "codex":
@@ -191,12 +191,12 @@ class SetupWizard:
         print(f"""
 ╔══════════════════════════════════════════════════════════╗
 ║                                                          ║
-║   Harvey Setup Wizard                                    ║
+║   Prospector Setup Wizard                                    ║
 ║   Let's get you closing deals.                           ║
 ║                                                          ║
 ╚══════════════════════════════════════════════════════════╝""")
 
-        _print_harvey("Hey. I'm Harvey. Let's get me set up so I can start")
+        _print_harvey("Hey. I'm Prospector. Let's get me set up so I can start")
         _print_harvey("closing deals for you. I'll walk you through everything.")
         _print_harvey("This takes about 5 minutes.\n")
 
@@ -219,7 +219,7 @@ class SetupWizard:
         self._setup_cloudflare()
 
         # Step 5: Train on product
-        _print_step(5, total_steps, "Train Harvey on Your Product")
+        _print_step(5, total_steps, "Train Prospector on Your Product")
         await self._setup_product()
 
         # Step 6: Configure behavior
@@ -308,7 +308,7 @@ class SetupWizard:
             raise SystemExit(1)
 
         # A real (subscription, not API-billed) call through the same
-        # isolated runtime Harvey uses for every prompt.
+        # isolated runtime Prospector uses for every prompt.
         print("  Testing Codex (isolated, no tools)...", end=" ", flush=True)
         state = StateManager()
         await state.init_db()
@@ -417,7 +417,7 @@ class SetupWizard:
             self.env_vars["CLOUDFLARE_API_TOKEN"] = ""
 
     async def _setup_product(self):
-        """Train Harvey on the product — either via URL or manual entry."""
+        """Train Prospector on the product — either via URL or manual entry."""
         _print_harvey("Now the important part — I need to learn about what you're selling.")
         _print_harvey("I can either crawl your website and figure it out myself,")
         _print_harvey("or you can tell me the basics manually.\n")
@@ -509,7 +509,7 @@ class SetupWizard:
                 booking_url = _ask("Booking URL")
                 booking_method = "calendar_link"
             else:
-                print("\n  How should Harvey suggest meeting times?")
+                print("\n  How should Prospector suggest meeting times?")
                 print("    1. Suggest specific times ('How about Thursday at 2pm?')")
                 print("    2. Ask for their preference ('What does your calendar look like?')")
                 method_choice = _ask("Method (1/2)", default="1")
@@ -520,7 +520,7 @@ class SetupWizard:
 
         _print_harvey("What persona should I use for outreach?\n")
 
-        persona_name = _ask("My name (what prospects see)", default="Harvey")
+        persona_name = _ask("My name (what prospects see)", default="Prospector")
         persona_email = _ask("My email address")
         persona_role = _ask("My title/role", default="Business Development")
 
@@ -581,7 +581,7 @@ class SetupWizard:
         _print_harvey("Got it. I have everything I need about your product.")
 
     def _setup_behavior(self):
-        """Configure Harvey's operational behavior."""
+        """Configure Prospector's operational behavior."""
         _print_harvey("Last thing — a few settings for how I operate.\n")
 
         # Usage limit
@@ -839,7 +839,7 @@ class SetupWizard:
     - .env (your credentials)
     - {_config_file().name} (your configuration)
 
-  To start Harvey:
+  To start Prospector:
     harvey run          (or: python -m harvey)
 
   To re-train on a different product:

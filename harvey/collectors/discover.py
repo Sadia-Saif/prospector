@@ -277,7 +277,7 @@ def is_junk(domain: str, name: str = "") -> bool:
 # the settings table: a given city is looked up once, ever.
 
 NOMINATIM = "https://nominatim.openstreetmap.org/search"
-GEOCODE_UA = "Harvey/0.1 (open-source sales agent; github.com/ethanplusai/harvey)"
+GEOCODE_UA = "Prospector/0.1 (open-source sales agent; github.com/ethanplusai/harvey)"
 
 
 async def geocode_city(state, city: str, radius_km: int = 40,
@@ -390,7 +390,7 @@ class DiscoveryQuery:
 
 
 # DataForSEO names places "Denver,Colorado,United States" — full state name,
-# no spaces after commas. Harvey's geography is written the way people write
+# no spaces after commas. Prospector's geography is written the way people write
 # it ("Denver, CO"), so US state abbreviations are expanded here. Anything
 # else passes through with its commas tightened; a name DataForSEO doesn't
 # know comes back as a task error, which the run reports.
@@ -539,7 +539,7 @@ class DataForSEOListings(DiscoveryProvider):
     free_tier = "$1 signup credit; $50 minimum deposit to go live"
     signup_url = "https://app.dataforseo.com/api-access"
     env_keys = ("dataforseo_login", "dataforseo_password")
-    caveat = "No email addresses — Harvey resolves those in a later stage."
+    caveat = "No email addresses — Prospector resolves those in a later stage."
 
     TASK_COST = 0.012
     ITEM_COST = 0.00036
@@ -731,7 +731,7 @@ class DataForSEOMaps(DataForSEOSerp):
              "business's map position, rating, category and claimed status — "
              "including businesses with no website at all.")
     cost_note = "$0.002 per search of up to 100 results (Live)"
-    caveat = ("Map rank depends heavily on where the searcher stands; Harvey "
+    caveat = ("Map rank depends heavily on where the searcher stands; Prospector "
               "searches from the city centre at city zoom. Treat it as 'when we "
               "searched from downtown', not an absolute position.")
 
@@ -868,7 +868,7 @@ class TinyFish(DiscoveryProvider):
     free_tier = "free with a key, no card: 30 searches a minute, 500 an hour"
     signup_url = "https://agent.tinyfish.ai/api-keys"
     env_keys = ("tinyfish_api_key",)
-    caveat = ("Needs TINYFISH_API_KEY in .env. Harvey paces itself to 30 searches "
+    caveat = ("Needs TINYFISH_API_KEY in .env. Prospector paces itself to 30 searches "
               "a minute; a depth-30 phrase is 3 searches, so about 160 phrases an "
               "hour fit in the 500. No SERP_RANK: use Serper or DataForSEO SERP "
               "for rank signals.")
@@ -1154,7 +1154,7 @@ class OpenStreetMap(DiscoveryProvider):
         # out readily under load. Walk the mirrors, then RAISE: returning []
         # would make a throttled run look exactly like a market with no
         # businesses in it.
-        headers = {"User-Agent": "Harvey/0.1 (open-source sales agent; "
+        headers = {"User-Agent": "Prospector/0.1 (open-source sales agent; "
                                  "github.com/ethanplusai/harvey)"}
         r = None
         for i, endpoint in enumerate(self.ENDPOINTS):

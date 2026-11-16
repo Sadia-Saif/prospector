@@ -1,7 +1,7 @@
 """The dashboard's Feedback buttons reach the Writer.
 
 Campaign feedback is guidance for every email written next; feedback on a
-contact is used when Harvey writes to that contact. Before this, the notes
+contact is used when Prospector writes to that contact. Before this, the notes
 were stored and nothing read them.
 """
 

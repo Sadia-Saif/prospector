@@ -1,12 +1,12 @@
-# Contributing to Harvey
+# Contributing to Prospector
 
 For anyone changing this repository and opening pull requests, and above all
 for coding agents (Claude Code, Codex, Cursor, Aider). `CLAUDE.md` is different:
-it guides someone *using* Harvey. This file is about contributing to it.
+it guides someone *using* Prospector. This file is about contributing to it.
 
 ## No real contact data, anywhere it gets published
 
-This repository is public. Harvey's job is finding real people at real businesses,
+This repository is public. Prospector's job is finding real people at real businesses,
 so testing it turns up real names, addresses and phone numbers. Those stay on
 your machine. A pull request once listed thirteen real people's work addresses,
 with their names and employers, in its description and test fixtures, and

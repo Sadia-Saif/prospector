@@ -1,4 +1,4 @@
-"""Harvey Dashboard — local web UI to set up, control, and monitor Harvey."""
+"""Prospector Dashboard — local web UI to set up, control, and monitor Prospector."""
 
 import asyncio
 import ipaddress
@@ -50,11 +50,11 @@ def _resolve_config_file() -> Path:
 
 # No /docs, /redoc or /openapi.json: the API is for this UI only, and every
 # route except the static shell needs the token (see dashboard_auth).
-app = FastAPI(title="Harvey Dashboard", docs_url=None, redoc_url=None, openapi_url=None)
+app = FastAPI(title="Prospector Dashboard", docs_url=None, redoc_url=None, openapi_url=None)
 token_store = auth.TokenStore(TOKEN_FILE)
 app.add_middleware(auth.DashboardGuard, store=token_store)
 
-# Harvey process tracking
+# Prospector process tracking
 _harvey_process: subprocess.Popen | None = None
 _harvey_started_at: datetime | None = None
 _env_lock = asyncio.Lock()
@@ -159,7 +159,7 @@ def _write_env_file(updates: dict[str, str]):
 
 
 def _check_harvey_pid() -> int | None:
-    """Check if there's a running Harvey process from a PID file."""
+    """Check if there's a running Prospector process from a PID file."""
     global _harvey_process, _harvey_started_at
     if _harvey_process and _harvey_process.poll() is None:
         return _harvey_process.pid
@@ -258,10 +258,10 @@ async def get_setup_status():
         except Exception:
             pass
     checks.append({
-        "id": "config", "label": f"Harvey configured ({config_path.name})",
+        "id": "config", "label": f"Prospector configured ({config_path.name})",
         "done": config_valid,
         "required": True,
-        "help": "Train Harvey on your product. Use the trainer or set up manually through Claude.",
+        "help": "Train Prospector on your product. Use the trainer or set up manually through Claude.",
     })
 
     # 6. Product trained
@@ -312,7 +312,7 @@ async def get_setup_status():
         "required": provider != "instantly",
         "help": ("A new mailbox needs 2-4 weeks of warmup before cold email, and warmup "
                  "keeps it out of spam after that. We recommend TrulyInbox: connect it and "
-                 "Harvey shows whether your mailbox is warmed."),
+                 "Prospector shows whether your mailbox is warmed."),
         "link": ti.AFFILIATE_URL,
     })
 
@@ -382,7 +382,7 @@ async def get_settings():
         "imap_port": env_vars.get("IMAP_PORT", ""),
         "imap_username": env_vars.get("IMAP_USERNAME", ""),
         "imap_password_set": is_set("IMAP_PASSWORD"),
-        # Microsoft 365: ids aren't secret (no client secret: Harvey signs
+        # Microsoft 365: ids aren't secret (no client secret: Prospector signs
         # in as a public client with PKCE); the token file means signed in.
         "m365_client_id": env_vars.get("M365_CLIENT_ID", ""),
         "m365_tenant_id": env_vars.get("M365_TENANT_ID", ""),
@@ -417,7 +417,7 @@ async def save_env_settings(request: Request):
                     return JSONResponse({"success": False, "message": f"{key} must be text."},
                                         status_code=400)
                 value = str(value)
-                # A port Harvey can't parse would stop it starting at all.
+                # A port Prospector can't parse would stop it starting at all.
                 if key.endswith("_PORT") and value.strip() and not value.strip().isdigit():
                     return JSONResponse({"success": False, "message": f"{key} must be a number."},
                                         status_code=400)
@@ -566,7 +566,7 @@ async def export_companies():
 @app.get("/api/companies/{company_id}/profile")
 async def get_company_profile(company_id: str):
     """One company's facts for its detail card: the register row plus what
-    Harvey observed on its site (latest value per signal, with the page)."""
+    Prospector observed on its site (latest value per signal, with the page)."""
     rows = await query_db("SELECT * FROM companies WHERE id = ?", (company_id,))
     if not rows:
         return JSONResponse({"error": "not found"}, status_code=404)
@@ -649,12 +649,12 @@ async def get_feedback(entity_type: str, entity_id: str):
     return rows
 
 
-# ── Harvey Controls ──
+# ── Prospector Controls ──
 
 
 @app.get("/api/harvey/status")
 async def get_harvey_status():
-    """Check if Harvey is currently running."""
+    """Check if Prospector is currently running."""
     pid = _check_harvey_pid()
     started = _harvey_started_at.isoformat() if _harvey_started_at else None
     return {"running": pid is not None, "pid": pid, "started_at": started}
@@ -662,15 +662,15 @@ async def get_harvey_status():
 
 @app.post("/api/harvey/start")
 async def start_harvey():
-    """Start Harvey's heartbeat loop as a subprocess."""
+    """Start Prospector's heartbeat loop as a subprocess."""
     global _harvey_process, _harvey_started_at
 
     if _check_harvey_pid():
-        return {"success": False, "message": "Harvey is already running."}
+        return {"success": False, "message": "Prospector is already running."}
     from harvey.main import _needs_setup
     if _needs_setup():
         return {"success": False,
-                "message": "Harvey isn't set up yet. Run `harvey setup` in a terminal first."}
+                "message": "Prospector isn't set up yet. Run `harvey setup` in a terminal first."}
 
     # Ensure data dir exists
     (PROJECT_ROOT / "data").mkdir(parents=True, exist_ok=True)
@@ -698,8 +698,8 @@ async def start_harvey():
             # Child holds its own copies of the fds; don't leak ours.
             log_handle.close()
     except Exception as e:
-        logger.warning("Failed to start Harvey: %s", e)
-        return {"success": False, "message": f"Failed to start Harvey: {e}"}
+        logger.warning("Failed to start Prospector: %s", e)
+        return {"success": False, "message": f"Failed to start Prospector: {e}"}
     _harvey_started_at = datetime.now()
     # The loop writes its own PID file once it holds the loop lock. Writing
     # the child's PID here would overwrite a running loop's record if this
@@ -709,12 +709,12 @@ async def start_harvey():
 
 @app.post("/api/harvey/stop")
 async def stop_harvey():
-    """Stop the Harvey subprocess."""
+    """Stop the Prospector subprocess."""
     global _harvey_process, _harvey_started_at
 
     pid = _check_harvey_pid()
     if not pid:
-        return {"success": False, "message": "Harvey is not running."}
+        return {"success": False, "message": "Prospector is not running."}
 
     own = _harvey_process if _harvey_process and _harvey_process.pid == pid else None
 
@@ -741,12 +741,12 @@ async def stop_harvey():
                 pass
             await asyncio.sleep(0.5)
     except OSError as e:
-        logger.warning("Couldn't signal Harvey (pid %s): %s", pid, e)
+        logger.warning("Couldn't signal Prospector (pid %s): %s", pid, e)
 
     if alive():
         # Started by another user, or from an elevated terminal on Windows.
         return {"success": False,
-                "message": f"Couldn't stop Harvey (pid {pid}). Stop it where it was started."}
+                "message": f"Couldn't stop Prospector (pid {pid}). Stop it where it was started."}
 
     _harvey_process = None
     _harvey_started_at = None
@@ -1072,7 +1072,7 @@ async def get_outbox_api():
     try:
         state = _state()
         await state.init_db()
-        # A send cut off mid-way shows up under Didn't send even when Harvey
+        # A send cut off mid-way shows up under Didn't send even when Prospector
         # isn't running.
         await state.fail_stale_sending_outbox()
         return {
@@ -1130,7 +1130,7 @@ async def set_sending_mode(request: Request):
     if mode not in ("approval", "autopilot"):
         return _refuse('expected {"mode": "approval"} or {"mode": "autopilot", "confirm": "autopilot"}', 400)
     if mode == "autopilot" and body.get("confirm") != "autopilot":
-        return _refuse('Type "autopilot" to confirm: Harvey will send email without asking you.', 400)
+        return _refuse('Type "autopilot" to confirm: Prospector will send email without asking you.', 400)
     path = _resolve_config_file()
     try:
         set_require_approval(mode == "approval", path)
@@ -1226,14 +1226,14 @@ async def outbox_edit(item_id: str, request: Request):
         return JSONResponse({"success": False, "message": str(e)}, status_code=500)
 
 
-# A hand send is only offered to someone Harvey could still email: never to
+# A hand send is only offered to someone Prospector could still email: never to
 # someone who replied, opted out, bounced or was already contacted.
 HAND_SENDABLE_STATUSES = ("new", "queued")
 HAND_SENDABLE_EMAIL = ("verified", "risky")
 
 
 def _harvey_can_send() -> bool:
-    """Can Harvey send email itself (a connected mailbox, or Instantly)?
+    """Can Prospector send email itself (a connected mailbox, or Instantly)?
 
     Sending by hand from the dashboard is only offered when it can't: with
     two senders, any timing gap between them emails someone twice. If the
@@ -1256,7 +1256,7 @@ def _harvey_can_send() -> bool:
 
 
 def _send_as() -> str:
-    """The address Harvey sends as, so Gmail opens the right account."""
+    """The address Prospector sends as, so Gmail opens the right account."""
     try:
         from harvey.config import load_config
         return load_config().persona.email or ""
@@ -1277,7 +1277,7 @@ def _compliance_view() -> dict:
 
 
 async def _harvey_committed_ids() -> set[str]:
-    """Everyone Harvey has approved or sent mail for (Outbox or Instantly).
+    """Everyone Prospector has approved or sent mail for (Outbox or Instantly).
 
     Approved mail can be going out at this moment, so these people are past
     the point where a hand send can be recorded safely. So is anyone whose
@@ -1307,7 +1307,7 @@ async def _hand_sent_ids() -> set[str]:
 
 
 async def _harvey_sent_to(prospect_id: str) -> bool:
-    """Did Harvey itself email this person (native send, or an Instantly campaign)?
+    """Did Prospector itself email this person (native send, or an Instantly campaign)?
 
     A send in flight, or cut off mid-way, counts: it may have reached them.
     """
@@ -1359,10 +1359,10 @@ async def mark_prospect_sent(prospect_id: str, request: Request):
                 return {"success": True, "sent": True, "already": True}
             if current not in HAND_SENDABLE_STATUSES:
                 # A reply, opt-out or close is never touched; neither is
-                # someone Harvey already emailed.
+                # someone Prospector already emailed.
                 return {"success": True, "sent": True, "status": current}
-            # Allowed even when Harvey can send: recording "I already emailed
-            # them" can only ever stop Harvey sending. Not once Harvey has
+            # Allowed even when Prospector can send: recording "I already emailed
+            # them" can only ever stop Prospector sending. Not once Prospector has
             # approved or sent mail to them, though: that may be going out now.
             # The marker goes down FIRST: a drain that checks after this sees
             # it and cancels; one that checked before only holds an approved
@@ -1370,10 +1370,10 @@ async def mark_prospect_sent(prospect_id: str, request: Request):
             await state.set_setting(key, current)
             if prospect_id in await _harvey_committed_ids():
                 await state.delete_setting(key)
-                return _refuse("Harvey has already approved or sent an email to this person. "
+                return _refuse("Prospector has already approved or sent an email to this person. "
                                "Check the Outbox.")
             await state.update_prospect_status(prospect_id, "contacted")
-            # Anything Harvey had queued for them must not go out as well.
+            # Anything Prospector had queued for them must not go out as well.
             changed = await state.cancel_pending_outbox_for_prospect(
                 prospect_id, reason=HAND_SENT_REASON)
         else:
@@ -1381,7 +1381,7 @@ async def mark_prospect_sent(prospect_id: str, request: Request):
                 if current in HAND_SENDABLE_STATUSES:
                     return {"success": True, "sent": False}
                 if current == "contacted":
-                    # Setting them back would make Harvey write and send again.
+                    # Setting them back would make Prospector write and send again.
                     return _refuse("This wasn't marked as sent by hand here, so it stays sent.")
                 return {"success": True, "sent": True, "status": current}
             if current != "contacted":
@@ -1395,7 +1395,7 @@ async def mark_prospect_sent(prospect_id: str, request: Request):
             changed = await state.restore_hand_cancelled_outbox(
                 prospect_id, reason=HAND_SENT_REASON)
         if sent:
-            # Open in Gmail adds today's footer; remember it as Harvey's text.
+            # Open in Gmail adds today's footer; remember it as Prospector's text.
             footer = _compliance_view()["footer"]
             await state.remember_footer_lines(footer.split("\n"))
         await state.log_action(
@@ -1486,16 +1486,16 @@ async def get_campaigns():
             tuple(ids),
         ) if ids else []
         row["send_as"] = send_as
-        # A cold email sent by hand needs the same footer Harvey adds.
+        # A cold email sent by hand needs the same footer Prospector adds.
         row["footer"] = footer
         for r in row["recipients"]:
             r["sent_by_hand"] = r["id"] in hand_sent
-            # "I already emailed them": always recordable before Harvey commits.
+            # "I already emailed them": always recordable before Prospector commits.
             r["can_mark_sent"] = (
                 r["id"] not in hand_sent and r["id"] not in committed
                 and (r.get("status") or "new") in HAND_SENDABLE_STATUSES
             )
-            # The Gmail button: only when Harvey can't send itself.
+            # The Gmail button: only when Prospector can't send itself.
             r["can_send_by_hand"] = (
                 r["can_mark_sent"] and not harvey_sends
                 and (r.get("email_status") or "guess") in HAND_SENDABLE_EMAIL
@@ -1524,7 +1524,7 @@ async def get_opt_out(prospect_id: str):
                     ("rule", "matched", "why", "message", "conversation_id")})
         out["at"] = last["at"]
     elif status == "opted_out" or history:
-        # Opted out before Harvey kept reasons (and maybe undone since):
+        # Opted out before Prospector kept reasons (and maybe undone since):
         # show the last thing they wrote.
         for c in await query_db(
                 "SELECT id, thread_json, updated_at FROM conversations "
@@ -1573,7 +1573,7 @@ async def get_conversations(awaiting: bool = False):
         LEFT JOIN prospects p ON c.prospect_id = p.id
         ORDER BY c.updated_at DESC LIMIT 100
     """)
-    # The stored thread holds replies and Harvey's answers; the cold emails
+    # The stored thread holds replies and Prospector's answers; the cold emails
     # a reply answers live in the Outbox. Attach those (sent ones only) and
     # any answer still waiting for approval, so the page shows the exchange.
     pids = sorted({r["prospect_id"] for r in rows if r.get("prospect_id")})
@@ -1606,7 +1606,7 @@ async def get_conversations(awaiting: bool = False):
 
 
 async def _awaiting_reply() -> list[dict]:
-    """Prospects Harvey emailed who haven't replied yet, shaped like a
+    """Prospects Prospector emailed who haven't replied yet, shaped like a
     conversation so the tab can show every sent email, not only the ones
     that got an answer. Read-only: no conversation row is created, and the
     card moves to the real conversation the moment a reply arrives."""
@@ -1644,10 +1644,10 @@ async def _awaiting_reply() -> list[dict]:
 
 @app.post("/api/conversations/{convo_id}/status")
 async def set_conversation_status(convo_id: str, request: Request):
-    """Close a conversation, or hand one Harvey escalated back to it.
+    """Close a conversation, or hand one Prospector escalated back to it.
 
-    Harvey answers new replies only on open conversations, so "open" means
-    "Harvey, carry on" and "closed" means it's done."""
+    Prospector answers new replies only on open conversations, so "open" means
+    "Prospector, carry on" and "closed" means it's done."""
     try:
         data = await request.json()
     except Exception:
@@ -1987,8 +1987,8 @@ async def get_live_status():
         if isinstance(ids, list):
             drafted.update(i for i in ids if isinstance(i, str))
     sent = {p["id"] for p in prospects if p.get("status") in SENT_STATUSES}
-    # Who is left for the user to send by hand: only when Harvey can't send
-    # itself, and never someone Harvey has queued, sent to, or can't reach.
+    # Who is left for the user to send by hand: only when Prospector can't send
+    # itself, and never someone Prospector has queued, sent to, or can't reach.
     harvey_sends = _harvey_can_send()
     awaiting_review = await _scalar("SELECT COUNT(*) FROM outbox WHERE status = 'pending_review'")
     by_hand: set[str] = set()
@@ -2072,7 +2072,7 @@ async def get_live_status():
 
     next_tab = ""   # where the next step is done, when it's done in the dashboard
     if reading or finding:
-        next_up = "Wait — Harvey is working. This page updates by itself."
+        next_up = "Wait — Prospector is working. This page updates by itself."
     elif finding_emails:
         next_up = "Wait — emails are being found."
     elif stopped:
@@ -2159,15 +2159,15 @@ async def get_today():
             "unprofiled": unprofiled_count,
         }
 
-        # Ordered by how much it blocks Harvey from doing anything at all.
+        # Ordered by how much it blocks Prospector from doing anything at all.
         brain = await _brain_status()
         if brain.get("status") == "paused":
-            who = "Codex" if brain.get("provider") == "codex" else "Harvey's model"
+            who = "Codex" if brain.get("provider") == "codex" else "Prospector's model"
             items.append({
                 "key": "brain-paused", "tone": "bad",
-                "title": f"{who} is paused, so Harvey is waiting",
+                "title": f"{who} is paused, so Prospector is waiting",
                 "detail": (str(brain.get("reason") or "It can't be used right now.")[:300] +
-                           " Replies and queued emails are untouched; Harvey resumes "
+                           " Replies and queued emails are untouched; Prospector resumes "
                            "once it's fixed. harvey status --check says what's wrong."),
                 "action": "Open the log", "tab": "controls",
             })
@@ -2177,9 +2177,9 @@ async def get_today():
         if rules_problem:
             items.append({
                 "key": "email-rules", "tone": "bad",
-                "title": "Harvey isn't writing emails: your email rules can't be used",
+                "title": "Prospector isn't writing emails: your email rules can't be used",
                 "detail": (f"{rules_problem}. Fix the file, or clear writer.email_rules "
-                           "to use Harvey's built-in rules."),
+                           "to use Prospector's built-in rules."),
                 "action": "Open the log", "tab": "controls",
             })
 
@@ -2224,7 +2224,7 @@ async def get_today():
                        if c.get("required") and not c.get("done")]
             items.append({
                 "key": "setup", "tone": "warn",
-                "title": "Finish setting Harvey up",
+                "title": "Finish setting Prospector up",
                 "detail": ", ".join(missing[:3]) or "Some required steps are incomplete.",
                 "action": "Open setup", "tab": "settings",
             })
@@ -2235,7 +2235,7 @@ async def get_today():
                 "title": (f"{len(proposed)} signal waiting for your confirmation"
                           if len(proposed) == 1
                           else f"{len(proposed)} signals waiting for your confirmation"),
-                "detail": ("Harvey won't collect anything you haven't approved. "
+                "detail": ("Prospector won't collect anything you haven't approved. "
                            "Confirm which signals define a good prospect for you."),
                 "action": "Review signals", "tab": "signals",
             })
@@ -2272,7 +2272,7 @@ async def get_today():
                 "key": "needs-human", "tone": "bad",
                 "title": (f"{needs_human} conversation needs you" if needs_human == 1
                           else f"{needs_human} conversations need you"),
-                "detail": ("Harvey stopped and handed these over: an escalation, or a "
+                "detail": ("Prospector stopped and handed these over: an escalation, or a "
                            "reply it had no safe answer for. Reply yourself, then close "
                            "it or hand it back."),
                 "action": "Read them", "tab": "conversations",
@@ -2295,7 +2295,7 @@ async def get_today():
                 "key": "replies", "tone": "good",
                 "title": (f"{open_convos} live conversation" if open_convos == 1
                           else f"{open_convos} live conversations"),
-                "detail": "People replied. Check how Harvey is handling them.",
+                "detail": "People replied. Check how Prospector is handling them.",
                 "action": "Read conversations", "tab": "conversations",
             })
 
@@ -2305,7 +2305,7 @@ async def get_today():
         return {"items": [], "stats": stats, "error": str(e)}
 
 
-# ── Signals: Harvey proposes, the user confirms ──
+# ── Signals: Prospector proposes, the user confirms ──
 #
 # Nothing is collected until a human has said yes to it. This is the gate the
 # whole prospecting pipeline hangs off: collectors ask `state.confirmed_signal_codes()`
@@ -2314,7 +2314,7 @@ async def get_today():
 CATEGORY_META = {
     "discovery": {
         "label": "Discovery — who exists",
-        "blurb": "How Harvey finds businesses at all, and how visible they are. "
+        "blurb": "How Prospector finds businesses at all, and how visible they are. "
                  "This is the only stage that costs money.",
     },
     "profile": {
@@ -2682,7 +2682,7 @@ def start_dashboard(host: str = "127.0.0.1", port: int = 5555):
     except (DashboardSetupError, auth.TokenError) as e:
         raise DashboardSetupError(str(e)) from e
 
-    print(f"\n  Harvey Dashboard running. Open this link to unlock it:\n\n    {url}\n")
+    print(f"\n  Prospector Dashboard running. Open this link to unlock it:\n\n    {url}\n")
     print(f"  The token is stored in {token_store.path} (owner-only). Keep the link")
     print("  private; anyone with it can use the dashboard. Press Ctrl+C to stop.\n")
     if os.name == "nt":

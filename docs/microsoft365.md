@@ -1,6 +1,6 @@
 # Sending from a Microsoft 365 mailbox
 
-Harvey can send and read mail through a Microsoft 365 / Outlook mailbox
+Prospector can send and read mail through a Microsoft 365 / Outlook mailbox
 (Exchange Online) using Microsoft Graph. Use it when your sending domain's
 mail lives in Microsoft 365.
 
@@ -8,12 +8,12 @@ mail lives in Microsoft 365.
 
 Exchange Online no longer accepts a password for IMAP, and SMTP AUTH is off
 by default in most tenants. The `smtp` provider can sometimes still send, but
-it can't read the inbox. Harvey has to read replies to stop sequences, honor
+it can't read the inbox. Prospector has to read replies to stop sequences, honor
 opt-outs and catch bounces. If it can send but can't read, it keeps emailing
 people who already answered.
 
 The `microsoft` provider signs in with OAuth (authorization code + PKCE)
-instead. Harvey never stores a password or a client secret.
+instead. Prospector never stores a password or a client secret.
 
 ## Setup
 
@@ -24,7 +24,7 @@ At [entra.microsoft.com](https://entra.microsoft.com), go to
 
 | Field | Value |
 |---|---|
-| Name | `Harvey` |
+| Name | `Prospector` |
 | Supported account types | *Accounts in this organizational directory only* |
 | Redirect URI, platform | **Public client/native (mobile & desktop)** |
 | Redirect URI, value | `http://localhost:8766` |
@@ -32,9 +32,9 @@ At [entra.microsoft.com](https://entra.microsoft.com), go to
 From the app's **Overview**, copy the **Application (client) ID** and the
 **Directory (tenant) ID**.
 
-Don't create a client secret. Harvey is a public client.
+Don't create a client secret. Prospector is a public client.
 
-### 2. Configure Harvey
+### 2. Configure Prospector
 
 `.env`:
 
@@ -60,7 +60,7 @@ harvey microsoft auth   # opens the browser; sign in as persona.email
 harvey microsoft test   # → ✓ Connected as you@yourdomain.com
 ```
 
-Harvey asks for four **delegated** permissions:
+Prospector asks for four **delegated** permissions:
 
 | Permission | Why it's needed |
 |---|---|
@@ -72,22 +72,22 @@ Harvey asks for four **delegated** permissions:
 The refresh token is stored in `data/m365_token.json` (gitignored). On macOS
 and Linux the file is mode 600 (owner only). Windows has no such mode bits:
 the file is protected only by the access permissions (ACLs) of the folder
-Harvey lives in, so keep Harvey in a folder only you can read.
-Microsoft rotates it on every use, and Harvey saves the new one each time.
+Prospector lives in, so keep Prospector in a folder only you can read.
+Microsoft rotates it on every use, and Prospector saves the new one each time.
 
 ### If you see "Need admin approval"
 
 Your tenant doesn't let users consent to apps themselves. An admin has to
 approve the app once:
 
-1. In Entra, open **App registrations → Harvey → API permissions**. Add the
+1. In Entra, open **App registrations → Prospector → API permissions**. Add the
    four Microsoft Graph delegated permissions above, then click
    **Grant admin consent**.
 2. Run `harvey microsoft auth` again and sign in as the **sending mailbox**,
-   not as the admin. Harvey always acts as whoever signs in.
+   not as the admin. Prospector always acts as whoever signs in.
 
 To make sure nobody else in the tenant can use the app, go to
-**Enterprise applications → Harvey**:
+**Enterprise applications → Prospector**:
 
 1. **Users and groups**: assign only the sending mailbox.
 2. **Properties**: set **Assignment required?** to **Yes**. Do this after
@@ -95,16 +95,16 @@ To make sure nobody else in the tenant can use the app, go to
 
 ## How it behaves
 
-- **Sending.** Harvey creates a draft and then sends it, so the email's
+- **Sending.** Prospector creates a draft and then sends it, so the email's
   RFC `Message-ID` is known. Bounces and replies are matched on it. Bodies
   are plain text, unless `channels.email.signature.logo` is set: then the
   body is HTML and the logo is added to the draft as an inline attachment
   before it's sent. Outlook's own signature isn't added to mail sent
-  through Graph, so this is the way to put a logo under Harvey's email.
-- **Replies are threaded.** Harvey answers with `createReply` on the
+  through Graph, so this is the way to put a logo under Prospector's email.
+- **Replies are threaded.** Prospector answers with `createReply` on the
   prospect's own message, so `In-Reply-To` and `References` are correct. If
   that message was deleted, the reply goes out as a new email.
-- **Your inbox is left alone.** Each cycle, Harvey reads the last 7 days of
+- **Your inbox is left alone.** Each cycle, Prospector reads the last 7 days of
   the inbox, newest first, all of it (page by page), and skips your own mail. It never marks anything
   read, moves it or deletes it. It keeps its own record of what it has
   handled.
@@ -116,7 +116,7 @@ To make sure nobody else in the tenant can use the app, go to
   Graph outage, throttling), the cycle sends nothing. A reply nobody read
   can't have stopped its follow-ups. Graph throttling (429/503 with a short
   `Retry-After`) is retried once. A read that fails part-way through counts
-  as a failed read: Harvey never acts on part of the inbox.
+  as a failed read: Prospector never acts on part of the inbox.
 - **Unsent drafts are cleaned up.** If a send fails, its draft is deleted
   so it doesn't sit in your Drafts folder.
 - **The sender name is the mailbox's.** Mail goes out under the mailbox's
@@ -132,7 +132,7 @@ To make sure nobody else in the tenant can use the app, go to
 | `signed in as X, but persona.email is Y` | Run `harvey microsoft auth` again and pick the right account. Use "Use another account" if the browser is already signed in as someone else. |
 | `token refresh rejected` | The login expired (90 days unused) or was revoked. Run `harvey microsoft auth` again. |
 
-To revoke Harvey's access, go to
+To revoke Prospector's access, go to
 [myaccount.microsoft.com](https://myaccount.microsoft.com) → **Apps**, or
 delete the app registration. Then delete `data/m365_token.json`.
 
@@ -158,7 +158,7 @@ delete the app registration. Then delete `data/m365_token.json`.
 of returning `[]`. The handler turns that into a failed read, and the
 heartbeat holds sending. It returns the whole 7-day window or nothing:
 
-- **Every page.** `limit` is only the page size (`$top`). Harvey follows
+- **Every page.** `limit` is only the page size (`$top`). Prospector follows
   `@odata.nextLink` until Graph stops sending one, using the link exactly
   as given, without re-adding the first request's parameters or touching
   `$skip`, as Microsoft asks. Messages repeated across pages (new mail

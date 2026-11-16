@@ -5,9 +5,9 @@ stand-in for the API. No credentials, no network.
 
 Plants instruction files everywhere Claude Code looks (user CLAUDE.md, user
 skill, user and project SessionStart hooks, project CLAUDE.md and
-CLAUDE.local.md, an ancestor CLAUDE.md, and a CLAUDE.md above Harvey's own
+CLAUDE.local.md, an ancestor CLAUDE.md, and a CLAUDE.md above Prospector's own
 temporary directory), each carrying a codeword, then checks what actually
-reaches the API. Control runs with Harvey's previous argv must leak the
+reaches the API. Control runs with Prospector's previous argv must leak the
 CLAUDE.md files and run the hooks, which proves the harness can see a leak;
 Brain's call must not. (The skill is a regression guard only: with tools
 off, even the previous argv didn't send skill descriptions.)
@@ -19,7 +19,7 @@ stand-in records header names only, never values.
 
 What this does NOT cover: a real subscription (OAuth/keychain) login, which
 would need a real account. The CLI documents that --safe-mode keeps login
-working, and Harvey doesn't use --bare, which wouldn't.
+working, and Prospector doesn't use --bare, which wouldn't.
 """
 
 import asyncio
@@ -55,7 +55,7 @@ CODEWORDS = {
     "project CLAUDE.local.md": "LOCALMD-4410",
     "CLAUDE.md above the temp dir": "TMPMD-3307",
 }
-# What the previous Harvey argv ran with (no isolation beyond tools/MCP).
+# What the previous Prospector argv ran with (no isolation beyond tools/MCP).
 LEGACY_ARGV = ["-p", "--output-format", "json", "--tools", "", "--strict-mcp-config"]
 
 
@@ -191,7 +191,7 @@ def test_brain_calls_reach_the_api_with_none_of_the_operators_setup(world):
     assert _leaks(world) == []
     assert _hooks_ran(world) == []
     assert _transcripts(world) == []
-    # The prompt arrived (via stdin), and Harvey's temp dir was cleaned up.
+    # The prompt arrived (via stdin), and Prospector's temp dir was cleaned up.
     assert any("Say hi" in json.dumps(r["body"]) for r in requests)
     assert list(Path(tempfile.tempdir).glob("harvey-claude-*")) == []
 

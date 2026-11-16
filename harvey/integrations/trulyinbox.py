@@ -1,9 +1,9 @@
-"""TrulyInbox (trulyinbox.com): the warmup service Harvey recommends, and reads.
+"""TrulyInbox (trulyinbox.com): the warmup service Prospector recommends, and reads.
 
 A new mailbox has no sending history, so it needs a few weeks of warmup before
 cold email, and a warmup service running alongside it keeps it healthy after.
-Harvey recommends TrulyInbox for that. With a key connected
-(TRULYINBOX_API_KEY, `harvey trulyinbox connect` or the dashboard), Harvey
+Prospector recommends TrulyInbox for that. With a key connected
+(TRULYINBOX_API_KEY, `harvey trulyinbox connect` or the dashboard), Prospector
 reads whether the sending mailbox is enrolled, whether its warmup is on and
 signed in, and how much of its warmup mail landed in spam, so `harvey warmup`
 can say whether the mailbox is actually warmed instead of counting days.
@@ -12,7 +12,7 @@ Only reads: every request is a GET, and nothing here can enroll, pause,
 change or remove anything in the user's TrulyInbox account. API access needs
 a paid TrulyInbox plan (Starter or higher) and a workspace key with the
 accounts:read, warmup:read and analytics:read scopes (workspace:read lets
-Harvey find the workspace on its own; otherwise set TRULYINBOX_WORKSPACE_ID).
+Prospector find the workspace on its own; otherwise set TRULYINBOX_WORKSPACE_ID).
 
 TrulyInbox locks an IP out for 15 minutes after five rejected keys, so a key
 it rejects is never sent again by this process until it's connected afresh.
@@ -30,7 +30,7 @@ from datetime import date, datetime, timezone
 import httpx
 
 API_BASE = "https://lynx-api.trulyinbox.com"
-# The referral link, used everywhere Harvey points people at TrulyInbox.
+# The referral link, used everywhere Prospector points people at TrulyInbox.
 AFFILIATE_URL = "https://trulyinbox.com/?via=harvey"
 AFFILIATE_TAG = "(affiliate link)"
 TIMEOUT = httpx.Timeout(connect=10.0, read=20.0, write=10.0, pool=10.0)
@@ -38,7 +38,7 @@ REPORT_DAYS = 14
 FIND_LIMIT = 25
 
 # What the user chose on the setup step: connected TrulyInbox, or uses another
-# warmup service. Either way Harvey (and the agent) stop asking.
+# warmup service. Either way Prospector (and the agent) stop asking.
 CHOICE_KEY = "trulyinbox:choice"
 CHOICES = ("connected", "other")
 
@@ -55,10 +55,10 @@ RATE_LIMITED = "TrulyInbox's API limit is reached. Try again in a minute."
 LOCKED_OUT = ("TrulyInbox locked this computer out for 15 minutes after rejected keys. "
               "Wait, then try again with a working key.")
 BAD_WORKSPACE_ID = "TRULYINBOX_WORKSPACE_ID must be the workspace's number. Fix it in .env."
-NO_ADDRESS = ("Harvey doesn't know which mailbox it sends from. Set persona.email in "
+NO_ADDRESS = ("Prospector doesn't know which mailbox it sends from. Set persona.email in "
               "harvey.yaml first.")
 NO_ANSWER = "TrulyInbox didn't answer. Try again in a minute."
-UNREADABLE = "TrulyInbox sent a reply Harvey couldn't read."
+UNREADABLE = "TrulyInbox sent a reply Prospector couldn't read."
 
 # Each error rule in both spellings the docs use (6-digit and string codes).
 AUTH_CODES = {"150001", "150002", "invalid_api_key", "unauthorized", "Api.InvalidKey"}
@@ -261,7 +261,7 @@ async def set_choice(state, choice: str) -> None:
 
 
 def sending_address(config) -> str:
-    """The mailbox Harvey sends from: the SMTP login when it's an address, else the persona's."""
+    """The mailbox Prospector sends from: the SMTP login when it's an address, else the persona's."""
     import os
     email = config.channels.email
     smtp_user = os.getenv("SMTP_USERNAME", "").strip() if email.provider == "smtp" else ""
