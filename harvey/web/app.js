@@ -684,7 +684,7 @@ async function loadSetupStatus() {
 
   el.innerHTML =
     '<div class="card setup-card">' +
-      '<div class="setup-head"><div><h3>Finish setting up Prospector</h3>' +
+      '<div class="setup-head"><div><h3>Finish setting up Xorora Prospector</h3>' +
         '<p class="muted">Prospector starts finding prospects and sending once these are done.</p></div>' +
         '<span class="setup-pct">' + done + ' of ' + required.length + ' done</span></div>' +
       '<div class="bar thick" style="margin-bottom:8px"><span style="width:' + pct + '%;background:var(--accent)"></span></div>' +
@@ -1412,7 +1412,7 @@ async function startHarvey() {
   const btn = document.getElementById('btn-start');
   btn.disabled = true;
   const data = await api('/api/harvey/start', {method: 'POST'});
-  if (data && data.success) showToast('Prospector started.', 'success');
+  if (data && data.success) showToast('Xorora Prospector started.', 'success');
   else showToast((data && data.message) || 'Failed to start.', 'error');
   btn.disabled = false;
   loadHarveyStatus();
@@ -1422,7 +1422,7 @@ async function stopHarvey() {
   const btn = document.getElementById('btn-stop');
   btn.disabled = true;
   const data = await api('/api/harvey/stop', {method: 'POST'});
-  if (data && data.success) showToast('Prospector stopped.', 'success');
+  if (data && data.success) showToast('Xorora Prospector stopped.', 'success');
   else showToast((data && data.message) || 'Failed to stop.', 'error');
   btn.disabled = false;
   loadHarveyStatus();

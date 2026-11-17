@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="referrer" content="no-referrer">
-<title>Prospector — Command Deck</title>
+<title>Xorora Prospector</title>
 <!-- First, so the token leaves the address bar before anything else runs. -->
 <script src="/static/auth.js"></script>
 <link rel="stylesheet" href="/static/app.css">
@@ -44,7 +44,7 @@
 <div id="lock-screen"
      style="display:none;position:fixed;inset:0;z-index:1000;align-items:center;justify-content:center;padding:24px">
   <div class="card" style="max-width:500px;width:100%">
-    <h2>Dashboard locked</h2>
+    <h2>Xorora Prospector is locked</h2>
     <p class="lede" id="lock-reason" role="alert"></p>
     <p class="lede">Open the link that <code>harvey dashboard</code> printed in your terminal,
       or run <code>harvey dashboard --url</code> to print it again. You can also paste the
@@ -63,8 +63,8 @@
 
 <aside class="sidebar">
   <div class="brand">
-    <h1>Prospector</h1>
-    <div class="tagline">Always Be Closing</div>
+    <h1 aria-label="Xorora Prospector">Xorora<span class="dot" aria-hidden="true">.</span></h1>
+    <div class="product" aria-hidden="true">Prospector</div>
   </div>
 
   <nav aria-label="Sections">
@@ -446,8 +446,8 @@
       </div>
       <div class="status-meta" id="control-meta"></div>
       <div class="btn-group">
-        <button class="btn btn-primary" id="btn-start" onclick="startHarvey()">Start Prospector</button>
-        <button class="btn btn-danger" id="btn-stop" onclick="stopHarvey()" style="display:none">Stop Prospector</button>
+        <button class="btn btn-primary" id="btn-start" onclick="startHarvey()">Start Xorora Prospector</button>
+        <button class="btn btn-danger" id="btn-stop" onclick="stopHarvey()" style="display:none">Stop Xorora Prospector</button>
       </div>
     </div>
     <div class="card">
@@ -462,8 +462,8 @@
   <div class="section-head"><div><h2>Help</h2><p>What Prospector is, how it works, and how to fix the usual problems.</p></div></div>
 
   <div class="help-section">
-    <h2>What is Prospector?</h2>
-    <p>Prospector is an autonomous AI sales agent. Once set up, Prospector runs on its own: finds people who match your ideal customer, writes personalized cold emails, sends them through your email platform, reads every reply, handles objections, and works toward booking a meeting. You review everything through this dashboard.</p>
+    <h2>What is Xorora Prospector?</h2>
+    <p>Xorora Prospector is an autonomous AI sales agent. Once set up, Prospector runs on its own: finds people who match your ideal customer, writes personalized cold emails, sends them through your email platform, reads every reply, handles objections, and works toward booking a meeting. You review everything through this dashboard.</p>
     <p>Prospector runs on your Claude Max subscription (or, if you opt in, your ChatGPT plan through Codex), so there are no extra AI costs. Everything stays on your machine in one folder.</p>
   </div>
 
