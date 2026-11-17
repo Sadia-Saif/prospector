@@ -1,4 +1,4 @@
-"""DISCOVER — who exists, and how visible they are.
+"""DISCOVER, who exists, and how visible they are.
 
 The only stage that costs money, so it is the one with a provider menu, a
 mandatory cost estimate, and a budget check inside the loop.
@@ -6,7 +6,7 @@ mandatory cost estimate, and a budget check inside the loop.
 Two shapes of discovery, and the difference matters:
 
 * **Listings** ask "which businesses of this type are in this place?" and come
-  back with a phone, a category, a rating and — crucially — whether there is a
+  back with a phone, a category, a rating and, crucially, whether there is a
   website at all. For local SMB verticals this is the primary path.
 * **SERP** asks "who ranks for this search?" and comes back with a rank
   position. You are buying the *signal*, not the list: positions 11-30 are
@@ -16,7 +16,7 @@ Two shapes of discovery, and the difference matters:
 Cost discipline lives here, not in the database. A table can only record spend
 after the fact; only the collector can decline to spend it. Every run
 estimates first, checks a budget between batches, reads the kill switch, and
-flushes observations per batch — a long run that dies must not lose what it
+flushes observations per batch, a long run that dies must not lose what it
 already learned.
 """
 
@@ -63,7 +63,7 @@ JUNK_DOMAIN_PATTERNS = tuple(re.compile(p, re.I) for p in (
     # Indian directories & marketplaces
     r"(^|\.)(indiamart|justdial|tradeindia|exportersindia|sulekha|urbanpro|yet5)\.",
     r"(^|\.)(olx|quikr|flipkart|snapdeal|myntra|shopclues|etsy|ebay|alibaba|aliexpress)\.",
-    # hobby communities & model repositories — never a prospect
+    # hobby communities & model repositories, never a prospect
     r"(^|\.)(boardgamegeek|team-bhp|hackaday|instructables|thingiverse|printables|cults3d|thangs|grabcad)\.",
     # media & reference
     r"(^|\.)(wikipedia|reddit|quora|medium|substack|forbes|inc|entrepreneur)\.",
@@ -119,7 +119,7 @@ JUNK_NAME_PATTERNS = tuple(re.compile(p, re.I) for p in (
 
 
 def normalize_domain(url_or_domain: str) -> str:
-    """A bare, lowercase, www-less hostname — the entity-resolution key.
+    """A bare, lowercase, www-less hostname, the entity-resolution key.
 
     Entity resolution decides whether any of this is real. Get it wrong and
     every trend built on top is garbage.
@@ -138,7 +138,7 @@ def normalize_domain(url_or_domain: str) -> str:
 # Management Firm", "Home Page - NVCM | Community Association Management".
 # Stored as-is it lands in an email as "...at Denver, CO | HOA Management
 # Firm". The business is the title segment that shares a DISTINCTIVE word with
-# the domain — "management" matches managementharbor.com but says nothing.
+# the domain, "management" matches managementharbor.com but says nothing.
 
 _TITLE_SEPARATORS = re.compile(r"\s+[|\-–—·•]\s+|\s*[|•·]\s*|:\s+")
 _GENERIC_NAME_WORDS = frozenset("""
@@ -389,7 +389,7 @@ class DiscoveryQuery:
         return f"{self.term} {self.location}".strip()
 
 
-# DataForSEO names places "Denver,Colorado,United States" — full state name,
+# DataForSEO names places "Denver,Colorado,United States", full state name,
 # no spaces after commas. Xorora Prospector's geography is written the way people write
 # it ("Denver, CO"), so US state abbreviations are expanded here. Anything
 # else passes through with its commas tightened; a name DataForSEO doesn't
@@ -463,8 +463,8 @@ class ProviderExhausted(RuntimeError):
 class DiscoveryProvider:
     """One way of answering "who exists".
 
-    Subclasses implement ``fetch``. Everything else — the menu metadata the
-    dashboard renders, cost estimation, configuration checks — lives here so a
+    Subclasses implement ``fetch``. Everything else, the menu metadata the
+    dashboard renders, cost estimation, configuration checks, lives here so a
     new provider is a small class rather than a wiring exercise.
     """
 
@@ -489,7 +489,7 @@ class DiscoveryProvider:
 
         An empty ``SERPER_API_KEY=`` line used to pass the truthiness check,
         the run then "succeeded" with zero queries, and the process exited 0
-        — a silent no-op that reads as success. Name the bad keys here,
+       , a silent no-op that reads as success. Name the bad keys here,
         before any money or time is spent.
         """
         def _missing(value) -> bool:
@@ -524,7 +524,7 @@ class DataForSEOListings(DiscoveryProvider):
     """Google Business Profile data as a queryable database, not a scrape.
 
     The cheapest way to enumerate local businesses anywhere, and the only one
-    with a filter for "has no website" — which for anyone selling websites is
+    with a filter for "has no website", which for anyone selling websites is
     the highest-intent query available.
     """
 
@@ -539,7 +539,7 @@ class DataForSEOListings(DiscoveryProvider):
     free_tier = "$1 signup credit; $50 minimum deposit to go live"
     signup_url = "https://app.dataforseo.com/api-access"
     env_keys = ("dataforseo_login", "dataforseo_password")
-    caveat = "No email addresses — Xorora Prospector resolves those in a later stage."
+    caveat = "No email addresses, Xorora Prospector resolves those in a later stage."
 
     TASK_COST = 0.012
     ITEM_COST = 0.00036
@@ -553,7 +553,7 @@ class DataForSEOListings(DiscoveryProvider):
 
     def base_url(self, env: dict) -> str:
         # The sandbox mirrors the response schema exactly and is never
-        # charged — the right target for a first run and for the test suite.
+        # charged, the right target for a first run and for the test suite.
         return ("https://sandbox.dataforseo.com/v3"
                 if env.get("dataforseo_sandbox") else
                 "https://api.dataforseo.com/v3")
@@ -610,10 +610,10 @@ class DataForSEOListings(DiscoveryProvider):
 
 
 class DataForSEOSerp(DiscoveryProvider):
-    """Organic rank — and the local 3-pack above it — as the buying signal.
+    """Organic rank, and the local 3-pack above it, as the buying signal.
 
     Buy the rank, not the list. A business sitting at 11-30 for its own core
-    search is visible enough to have tried and is losing — the single most
+    search is visible enough to have tried and is losing, the single most
     useful thing you can know before writing to them. The same response
     carries the local pack, so who holds those three slots comes free.
     """
@@ -625,14 +625,14 @@ class DataForSEOSerp(DiscoveryProvider):
     blurb = ("Search '<service> <city>' from the city centre and record where "
              "each business ranks, plus who holds the local 3-pack. Discovers "
              "businesses you didn't have AND scores the ones you did.")
-    cost_note = "$0.002 per 10 results (Live) — depth 30 costs $0.006 a search"
+    cost_note = "$0.002 per 10 results (Live), depth 30 costs $0.006 a search"
     free_tier = "$1 signup credit; free sandbox; $50 minimum deposit to go live"
     signup_url = "https://app.dataforseo.com/api-access"
     env_keys = ("dataforseo_login", "dataforseo_password")
     caveat = ("Google removed 100-results-per-page in September 2025, so depth "
               "100 now costs 10x depth 10. Depth 20-30 is the sweet spot; "
               "below rank 30 it is mostly directories anyway. Rank depends on "
-              "where the searcher stands — this is the view from the city centre.")
+              "where the searcher stands, this is the view from the city centre.")
 
     # Live mode. The standard queue is $0.0006 but asynchronous (post a task,
     # poll for it minutes later); the run loop checks the spend cap between
@@ -717,7 +717,7 @@ class DataForSEOSerp(DiscoveryProvider):
 
 
 class DataForSEOMaps(DataForSEOSerp):
-    """Google Maps rank — the map results a local searcher actually scrolls.
+    """Google Maps rank, the map results a local searcher actually scrolls.
 
     Every result is a Google Business Profile, so it carries a phone, a
     category, a rating, whether the listing is claimed and whether there is a
@@ -728,7 +728,7 @@ class DataForSEOMaps(DataForSEOSerp):
     label = "DataForSEO Google Maps (map rank)"
     kind = "serp"
     blurb = ("Search Google Maps for '<service> <city>' and record each "
-             "business's map position, rating, category and claimed status — "
+             "business's map position, rating, category and claimed status, "
              "including businesses with no website at all.")
     cost_note = "$0.002 per search of up to 100 results (Live)"
     caveat = ("Map rank depends heavily on where the searcher stands; Xorora Prospector "
@@ -1036,15 +1036,15 @@ class OpenStreetMap(DiscoveryProvider):
     free_tier = "unlimited, within community rate etiquette"
     signup_url = "https://www.openstreetmap.org"
     env_keys = ()
-    caveat = ("Coverage is thin for any trade without a storefront — OSM maps "
+    caveat = ("Coverage is thin for any trade without a storefront, OSM maps "
               "premises, so it holds under 2,000 roofers for the entire US. "
               "Great for a free trial run or as a cross-reference; not a "
               "complete list.")
 
     # Several public Overpass instances run the same API. The main one
-    # throttles readily, so try the mirrors before giving up — a free source
+    # throttles readily, so try the mirrors before giving up, a free source
     # that fails half the time is not usable as a default.
-    # Two entries, two conditions, both measured — see
+    # Two entries, two conditions, both measured, see
     # scripts/diagnose_overpass.py, which re-checks them.
     #
     # Each must be its OWN instance: overpass.private.coffee sat here and
@@ -1057,7 +1057,7 @@ class OpenStreetMap(DiscoveryProvider):
     # in 0.21s, so it serves a regional extract, and overpass.osm.jp is the
     # same kind of instance. A mirror like that answers "roofers in Denver"
     # with an empty list, and an empty list here is indistinguishable from a
-    # market with nobody in it — the one failure this provider must never
+    # market with nobody in it, the one failure this provider must never
     # produce. Vet a candidate with
     # `python scripts/diagnose_overpass.py --coverage <url>` before adding it;
     # independence at the DNS level is not enough.
@@ -1068,8 +1068,8 @@ class OpenStreetMap(DiscoveryProvider):
     # Overpass etiquette for a shipped tool: modest volume, no parallelism.
     MIN_INTERVAL = 2.0
     BACKOFF = 5.0
-    # A free instance queues before it computes: node(1) — the smallest query
-    # Overpass accepts — measured 38s of pure waiting on a busy afternoon. The
+    # A free instance queues before it computes: node(1), the smallest query
+    # Overpass accepts, measured 38s of pure waiting on a busy afternoon. The
     # module-wide 45s read budget leaves nothing for a real query over a 40km
     # radius, so Overpass gets its own and asks the server for a matching
     # slice of execution time. Slow beats empty-handed, and a run that cannot
@@ -1196,7 +1196,7 @@ class OpenStreetMap(DiscoveryProvider):
 
         There is deliberately no catch-all fallback. An earlier version fell
         back to `office=company`, which answers "roofers in Denver" with every
-        registered office in Denver — coffee roasters, churches, photography
+        registered office in Denver, coffee roasters, churches, photography
         studios. A search this source cannot answer has to say so; filling the
         database with plausible-looking junk is far worse than returning
         nothing.
@@ -1209,7 +1209,7 @@ class OpenStreetMap(DiscoveryProvider):
 
     async def fetch(self, client, env, query):
         if not query.coordinate:
-            logger.warning("osm: no coordinate for %r — Overpass needs a "
+            logger.warning("osm: no coordinate for %r, Overpass needs a "
                            "lat,lng,radius to search", query.keyword())
             return []
         tags = self._tags(query.term)
@@ -1247,12 +1247,12 @@ class OpenStreetMap(DiscoveryProvider):
                 continue
             if r.status_code not in self.RETRY_STATUSES:
                 break
-            logger.warning("osm: %s is throttling or down (%s) — trying the "
+            logger.warning("osm: %s is throttling or down (%s), trying the "
                            "next mirror", endpoint, r.status_code)
         else:
             raise RuntimeError(
                 "Every public Overpass mirror is unavailable or throttling "
-                "right now. This is free volunteer infrastructure — wait a few "
+                "right now. This is free volunteer infrastructure, wait a few "
                 "minutes and re-run, or use a paid provider for bulk work.")
         if r is None:
             raise RuntimeError("Could not reach any Overpass mirror.")
@@ -1567,7 +1567,7 @@ def _dfs_items(payload: dict) -> list[dict]:
         return []
     task = tasks[0]
     if task.get("status_code") == NO_SEARCH_RESULTS:
-        # A real answer — nobody ranks for this search here — not a failure.
+        # A real answer, nobody ranks for this search here, not a failure.
         return []
     if task.get("status_code") not in (20000, None):
         raise RuntimeError(
@@ -1584,7 +1584,7 @@ def _dfs_items(payload: dict) -> list[dict]:
 
 @dataclass
 class DiscoveryReport:
-    """What a run did — the honest version, including what it skipped."""
+    """What a run did, the honest version, including what it skipped."""
 
     provider: str = ""
     queries: int = 0
@@ -1748,7 +1748,7 @@ def build_queries(config, cities: list[str] | None = None,
         places = cities if cities is not None else ([""] if not spec["local"] else list(icp.geography) or [""])
     else:
         # "roofing contractor" is one way to search for a roofer. Each
-        # configured variant is another search in every city — ranks differ
+        # configured variant is another search in every city, ranks differ
         # by phrasing, and the email should quote the phrase that was used.
         variants = getattr(icp, "keyword_variants", {}) or {}
         terms = list(dict.fromkeys(
@@ -1765,7 +1765,7 @@ def build_queries(config, cities: list[str] | None = None,
 
 
 def estimate_cost(provider_key: str, queries: list[DiscoveryQuery]) -> float:
-    """Projected spend. Always call this before a run — and print it."""
+    """Projected spend. Always call this before a run, and print it."""
     provider = PROVIDERS.get(provider_key)
     return provider.estimate(queries) if provider else 0.0
 
@@ -1814,7 +1814,7 @@ async def run_discovery(
     if report.estimated_cost > max_spend:
         report.errors.append(
             f"estimated ${report.estimated_cost:.2f} exceeds the ${max_spend:.2f} "
-            f"cap — raise the cap or run fewer queries")
+            f"cap, raise the cap or run fewer queries")
         report.stopped = "over budget"
         return report
 
@@ -1822,7 +1822,7 @@ async def run_discovery(
     confirmed = await state.confirmed_signal_codes()
     if not confirmed:
         report.errors.append(
-            "no signals confirmed — confirm signals first (dashboard → Signals, "
+            "no signals confirmed, confirm signals first (dashboard → Signals, "
             "or `xorora-prospector signals --confirm free`) or discovery has nothing to record")
         report.stopped = "no confirmed signals"
         return report
@@ -2015,7 +2015,7 @@ def _rank_tuple(biz: Business) -> tuple:
 def _observations(biz: Business, company_id: str, confirmed: set[str],
                   run_id: str, query: DiscoveryQuery | None = None,
                   ranks_only: bool = False) -> list[dict]:
-    """Every fact this business gave us, as rows — and only the confirmed ones.
+    """Every fact this business gave us, as rows, and only the confirmed ones.
 
     Rank rows carry the search phrase in ``value_text``: "#14 for 'roofer
     Denver, CO'" is a fact; "#14" on its own isn't. ``ranks_only`` is for a

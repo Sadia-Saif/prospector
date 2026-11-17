@@ -383,7 +383,7 @@ async function downloadCsv(path, filename, btn) {
     a.remove();
     setTimeout(() => URL.revokeObjectURL(href), 10000);
   } catch {
-    showToast('Export failed — is the dashboard still running?', 'error');
+    showToast('Export failed, is the dashboard still running?', 'error');
   } finally {
     if (btn) btn.disabled = false;
   }
@@ -457,7 +457,7 @@ async function loadToday() {
       '<div class="queue-icon">' + icon('check') + '</div><div>' +
       '<div class="qtitle">Nothing needs you</div>' +
       '<div class="qdetail">Xorora Prospector has everything it needs. Anything that requires a ' +
-      'decision — an email to approve, a signal to confirm — shows up here.</div>' +
+      'decision (an email to approve, a signal to confirm) shows up here.</div>' +
       '</div></div>';
     return;
   }
@@ -486,7 +486,7 @@ async function loadLiveStatus() {
   if (!d || !Array.isArray(d.steps)) {
     // Keep the last good numbers on screen, but never let them pass for live.
     const flag = el.querySelector('.live-flag');
-    if (flag) flag.textContent = "Can't reach Xorora Prospector right now — numbers below may be old.";
+    if (flag) flag.textContent = "Can't reach Xorora Prospector right now, numbers below may be old.";
     else el.innerHTML = '<p class="muted live-flag">Can\'t reach Xorora Prospector right now. ' +
       'Is the dashboard window still open?</p>';
     return;
@@ -542,7 +542,7 @@ function renderFigures(stats) {
 
   // Instantly sends from its own servers, so the Outbox never sees them.
   const sent = stats.email_provider === 'instantly'
-    ? card('Emails sent', '&mdash;', '', 'Instantly tracks sends')
+    ? card('Emails sent', '-', '', 'Instantly tracks sends')
     : card('Emails sent', sum(t.sent), sparkBars(t.sent, 'Emails sent per day, last 14 days'),
            'last 14 days · <b>' + (stats.outbox_approved || 0) + '</b> scheduled');
   const waiting = (stats.outbox_pending || 0) + (stats.needs_human || 0);
@@ -835,7 +835,7 @@ async function setSignals(codes, status) {
     showToast(
       status === 'confirmed'
         ? 'Confirmed ' + data.changed + ' signal' + (data.changed === 1 ? '' : 's') +
-          ' — Xorora Prospector will collect ' + (data.changed === 1 ? 'it' : 'them') + ' from now on.'
+          ', Xorora Prospector will collect ' + (data.changed === 1 ? 'it' : 'them') + ' from now on.'
         : data.changed + ' signal' + (data.changed === 1 ? '' : 's') + ' turned off.',
       'success');
   } else {
@@ -890,7 +890,7 @@ async function loadDiscoverProviders() {
     const btn = document.getElementById('disc-run');
     btn.disabled = true;
     btn.disabled = false;
-    btn.textContent = 'Run — free';
+    btn.textContent = 'Run (free)';
     showToast(data.running_kind === 'profile' ? 'Finished reading websites.' : 'Discovery finished.', 'success');
   }
   renderDiscoverResult(data.last_report, running);
@@ -899,7 +899,7 @@ async function loadDiscoverProviders() {
 function pickProvider(key) {
   _provider = key;
   document.getElementById('disc-run').disabled = false;
-  document.getElementById('disc-run').textContent = 'Run — free';
+  document.getElementById('disc-run').textContent = 'Run (free)';
   document.getElementById('discover-estimate').innerHTML = '';
   loadDiscoverProviders();
 }
@@ -948,7 +948,7 @@ async function estimateDiscovery() {
   const btn = document.getElementById('disc-run');
   btn.disabled = over;
   btn.textContent = over ? 'Over cap'
-    : (data.free ? 'Run — free' : 'Run — spend up to $' + data.estimated_cost.toFixed(2));
+    : (data.free ? 'Run (free)' : 'Run, spend up to $' + data.estimated_cost.toFixed(2));
 }
 
 async function runDiscovery() {
@@ -960,7 +960,7 @@ async function runDiscovery() {
     body: JSON.stringify(discoverBody()),
   });
   if (data && data.success) {
-    showToast('Discovery started — ' + data.queries + ' queries.', 'success');
+    showToast('Discovery started, ' + data.queries + ' queries.', 'success');
   } else {
     showToast((data && data.message) || 'Could not start.', 'error');
     btn.disabled = false;
@@ -1089,16 +1089,16 @@ function renderCohortBuilder() {
   const rangeCol = numeric.length ?
     '<div style="height:18px"></div><div><div class="subhead" style="margin-top:0">In range ' +
       '<span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">' +
-      '&mdash; e.g. organic rank 11 to 30; leave a side blank for no limit</span></div>' +
+      'e.g. organic rank 11 to 30; leave a side blank for no limit</span></div>' +
       '<div class="cohort-grid">' +
       numeric.map(s =>
         '<div class="cohort-pick cohort-range"><span>' + escHtml(s.label || s.code) + '</span>' +
           bound(s.code, 'min') + '<span class="muted">to</span>' + bound(s.code, 'max') + '</div>'
       ).join('') + '</div></div>' : '';
 
-  el.innerHTML = col('Must have', 'require', '&mdash; every company in the cohort carries all of these') +
+  el.innerHTML = col('Must have', 'require', 'every company in the cohort carries all of these') +
     '<div style="height:18px"></div>' +
-    col('Must not have', 'exclude', '&mdash; disqualifiers') + rangeCol;
+    col('Must not have', 'exclude', 'disqualifiers') + rangeCol;
 }
 
 function setCohortRange(code, side, value) {
@@ -1211,7 +1211,7 @@ async function exportCohort(button) {
     link.click();
     button.textContent = 'Export CSV';
   } catch (error) {
-    button.textContent = 'Export failed — retry';
+    button.textContent = 'Export failed, retry';
   } finally {
     if (link) link.remove();
     // Give the browser time to start consuming the download before revoking.
@@ -1260,12 +1260,12 @@ async function loadSettings() {
   const provEl = document.getElementById('active-provider');
   if (provEl) provEl.textContent = prov;
 
-  // Secret fields never echo a value — show a "saved" placeholder instead.
+  // Secret fields never echo a value, show a "saved" placeholder instead.
   const savedPh = (id, isSet, base) => {
     const el = document.getElementById(id);
     if (!el) return;
     el.value = '';
-    el.placeholder = isSet ? 'Saved — enter new value to change' : base;
+    el.placeholder = isSet ? 'Saved, enter new value to change' : base;
   };
   const tag = (id, ok, okLabel) => {
     const el = document.getElementById(id);
@@ -1292,10 +1292,10 @@ async function loadSettings() {
   savedPh('imap-pass', data.imap_password_set, 'Same as SMTP password');
   document.getElementById('imap-same-pass').checked = !data.imap_password_set;
   savedPh('instantly-key', data.instantly_api_key_set, 'Enter your Instantly API key');
-  savedPh('reoon-key', data.reoon_api_key_set, '600 free/mo — reoon.com/email-verifier');
-  savedPh('zerobounce-key', data.zerobounce_api_key_set, '100 free/mo — best for M365/Workspace catch-alls');
+  savedPh('reoon-key', data.reoon_api_key_set, '600 free/mo, reoon.com/email-verifier');
+  savedPh('zerobounce-key', data.zerobounce_api_key_set, '100 free/mo, best for M365/Workspace catch-alls');
   savedPh('hunter-key', data.hunter_api_key_set, '50 free/mo + email-pattern lookup');
-  savedPh('prospeo-key', data.prospeo_api_key_set, 'Free monthly credits — prospeo.io');
+  savedPh('prospeo-key', data.prospeo_api_key_set, 'Free monthly credits, prospeo.io');
   savedPh('apollo-key', data.apollo_api_key_set, 'Finds a verified work email when the guess can’t be verified');
   savedPh('linkedin-password', data.linkedin_password_set, 'Enter password');
   savedPh('cf-api-token', data.cloudflare_api_token_set, 'Your Cloudflare API Token');
@@ -1377,7 +1377,7 @@ async function saveEnv(payload, okMsg) {
     body: JSON.stringify(payload)
   });
   if (data && data.success) showToast(okMsg, 'success');
-  else showToast((data && data.message) || 'Save failed — is the dashboard still running?', 'error');
+  else showToast((data && data.message) || 'Save failed, is the dashboard still running?', 'error');
 }
 
 // Secrets are only sent when typed: an empty box means "keep the saved one".
@@ -1485,7 +1485,7 @@ async function loadLogs() {
 
 // ── Pipeline data ──
 
-// Calls today per subscription — each labelled with the provider it ran on.
+// Calls today per subscription, each labelled with the provider it ran on.
 function brainCallChips(data) {
   const chip = (label, n) => '<span class="chip">' + label + ' calls today <b>' + escHtml(String(n || 0)) + '</b></span>';
   const codex = data.codex_calls_today || 0;
@@ -1562,7 +1562,7 @@ async function loadUsage() {
   quotaEl.innerHTML = qHtml;
   quotaEl.style.display = qHtml ? 'block' : 'none';
 
-  // Totals cards — usage-first (calls is the headline; tokens as chips).
+  // Totals cards, usage-first (calls is the headline; tokens as chips).
   // No dollars: on a subscription plan usage isn't billed per token.
   const t = data.totals || {};
   const card = (label, p) => {
@@ -1578,7 +1578,7 @@ async function loadUsage() {
   };
   statsEl.innerHTML = card('Today', t.today) + card('Last 7 Days', t.week) + card('Last 30 Days', t.month);
 
-  // Daily columns — output tokens per day (the work done)
+  // Daily columns, output tokens per day (the work done)
   const dailyEl = document.getElementById('usage-daily');
   const days = (data.by_day || []).slice(-30);
   if (days.length) {
@@ -1596,7 +1596,7 @@ async function loadUsage() {
     dailyEl.style.display = 'none';
   }
 
-  // Breakdown tables — calls + tokens, no cost column
+  // Breakdown tables, calls + tokens, no cost column
   const tablesEl = document.getElementById('usage-tables');
   const table = (title, rows, keyName) => {
     if (!rows || !rows.length) return '';
@@ -1677,7 +1677,7 @@ async function loadOutbox() {
       : '<button class="btn btn-secondary btn-sm" onclick="sendingToggle(\'pause\')">' +
         'Pause all sending</button>');
 
-  // The kill switch gets a banner only when it's actually on — a permanent
+  // The kill switch gets a banner only when it's actually on, a permanent
   // bar for a thing that isn't happening is just noise.
   banner.innerHTML = sendingModeBanner(_sendingMode) + (data.paused
     ? '<div class="banner bad">' + icon('alert') + '<div><b>Sending is paused</b>' +
@@ -2016,7 +2016,7 @@ document.addEventListener('keydown', e => {
 async function outboxAct(id, action) {
   if (deskBusy()) return;
   const data = await api('/api/outbox/' + encodeURIComponent(id) + '/' + action, {method: 'POST'});
-  if (data && data.success) showToast(action === 'approve' ? 'Approved — will send on schedule.' : 'Rejected.', 'success');
+  if (data && data.success) showToast(action === 'approve' ? 'Approved, will send on schedule.' : 'Rejected.', 'success');
   else showToast(failMsg(data, 'Action failed.'), 'error');
   loadOutbox();
 }
@@ -2129,7 +2129,7 @@ function companyInfoCard(company, profile) {
     row('Area', escHtml(c.location)) +
     row('Why selected', escHtml(reg.why_selected || (company.fit_reasons || []).join(' · '))) +
     row('Status', '<b>' + escHtml(reg.status || company.register_status || '') + '</b>' +
-      (reg.why_not_contacted || company.register_why ? ' — ' + escHtml(reg.why_not_contacted || company.register_why) : '')) +
+      (reg.why_not_contacted || company.register_why ? ', ' + escHtml(reg.why_not_contacted || company.register_why) : '')) +
     row('People named on site', list(people, 8)) +
     row('Contact form', form ? link(form.value_text, form.value_text) : '') +
     row('Hiring', list(by('HIRING_ROLE'), 6)) +
@@ -2378,7 +2378,7 @@ async function showOptOut(prospectId, email) {
 }
 
 // Opens a filled-in compose window in whatever Gmail account the browser is
-// logged into. Nothing is sent from here — the user reads it and presses Send.
+// logged into. Nothing is sent from here, the user reads it and presses Send.
 // Same values as the Sender's _render, so a hand-sent email reads the same.
 function fillMergeVars(text, r) {
   const inbox = r.source === 'company_inbox';
@@ -2423,7 +2423,7 @@ async function openInGmail(ci, si, ri) {
   }
   w.opener = null;
   // Record the send BEFORE the user can press Send in Gmail, so Xorora Prospector can
-  // never email them as well — not even if they forget to tick the box.
+  // never email them as well, not even if they forget to tick the box.
   _gmailBusy = true;
   let claimed = r.sent_by_hand;
   try { if (!claimed) claimed = await markSent(ci, ri, true); } finally { _gmailBusy = false; }
@@ -2568,7 +2568,7 @@ async function loadConversations() {
   _convos = data;
   if (!data.length) {
     el.innerHTML = emptyState(icon('conversations'), 'No conversations yet',
-      'No prospects have replied so far. When they do, the Handler agent classifies each reply and responds — every thread shows up here.');
+      'No prospects have replied so far. When they do, the Handler agent classifies each reply and responds, every thread shows up here.');
     return;
   }
   // Open on "Needs you" only when something needs you.
@@ -2734,7 +2734,7 @@ setInterval(async () => {
 }, 20000);
 
 // Data tabs: auto-refresh live views without clobbering anything in progress.
-// Outbox, settings and help are deliberately excluded — re-rendering the desk
+// Outbox, settings and help are deliberately excluded, re-rendering the desk
 // under someone mid-decision loses their place, and settings may be mid-edit.
 setInterval(() => {
   if (document.hidden || _locked) return;

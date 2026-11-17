@@ -1,4 +1,4 @@
-// Xorora Prospector — team member portal.
+// Xorora Prospector, team member portal.
 // Each person signs in with their own name, work email and password and sees
 // only their own campaigns, plus a read-only list of teammates' campaigns.
 

@@ -1,4 +1,4 @@
-"""Xorora Prospector Dashboard — local web UI to set up, control, and monitor Xorora Prospector."""
+"""Xorora Prospector Dashboard, local web UI to set up, control, and monitor Xorora Prospector."""
 
 import asyncio
 import ipaddress
@@ -38,7 +38,7 @@ TOKEN_FILE = PROJECT_ROOT / "data" / "dashboard-token"
 
 
 def _resolve_config_file() -> Path:
-    """harvey.local.yaml wins when present — same resolution as config.py's
+    """harvey.local.yaml wins when present, same resolution as config.py's
     loader, so the dashboard doesn't judge setup complete against the
     tracked harvey.yaml template while the real trained config sits in the
     gitignored local override."""
@@ -359,7 +359,7 @@ async def get_setup_status():
         "id": "verifier", "label": "Email verification key",
         "done": verifier_set,
         "required": True,
-        "help": "Add a Reoon (free 600/mo), ZeroBounce, or Hunter key in Settings — "
+        "help": "Add a Reoon (free 600/mo), ZeroBounce, or Hunter key in Settings, "
                 "without one, found emails stay 'guess' and are never sent.",
     })
 
@@ -458,7 +458,7 @@ def _current_provider() -> str:
 
 @app.get("/api/settings")
 async def get_settings():
-    """Get current settings — presence flags only for secrets, never raw values."""
+    """Get current settings, presence flags only for secrets, never raw values."""
     env_vars = _read_env_file()
     all_keys = [
         "INSTANTLY_API_KEY", "LINKEDIN_EMAIL", "LINKEDIN_PASSWORD",
@@ -2685,7 +2685,7 @@ async def estimate_discovery(request: Request):
 async def start_discovery(request: Request):
     """Kick off a run in the background and hand back immediately.
 
-    Discovery takes minutes, not milliseconds — holding the request open
+    Discovery takes minutes, not milliseconds, holding the request open
     would just time out. Progress shows up in the run log.
     """
     global _discovery_task, _discovery_report
@@ -2819,7 +2819,7 @@ async def _scalar(sql: str, params: tuple = ()) -> int:
 
 
 async def _first(sql: str, params: tuple = (), key: str = "t"):
-    """First row's `key`, or None — query_db returns [] on any DB problem."""
+    """First row's `key`, or None, query_db returns [] on any DB problem."""
     rows = await query_db(sql, params)
     return rows[0].get(key) if rows else None
 
@@ -2846,7 +2846,7 @@ async def get_live_status():
 
     Built for someone who would otherwise keep asking "what's the status?".
     Everything is derived from the database, so it is true whatever started
-    the work — `xorora-prospector run`, a CLI command, or a one-off script. Every total
+    the work, `xorora-prospector run`, a CLI command, or a one-off script. Every total
     counts only what the step can act on (a business with no website is never
     read), so a finished step always reaches 100% instead of sticking.
     """
@@ -2971,9 +2971,9 @@ async def get_live_status():
 
     next_tab = ""   # where the next step is done, when it's done in the dashboard
     if reading or finding:
-        next_up = "Wait — Xorora Prospector is working. This page updates by itself."
+        next_up = "Wait, Xorora Prospector is working. This page updates by itself."
     elif finding_emails:
-        next_up = "Wait — emails are being found."
+        next_up = "Wait, emails are being found."
     elif stopped:
         next_up, next_tab = "A job stopped before finishing. Run it again.", "discover"
     elif harvey_sends and awaiting_review:
@@ -3167,7 +3167,7 @@ async def get_today():
                 "key": "discover", "tone": "good",
                 "title": "No companies yet",
                 "detail": ("Signals are confirmed but nothing has been collected. "
-                           "Discovery is free to try — no account needed."),
+                           "Discovery is free to try, no account needed."),
                 "action": "Find businesses", "tab": "discover",
             })
 
@@ -3177,7 +3177,7 @@ async def get_today():
                 "key": "profile", "tone": "good",
                 "title": f"{unprofiled} companies not looked at yet",
                 "detail": ("Reading their websites is free and it is what makes "
-                           "an email specific — who their agency is, what they "
+                           "an email specific, who their agency is, what they "
                            "are missing, whether they are spending on ads."),
                 "action": "Read their sites", "tab": "discover",
             })
@@ -3228,22 +3228,22 @@ async def get_today():
 
 CATEGORY_META = {
     "discovery": {
-        "label": "Discovery — who exists",
+        "label": "Discovery, who exists",
         "blurb": "How Xorora Prospector finds businesses at all, and how visible they are. "
                  "This is the only stage that costs money.",
     },
     "profile": {
-        "label": "Profile — what they are",
+        "label": "Profile, what they are",
         "blurb": "Read from the pages a business already publishes. Free, no AI "
                  "tokens, three HTTP requests per company. These are the signals "
                  "that make an email specific.",
     },
     "people": {
-        "label": "People — who decides",
+        "label": "People, who decides",
         "blurb": "Named humans and whether they're the one who can say yes.",
     },
     "verification": {
-        "label": "Contactability — can you reach them",
+        "label": "Contactability, can you reach them",
         "blurb": "Whether the address will actually deliver, and what to do when "
                  "it won't.",
     },
@@ -3260,7 +3260,7 @@ async def get_signals():
         state = _state()
         await state.init_db()
         # Seeding is idempotent and never overrides a decision the user made,
-        # so it is safe to run on every load — new signals shipped in an
+        # so it is safe to run on every load, new signals shipped in an
         # upgrade show up as `proposed` without any migration step.
         await seed_signal_catalog(state)
 
@@ -3427,10 +3427,10 @@ async def preview_cohort(request: Request):
     """How many companies carry ALL these signals and none of those.
 
     The payoff for confirming signals: a cohort is a query, not a list. Set
-    intersection happens in SQL — intersecting in JS over a capped fetch
+    intersection happens in SQL, intersecting in JS over a capped fetch
     silently returns the wrong answer. ``offset``/``limit`` page through the
     matches; ``size`` is always the whole cohort. ``ranges`` adds numeric
-    filters — ``[{"code": "SERP_RANK", "min": 11, "max": 30}]``.
+    filters, ``[{"code": "SERP_RANK", "min": 11, "max": 30}]``.
     """
     try:
         body = await request.json()
@@ -3465,7 +3465,7 @@ def _csv_cell(value):
 
 @app.get("/api/cohort.csv")
 async def export_cohort(require: str = "", exclude: str = "", ranges: str = ""):
-    """The whole cohort as a CSV download — every match, not just one page."""
+    """The whole cohort as a CSV download, every match, not just one page."""
     import csv
     import io
 
@@ -3497,7 +3497,7 @@ async def export_cohort(require: str = "", exclude: str = "", ranges: str = ""):
 
 @app.get("/api/runs")
 async def get_runs_api():
-    """The collector run log — what ran, when, what it produced and cost."""
+    """The collector run log, what ran, when, what it produced and cost."""
     try:
         state = _state()
         await state.init_db()
@@ -3532,7 +3532,7 @@ async def static_file(path: str):
 
     Read per-request rather than cached at import: editing app.css and hitting
     reload is the whole point of having them as real files. Fonts are vendored
-    rather than fetched from a CDN — this is a local tool and it should work
+    rather than fetched from a CDN, this is a local tool and it should work
     with the network off.
     """
     target = (WEB_DIR / path).resolve()
