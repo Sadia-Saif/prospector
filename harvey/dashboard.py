@@ -721,6 +721,18 @@ async def _autostart_agent():
     """Bring the agent back after the dashboard restarts (a deploy, a reboot),
     unless someone stopped it on purpose."""
     asyncio.get_running_loop().create_task(_keep_campaigns_supplied())
+    # A restart stops any company search mid-way: run those again.
+    try:
+        from harvey import team
+        state = _state()
+        await state.init_db()
+        for r in await team.load_requests(state):
+            if r.get("discovery") == "running":
+                await team.update_request(state, r["id"], discovery="queued",
+                                          discovery_note="Finding companies…")
+        _kick_team_discovery()
+    except Exception as e:
+        logger.warning("Couldn't resume campaign searches: %s", e)
     if AUTOSTART_FILE.exists():
         try:
             await start_harvey()

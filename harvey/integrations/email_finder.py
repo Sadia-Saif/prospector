@@ -688,6 +688,33 @@ async def apollo_match(first_name: str, last_name: str, domain: str,
     return email
 
 
+async def hunter_find(first_name: str, last_name: str, domain: str,
+                      api_key: str) -> Optional[str]:
+    """Hunter's email finder (free tier included). Used only when Hunter has
+    verified the address it returns."""
+    try:
+        async with httpx.AsyncClient(timeout=API_TIMEOUT) as client:
+            resp = await client.get(
+                "https://api.hunter.io/v2/email-finder",
+                params={"domain": domain, "first_name": first_name,
+                        "last_name": last_name, "api_key": api_key},
+            )
+    except httpx.HTTPError as e:
+        logger.debug(f"Hunter finder failed for {domain}: {e}")
+        return None
+    if resp.status_code != 200:
+        return None
+    try:
+        data = (resp.json() or {}).get("data") or {}
+    except ValueError:
+        return None
+    email = str(data.get("email") or "").strip().lower()
+    status = str(((data.get("verification") or {}).get("status")) or "").lower()
+    if not email or status != "valid" or email.partition("@")[2] != domain.lower():
+        return None
+    return email
+
+
 def _status_from_verdict(verdict: dict) -> Optional[str]:
     """Map a provider verdict dict to our status, or None if inconclusive."""
     if verdict.get("catch_all"):
@@ -897,6 +924,16 @@ async def find_email(
             if found and not _belongs_to_someone_else(found, pattern, (first_name, last_name), domain,
                                                       other_people, known_emails):
                 logger.info(f"Email for {first_name} {last_name}@{domain}: {found} [verified by Apollo]")
+                return EmailResult(email=found, status="verified",
+                                   pattern=infer_pattern_from_email(found, first_name, last_name) or pattern,
+                                   mx_type=mx_type)
+        hunter_key = _hunter_api_key()
+        if hunter_key and state is not None and await hunter_searches_remaining(state) > 0:
+            found = await hunter_find(first_name, last_name, domain, hunter_key)
+            await record_hunter_search(state)
+            if found and not _belongs_to_someone_else(found, pattern, (first_name, last_name), domain,
+                                                      other_people, known_emails):
+                logger.info(f"Email for {first_name} {last_name}@{domain}: {found} [verified by Hunter]")
                 return EmailResult(email=found, status="verified",
                                    pattern=infer_pattern_from_email(found, first_name, last_name) or pattern,
                                    mx_type=mx_type)
