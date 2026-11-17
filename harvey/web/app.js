@@ -1227,6 +1227,30 @@ function pageCohort(dir) {
 
 // ── Settings ──
 
+// Keys are shared by everyone; only admins change them.
+function lockSettingsForMembers() {
+  const admin = _meAccount && _meAccount.role === 'admin';
+  const panel = document.getElementById('settings');
+  if (!panel) return;
+  if (admin) {
+    const n = document.getElementById('keys-locked-note'); if (n) n.remove();
+    panel.querySelectorAll('.fields input, .fields select, .fields textarea, .fields button').forEach(e => { e.disabled = false; });
+    panel.querySelectorAll('button[title="Admins only"]').forEach(b => { b.disabled = false; b.title = ''; });
+    return;
+  }
+  if (!document.getElementById('keys-locked-note')) {
+    const note = document.createElement('div');
+    note.id = 'keys-locked-note';
+    note.className = 'keys-locked';
+    note.textContent = 'Keys and accounts are set by admins and used by the whole team. Ask an admin to change them.';
+    panel.querySelector('.section-head').after(note);
+  }
+  panel.querySelectorAll('.fields input, .fields select, .fields textarea').forEach(e => { e.disabled = true; });
+  panel.querySelectorAll('.fields button, button[onclick^="save"], button[onclick*="truly" i]').forEach(b => {
+    if (/^(save|connect)|truly/i.test(b.getAttribute('onclick') || '')) { b.disabled = true; b.title = 'Admins only'; }
+  });
+}
+
 async function loadSettings() {
   const data = await api('/api/settings');
   if (!data) return;
@@ -1294,6 +1318,7 @@ async function loadSettings() {
   tag('hunter-status', data.hunter_api_key_set, 'set');
   tag('prospeo-status', data.prospeo_api_key_set, 'set');
   tag('apollo-status', data.apollo_api_key_set, 'set');
+  lockSettingsForMembers();
 }
 
 function saveGmail() {
@@ -2822,6 +2847,7 @@ let _meAccount = null;
     }
     _lsSet(TEAM_NAME_KEY, _meAccount.name);
     renderWhoAmI();
+    lockSettingsForMembers();
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else setTimeout(go, 0);
 })();

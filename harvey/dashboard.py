@@ -397,8 +397,22 @@ async def get_settings():
     }
 
 
+async def _admins_only(request: Request):
+    """Keys and accounts are shared by the whole team, so only admins change them."""
+    from harvey import members
+    state = _state()
+    await state.init_db()
+    m = await members.member_for_token(state, request.headers.get("x-member-session", ""))
+    if members.is_admin(m):
+        return None
+    return JSONResponse({"success": False, "message": "Only admins can change keys and accounts.",
+                         "error": "Only admins can change keys and accounts."}, status_code=403)
+
+
 @app.post("/api/settings/env")
 async def save_env_settings(request: Request):
+    if (denied := await _admins_only(request)) is not None:
+        return denied
     """Save environment variables to .env file."""
     try:
         data = await request.json()
@@ -442,6 +456,8 @@ async def save_env_settings(request: Request):
 
 @app.post("/api/trulyinbox/connect")
 async def trulyinbox_connect(request: Request):
+    if (denied := await _admins_only(request)) is not None:
+        return denied
     """Check a TrulyInbox key against the sending mailbox, then save it to .env."""
     from harvey import deliverability as d
     from harvey.integrations import trulyinbox as ti
@@ -486,7 +502,9 @@ async def trulyinbox_connect(request: Request):
 
 
 @app.post("/api/trulyinbox/other")
-async def trulyinbox_other():
+async def trulyinbox_other(request: Request):
+    if (denied := await _admins_only(request)) is not None:
+        return denied
     """The user warms their mailbox with another service: stop recommending one."""
     from harvey.integrations import trulyinbox as ti
     state = _state()
