@@ -145,3 +145,7 @@ input,select,textarea{border-radius:12px}
 .m-sug-chip{border:1px dashed rgba(242,107,33,.55);background:var(--surface);color:var(--text);border-radius:999px;padding:5px 12px;font:inherit;font-size:13px;cursor:pointer}
 .m-sug-chip:hover{border-style:solid;border-color:#F26B21}
 .m-sug-chip.on{background:#F26B21;border-color:#F26B21;border-style:solid;color:#fff}
+
+.whoami-links{margin-left:auto;display:flex;gap:10px}
+.whoami-links a{margin-left:0 !important}
+.whoami-role{font-style:normal;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:1px 6px;border-radius:999px;background:#F26B21;color:#fff;margin-left:4px}

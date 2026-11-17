@@ -2757,11 +2757,23 @@ function renderWhoAmI() {
   const el = document.getElementById('whoami');
   if (!el) return;
   const n = me();
+  const admin = _meAccount && _meAccount.role === 'admin';
   el.innerHTML = n
     ? '<span class="whoami-avatar">' + escHtml(n.charAt(0).toUpperCase()) + '</span>' +
-      '<span class="whoami-name">' + escHtml(n) + '</span>' +
-      '<a href="#" onclick="askTeamName(true);return false">Switch</a>'
-    : '<a href="#" onclick="askTeamName(true);return false">Sign in with your name</a>';
+      '<span class="whoami-name">' + escHtml(n) + (admin ? ' <em class="whoami-role">Admin</em>' : '') + '</span>' +
+      '<span class="whoami-links">' + (admin ? '<a href="/member#team-members">Team</a>' : '') +
+      '<a href="#" onclick="signOutMember();return false">Sign out</a></span>'
+    : '<a href="/member">Sign in</a>';
+}
+
+async function signOutMember() {
+  let session = '';
+  try { session = localStorage.getItem('xorora.member.session') || ''; } catch {}
+  if (session) await fetch('/api/member/logout', {method: 'POST', headers: {'X-Member-Session': session}}).catch(() => {});
+  try {
+    ['xorora.member.session', 'harvey-dashboard-token', 'xorora.teamName'].forEach(k => localStorage.removeItem(k));
+  } catch {}
+  location.replace('/member');
 }
 
 async function askTeamName(force) {
@@ -2795,8 +2807,22 @@ async function askTeamName(force) {
   input.focus();
 }
 
+let _meAccount = null;
 (function signInByName() {
-  const go = () => { if (typeof authToken === 'function' && !authToken()) return; askTeamName(false); };
+  const go = async () => {
+    if (typeof authToken === 'function' && !authToken()) return;
+    let session = '';
+    try { session = localStorage.getItem('xorora.member.session') || ''; } catch {}
+    if (!session) { location.replace('/member'); return; }
+    const t = await api('/api/team');
+    _meAccount = t && t.me;
+    if (!_meAccount) {  // session expired or removed: sign in again
+      try { localStorage.removeItem('xorora.member.session'); } catch {}
+      location.replace('/member'); return;
+    }
+    _lsSet(TEAM_NAME_KEY, _meAccount.name);
+    renderWhoAmI();
+  };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else setTimeout(go, 0);
 })();
 function setTeamFilter(v) { _teamFilterValue = v; loadCampaigns(); }
@@ -2845,7 +2871,7 @@ async function loadTeamPanel(force) {
     '<div class="team-section">Who’s sending</div>' +
     '<div class="team-grid">' +
       '<label><span>Sending as</span><input id="tm-owner" class="team-input" readonly value="' + escHtml(me()) + '">' +
-        '<span class="team-hint">Not you? <a href="#" onclick="askTeamName(true);return false">Switch name</a></span></label>' +
+        '<span class="team-hint">Your account name.</span></label>' +
       '<label><span>Send from (Instantly)</span>' + accHtml + '</label>' +
     '</div>' +
     '<div class="team-section">What you’re offering <a href="#" onclick="toggleServiceEditor();return false">Edit services</a></div>' +
@@ -2880,7 +2906,7 @@ async function loadTeamPanel(force) {
   const camps = (team && team.campaigns) || [];
   const owners = (team && team.owners) || [];
   const who = _teamFilter();
-  const mine = c => _sameName(c.owner, me());
+  const mine = c => !!c.mine;
   const shown = (who ? camps.filter(c => _sameName(c.owner, who)) : camps).slice()
     .sort((a, b) => (mine(b) - mine(a)));
   const statusLabel = c => {
@@ -2913,7 +2939,8 @@ async function loadTeamPanel(force) {
       '</div>' +
       '<div class="tc-bar"><i style="width:' + pct + '%"></i></div>' +
       (c.discovery_note ? '<div class="team-hint">' + escHtml(c.discovery_note) + '</div>' : '') +
-      ('<div class="tc-actions">' +
+      (!c.can_edit ? '<div class="tc-actions"><span class="team-hint">Run by ' + escHtml(personName(c.owner)) + '. Only they or an admin can change it.</span></div></div>' :
+      '<div class="tc-actions">' +
         '<button class="btn btn-secondary btn-sm" onclick="editTeamCampaign(\'' + c.id + '\')">Edit</button>' +
         (c.status === 'active'
           ? '<button class="btn btn-secondary btn-sm" onclick="teamAction(\'' + c.id + '\',\'stop\')">Pause</button>'
@@ -2991,7 +3018,7 @@ async function startTeamCampaign(btn) {
   // Cities keep their commas ("Miami, FL"); only semicolons separate them.
   const splitR = t => (t || '').split(/[;\n]/).map(x => x.trim()).filter(Boolean);
   v.owner = me();
-  if (!v.owner) { askTeamName(true); return; }
+  if (!_meAccount) { location.replace('/member'); return; }
   if (!v.account) { msg.textContent = 'Pick the mailbox to send from.'; return; }
   if (!v.service) { msg.textContent = 'Pick the service to offer.'; return; }
   if (!split(v.titles).length) { msg.textContent = 'Add who to email, e.g. CEO; Founder.'; return; }

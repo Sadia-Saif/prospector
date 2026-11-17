@@ -51,6 +51,9 @@ function authFetch(path, opts) {
   const headers = new Headers(o.headers || {});
   const token = authToken();
   if (token) headers.set('Authorization', 'Bearer ' + token);
+  let member = '';
+  try { member = localStorage.getItem('xorora.member.session') || ''; } catch { /* ignore */ }
+  if (member) headers.set('X-Member-Session', member);
   o.headers = headers;
   o.mode = 'same-origin';
   o.credentials = 'omit';

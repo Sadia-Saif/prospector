@@ -1651,11 +1651,12 @@ async def _team_stats(state, req: dict) -> dict:
 
 
 @app.get("/api/team")
-async def team_overview():
+async def team_overview(request: Request):
     """Every team campaign with its progress, and who has campaigns."""
-    from harvey import team
+    from harvey import team, members
     state = _state()
     await state.init_db()
+    caller = await _caller(state, request)
     out = []
     for r in await team.load_requests(state):
         view = {k: r.get(k) for k in (
@@ -1664,11 +1665,34 @@ async def team_overview():
             "discovery_note", "created_at")}
         view["service"] = (r.get("service") or {}).get("name", "")
         view.update(await _team_stats(state, r))
+        view["can_edit"] = _may_change(r, caller)
+        view["mine"] = bool(caller) and r.get("member_id") == caller["id"]
         out.append(view)
     owners = sorted({r["owner"] for r in out if r.get("owner")})
     _kick_team_discovery()
     return {"team_mode": await team.team_mode(state), "owners": owners,
-            "campaigns": out}
+            "campaigns": out, "me": members.public(caller) if caller else None}
+
+
+async def _caller(state, request: Request):
+    """The signed-in team member making a dashboard call, or None."""
+    from harvey import members
+    return await members.member_for_token(state, request.headers.get("x-member-session", ""))
+
+
+def _may_change(req: dict, m: dict | None) -> bool:
+    """Admins change any campaign; everyone else only their own."""
+    from harvey import members
+    if not m:
+        return False
+    if members.is_admin(m) or req.get("member_id") == m["id"]:
+        return True
+    # Campaigns started before accounts existed belong to whoever's name is on them.
+    if not req.get("member_id"):
+        owner = str(req.get("owner") or "").strip().lower()
+        return owner in (m["name"].lower(), m["email"].lower(),
+                         m["email"].split("@")[0].replace(".", " ").lower())
+    return False
 
 
 @app.post("/api/team/campaign")
@@ -1676,13 +1700,17 @@ async def team_start_campaign(request: Request):
     """Start a personal campaign: who, what service, which companies, which mailbox."""
     state = _state()
     await state.init_db()
+    m = await _caller(state, request)
     try:
         body = await request.json()
         if not isinstance(body, dict):
             raise ValueError("request body must be an object")
     except (ValueError, TypeError) as e:
         return JSONResponse({"success": False, "error": str(e)}, status_code=400)
-    return await _create_team_campaign(state, body)
+    if not m:
+        return JSONResponse({"success": False, "error": "Sign in at the team page to start a campaign."},
+                            status_code=401)
+    return await _create_team_campaign(state, body, member=m)
 
 
 async def _create_team_campaign(state, body: dict, member: dict | None = None):
@@ -1814,10 +1842,18 @@ async def _apply_mailbox_limits(accounts: list[str], limit: int, campaign_ids=()
 
 
 @app.post("/api/team/campaign/{request_id}/{action}")
-async def team_campaign_action(request_id: str, action: str, request: Request):
+async def team_campaign_action(request_id: str, action: str, request: Request,
+                               _checked: bool = False):
     from harvey import team
     state = _state()
     await state.init_db()
+    if not _checked:
+        m = await _caller(state, request)
+        req = next((r for r in await team.load_requests(state) if r.get("id") == request_id), None)
+        if req and not _may_change(req, m):
+            return JSONResponse({"success": False,
+                                 "error": "Only the person who started this campaign (or an admin) can change it."},
+                                status_code=403)
     if action == "edit":
         return await _edit_team_campaign(state, request_id, await _json_body(request))
     if action == "limit":
@@ -1935,8 +1971,6 @@ async def member_admin_token(request: Request):
     state, m = await _member(request)
     if not m:
         return _signin_needed()
-    if not members.is_admin(m):
-        return JSONResponse({"success": False, "error": "Admins only."}, status_code=403)
     return {"success": True, "token": token_store.get()}
 
 
@@ -2067,7 +2101,7 @@ async def member_campaign_action(request_id: str, action: str, request: Request)
     if not await _own_request(state, m, request_id):
         return JSONResponse({"success": False, "error": "Only the person who started a campaign can change it."},
                             status_code=403)
-    return await team_campaign_action(request_id, action, request)
+    return await team_campaign_action(request_id, action, request, _checked=True)
 
 
 @app.get("/api/member/campaign/{request_id}/contacts")

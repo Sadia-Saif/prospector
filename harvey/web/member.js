@@ -166,7 +166,9 @@ async function boot() {
   if (!r || !r.success) return;
   me = r.member;
   // Admins work in the full dashboard: take them straight there.
-  if (me.role === 'admin') { openAdmin(); return; }
+  // Everyone works in the full dashboard. #team-members opens the people list for admins.
+  if (location.hash !== '#team-members') { openAdmin(); return; }
+  history.replaceState(null, '', location.pathname);
   $('m-user').innerHTML = '<span class="m-avatar">' + esc(me.name.charAt(0).toUpperCase()) + '</span>' +
     '<span class="m-who"><b>' + esc(me.name) + (me.role === 'admin' ? ' <em class="m-role">Admin</em>' : '') +
       '</b><small>' + esc(me.email) + '</small></span>' +
