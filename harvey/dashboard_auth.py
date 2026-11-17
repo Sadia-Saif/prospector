@@ -277,7 +277,7 @@ def is_loopback(host: str) -> bool:
 def is_public_path(method: str, path: str) -> bool:
     if method not in ("GET", "HEAD"):
         return False
-    if path == "/":
+    if path in ("/", "/member"):
         return True
     if not path.startswith("/static/"):
         return False
@@ -347,7 +347,7 @@ class DashboardGuard:
 
         # 2. Browser provenance.
         public = is_public_path(method, path)
-        navigation = (method in ("GET", "HEAD") and path == "/"
+        navigation = (method in ("GET", "HEAD") and path in ("/", "/member")
                       and headers.get("sec-fetch-mode", [""])[0] == "navigate"
                       and headers.get("sec-fetch-dest", [""])[0] == "document")
         origins = headers.get("origin", [])
@@ -359,6 +359,17 @@ class DashboardGuard:
             return await deny(403, "cross_origin", "Cross-site requests are refused.")
 
         if public:
+            return await self.app(scope, receive, send_secured)
+
+        # Team members: their own session token, checked by the member routes,
+        # which only ever expose that member's own campaigns.
+        if path.startswith("/api/member/"):
+            if method in _UNSAFE_METHODS:
+                ctype = headers.get("content-type", [""])[0]
+                length = headers.get("content-length", ["0"])[0].strip()
+                if length not in ("", "0") and not _is_json(ctype):
+                    return await deny(415, "unsupported_media_type",
+                                      "Request bodies must be application/json.")
             return await self.app(scope, receive, send_secured)
 
         # 3. Token (fail closed when it can't be loaded).

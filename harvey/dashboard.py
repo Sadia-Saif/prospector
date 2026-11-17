@@ -660,10 +660,29 @@ async def get_harvey_status():
     return {"running": pid is not None, "pid": pid, "started_at": started}
 
 
+AUTOSTART_FILE = PROJECT_ROOT / "data" / "autostart"
+
+
+@app.on_event("startup")
+async def _autostart_agent():
+    """Bring the agent back after the dashboard restarts (a deploy, a reboot),
+    unless someone stopped it on purpose."""
+    if AUTOSTART_FILE.exists():
+        try:
+            await start_harvey()
+        except Exception as e:
+            logger.warning("Autostart failed: %s", e)
+
+
 @app.post("/api/harvey/start")
 async def start_harvey():
     """Start Xorora Prospector's heartbeat loop as a subprocess."""
     global _harvey_process, _harvey_started_at
+    try:
+        AUTOSTART_FILE.parent.mkdir(parents=True, exist_ok=True)
+        AUTOSTART_FILE.write_text("1\n")
+    except OSError:
+        pass
 
     if _check_harvey_pid():
         return {"success": False, "message": "Xorora Prospector is already running."}
@@ -711,6 +730,7 @@ async def start_harvey():
 async def stop_harvey():
     """Stop the Xorora Prospector subprocess."""
     global _harvey_process, _harvey_started_at
+    AUTOSTART_FILE.unlink(missing_ok=True)
 
     pid = _check_harvey_pid()
     if not pid:
@@ -1616,15 +1636,22 @@ async def team_overview():
 @app.post("/api/team/campaign")
 async def team_start_campaign(request: Request):
     """Start a personal campaign: who, what service, which companies, which mailbox."""
-    from harvey import team
-    from harvey.collectors.discover import PROVIDERS
     state = _state()
     await state.init_db()
     try:
         body = await request.json()
         if not isinstance(body, dict):
             raise ValueError("request body must be an object")
-        owner = team.clean_name(body.get("owner"), 60)
+    except (ValueError, TypeError) as e:
+        return JSONResponse({"success": False, "error": str(e)}, status_code=400)
+    return await _create_team_campaign(state, body)
+
+
+async def _create_team_campaign(state, body: dict, member: dict | None = None):
+    from harvey import team
+    from harvey.collectors.discover import PROVIDERS
+    try:
+        owner = team.clean_name(member["name"] if member else body.get("owner"), 60)
         if not owner:
             raise ValueError("Enter your name.")
         accounts = body.get("accounts") or []
@@ -1651,6 +1678,7 @@ async def team_start_campaign(request: Request):
         daily_limit = team.clean_daily_limit(body.get("daily_limit"))
         name = team.clean_name(body.get("name")) or (
             f"{service['name'].split(' (')[0]} · {industries[0]} · {regions[0]}")
+        titles = team.clean_list(body.get("titles")) or team.icp_for(service["name"])["titles"]
     except (ValueError, TypeError) as e:
         return JSONResponse({"success": False, "error": str(e)}, status_code=400)
 
@@ -1660,6 +1688,7 @@ async def team_start_campaign(request: Request):
         industries=industries, regions=regions, headcount=headcount,
         provider=provider, max_spend=max_spend, max_leads=max_leads,
         company_ids=existing, daily_limit=daily_limit,
+        member_id=member["id"] if member else "", titles=titles,
     )
     await _apply_mailbox_limits(accounts, daily_limit)
     _kick_team_discovery()
@@ -1723,6 +1752,185 @@ async def team_campaign_action(request_id: str, action: str, request: Request):
     return {"success": True}
 
 
+# ── Team member portal: each person signs in and sees only their own ──
+
+TEAM_INVITE_FILE = PROJECT_ROOT / "data" / "team-invite"
+
+
+@app.get("/member", response_class=HTMLResponse)
+async def member_page():
+    return (WEB_DIR / "member.html").read_text(encoding="utf-8")
+
+
+async def _member(request: Request):
+    from harvey import members
+    state = _state()
+    await state.init_db()
+    token = request.headers.get("x-member-session", "")
+    return state, await members.member_for_token(state, token)
+
+
+def _signin_needed():
+    return JSONResponse({"success": False, "error": "signin",
+                         "message": "Please sign in again."}, status_code=401)
+
+
+async def _json_body(request: Request) -> dict:
+    try:
+        body = await request.json()
+    except Exception:
+        return {}
+    return body if isinstance(body, dict) else {}
+
+
+@app.post("/api/member/signup")
+async def member_signup(request: Request):
+    from harvey import members
+    body = await _json_body(request)
+    invite = members.load_or_create_invite(TEAM_INVITE_FILE)
+    if not members.invite_ok(body.get("invite"), invite):
+        return JSONResponse({"success": False, "error": "Open the team link you were sent to create an account."},
+                            status_code=403)
+    state = _state()
+    await state.init_db()
+    try:
+        member, token = await members.signup(state, name=body.get("name"), email=body.get("email"),
+                                             password=str(body.get("password") or ""))
+    except members.MemberError as e:
+        return JSONResponse({"success": False, "error": str(e)}, status_code=400)
+    return {"success": True, "session": token, "member": members.public(member)}
+
+
+@app.post("/api/member/login")
+async def member_login(request: Request):
+    from harvey import members
+    body = await _json_body(request)
+    state = _state()
+    await state.init_db()
+    try:
+        member, token = await members.login(state, email=body.get("email"),
+                                            password=str(body.get("password") or ""))
+    except members.MemberError as e:
+        return JSONResponse({"success": False, "error": str(e)}, status_code=400)
+    return {"success": True, "session": token, "member": members.public(member)}
+
+
+@app.post("/api/member/logout")
+async def member_logout(request: Request):
+    from harvey import members
+    state = _state()
+    await state.init_db()
+    await members.logout(state, request.headers.get("x-member-session", ""))
+    return {"success": True}
+
+
+@app.get("/api/member/me")
+async def member_me(request: Request):
+    from harvey import members
+    state, m = await _member(request)
+    if not m:
+        return _signin_needed()
+    return {"success": True, "member": members.public(m)}
+
+
+@app.get("/api/member/options")
+async def member_options(request: Request):
+    from harvey import team
+    state, m = await _member(request)
+    if not m:
+        return _signin_needed()
+    accounts = await team_accounts()
+    used_ind, used_reg = [], []
+    for r in await team.load_requests(state):
+        used_ind += r.get("industries") or []
+        used_reg += r.get("regions") or []
+    return {
+        "services": await team.load_services(state),
+        "headcounts": [h for h in team.HEADCOUNTS if h],
+        "accounts": accounts,
+        "suggest": {
+            "industries": list(dict.fromkeys(team.INDUSTRY_SUGGESTIONS + used_ind)),
+            "regions": list(dict.fromkeys(team.REGION_SUGGESTIONS + used_reg)),
+            "titles": team.TITLE_SUGGESTIONS,
+        },
+    }
+
+
+def _is_mine(req: dict, m: dict) -> bool:
+    return bool(m) and req.get("member_id") == m["id"]
+
+
+@app.get("/api/member/campaigns")
+async def member_campaigns(request: Request):
+    from harvey import team
+    state, m = await _member(request)
+    if not m:
+        return _signin_needed()
+    mine, others = [], []
+    for r in await team.load_requests(state):
+        stats = await _team_stats(state, r)
+        base = {"id": r.get("id"), "owner": r.get("owner"), "name": r.get("name"),
+                "service": (r.get("service") or {}).get("name", ""),
+                "status": r.get("status"), "discovery": r.get("discovery"),
+                "written": r.get("written") or 0, "max_leads": r.get("max_leads") or 0,
+                "companies": stats["companies"], "created_at": r.get("created_at")}
+        if _is_mine(r, m):
+            base.update({k: r.get(k) for k in ("industries", "regions", "headcount", "accounts",
+                                                "titles", "daily_limit", "discovery_note")})
+            base.update(stats)
+            mine.append(base)
+        else:
+            others.append(base)
+    _kick_team_discovery()
+    return {"success": True, "mine": mine, "team": others,
+            "agent_running": _check_harvey_pid() is not None}
+
+
+@app.post("/api/member/campaign")
+async def member_start_campaign(request: Request):
+    state, m = await _member(request)
+    if not m:
+        return _signin_needed()
+    return await _create_team_campaign(state, await _json_body(request), member=m)
+
+
+async def _own_request(state, m, request_id):
+    from harvey import team
+    for r in await team.load_requests(state):
+        if r.get("id") == request_id:
+            return r if _is_mine(r, m) else None
+    return None
+
+
+@app.post("/api/member/campaign/{request_id}/{action}")
+async def member_campaign_action(request_id: str, action: str, request: Request):
+    state, m = await _member(request)
+    if not m:
+        return _signin_needed()
+    if not await _own_request(state, m, request_id):
+        return JSONResponse({"success": False, "error": "Only the person who started a campaign can change it."},
+                            status_code=403)
+    return await team_campaign_action(request_id, action, request)
+
+
+@app.get("/api/member/campaign/{request_id}/contacts")
+async def member_campaign_contacts(request_id: str, request: Request):
+    state, m = await _member(request)
+    if not m:
+        return _signin_needed()
+    req = await _own_request(state, m, request_id)
+    if not req:
+        return JSONResponse({"success": False, "error": "Not your campaign."}, status_code=403)
+    ids = list(req.get("company_ids") or [])[:2000]
+    rows = []
+    if ids:
+        marks = ",".join("?" * len(ids))
+        rows = await query_db(
+            f"SELECT first_name, last_name, title, company, email, status FROM prospects "
+            f"WHERE company_id IN ({marks}) ORDER BY score DESC LIMIT 300", tuple(ids))
+    return {"success": True, "contacts": rows}
+
+
 _team_worker: "asyncio.Task | None" = None
 
 
@@ -1763,6 +1971,8 @@ async def _team_discovery_loop():
             config.icp.geography = cities
             if req.get("headcount"):
                 config.icp.company_size = req["headcount"] + " employees"
+            if req.get("titles"):
+                config.icp.titles = list(req["titles"])
             queries = build_queries(config, cities=cities,
                                     depth=30, limit=100)
             async with state._connect() as db:

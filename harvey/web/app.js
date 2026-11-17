@@ -2717,6 +2717,19 @@ function _lsGet(k) { try { return localStorage.getItem(k) || ''; } catch { retur
 function _lsSet(k, v) { try { localStorage.setItem(k, v); } catch {} }
 function _teamFilter() { return _teamFilterValue; }
 function me() { return _lsGet(TEAM_NAME_KEY).trim(); }
+// Show a person's name, never their email: "humayun.khan@x.com" -> "Humayun Khan".
+function personName(n) {
+  n = String(n || '').trim();
+  if (!n.includes('@')) return n;
+  return n.split('@')[0].split(/[._-]+/).filter(Boolean)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+function livePill(c) {
+  if (c.status === 'stopped') return '<span class="live-pill paused"><i></i>Paused</span>';
+  if (c.status === 'complete') return '<span class="live-pill done"><i></i>Done</span>';
+  if (c.discovery === 'failed') return '<span class="live-pill warn"><i></i>Needs attention</span>';
+  return '<span class="live-pill live"><i></i>Live</span>';
+}
 function _sameName(a, b) { return !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase(); }
 
 // Each person signs in with their name once (remembered on this browser).
@@ -2861,9 +2874,10 @@ async function loadTeamPanel(force) {
     const [label, tone] = statusLabel(c);
     const pct = Math.min(100, Math.round(100 * (c.written || 0) / Math.max(1, c.max_leads || 1)));
     return '<div class="tc-card' + (mine(c) ? ' tc-mine' : '') + '">' +
-      '<div class="tc-top"><div><span class="owner-chip">' + escHtml(mine(c) ? c.owner + ' (you)' : c.owner) + '</span> ' +
+      '<div class="tc-top"><div><span class="owner-chip">' + escHtml(personName(c.owner) + (mine(c) ? ' (you)' : '')) + '</span> ' +
         '<strong>' + escHtml(c.name) + '</strong></div>' +
-        '<span class="mini ' + tone + '">' + label + '</span></div>' +
+        livePill(c) + '</div>' +
+      '<div class="team-hint" style="margin:-4px 0 6px">' + escHtml(label) + '</div>' +
       '<div class="tc-meta">' + escHtml(c.service) + ' &middot; ' + escHtml((c.industries || []).join(', ')) +
         ' &middot; ' + escHtml((c.regions || []).join(', ')) +
         (c.headcount ? ' &middot; ' + escHtml(c.headcount) + ' employees' : '') +
@@ -2877,7 +2891,7 @@ async function loadTeamPanel(force) {
       '</div>' +
       '<div class="tc-bar"><i style="width:' + pct + '%"></i></div>' +
       (c.discovery_note ? '<div class="team-hint">' + escHtml(c.discovery_note) + '</div>' : '') +
-      (!mine(c) ? '<div class="tc-actions"><span class="team-hint">Run by ' + escHtml(c.owner) + '. Only they can pause or delete it.</span></div></div>' :
+      (!mine(c) ? '<div class="tc-actions"><span class="team-hint">Run by ' + escHtml(personName(c.owner)) + '.</span></div></div>' :
       '<div class="tc-actions">' +
         (c.status === 'active'
           ? '<button class="btn btn-secondary btn-sm" onclick="teamAction(\'' + c.id + '\',\'stop\')">Pause</button>'
@@ -2892,8 +2906,7 @@ async function loadTeamPanel(force) {
   const listHtml = '<div class="team-list-head"><h3>Team campaigns</h3>' +
       '<div class="team-filter"><button class="btn btn-sm ' + (!who ? 'btn-primary' : 'btn-secondary') + '" onclick="setTeamFilter(\'\')">Everyone</button>' +
       (me() ? '<button class="btn btn-sm ' + (who === me() ? 'btn-primary' : 'btn-secondary') + '" onclick="setTeamFilter(' + escHtml(JSON.stringify(me())) + ')">Mine</button>' : '') +
-      owners.filter(n => !_sameName(n, me())).map(n => '<button class="btn btn-sm ' + (who === n ? 'btn-primary' : 'btn-secondary') +
-        '" onclick="setTeamFilter(' + escHtml(JSON.stringify(n)) + ')">' + escHtml(n) + '</button>').join('') + '</div></div>' +
+      '</div></div>' +
       (list || '<p class="muted" style="font-size:13px">No campaigns yet. Start yours on the left.</p>') +
       '<p class="team-hint" style="margin-top:12px">Xorora Prospector must be running (Controls → Start) for campaigns to move. The emails it writes show below.</p>';
   const formEl = el.querySelector('.team-form');

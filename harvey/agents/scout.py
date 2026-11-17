@@ -1664,7 +1664,8 @@ Respond ONLY with the JSON array."""
         # already a prospect (a revisit), or anyone already on file from
         # another source, means the company is covered.
         reachable = any(c.email_status in ("verified", "risky") for c in contacts)
-        if not reachable and (contacts or not named_on_site) \
+        personal_only = getattr(self.config.icp, "personal_inbox_only", False)
+        if not personal_only and not reachable and (contacts or not named_on_site) \
                 and await self._company_uncontacted(company_id):
             inbox = await self._company_inbox_prospect(
                 company_id, domain, company_name, industry, signal_note,

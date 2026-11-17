@@ -75,6 +75,10 @@ class ICPConfig(BaseModel):
     # Each variant runs in every city alongside the industry itself, so the
     # estimate grows with it. Empty → each industry is its own one search.
     keyword_variants: dict[str, list[str]] = {}
+    # Email only named decision makers (owner, CEO, founder...). When on, a
+    # company whose site names nobody reachable is skipped rather than sent
+    # to its general inbox (info@, contact@).
+    personal_inbox_only: bool = False
 
 
 class WarmupConfig(BaseModel):
