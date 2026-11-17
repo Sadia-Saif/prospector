@@ -33,6 +33,7 @@ async def collect_prospects(
     statuses: list[str] | None = None,
     include_all: bool = False,
     config=None,
+    only_ids: set[str] | None = None,
 ) -> list[dict]:
     """Fetch prospects matching the filters as export-ready dicts.
 
@@ -71,6 +72,8 @@ async def collect_prospects(
         db.row_factory = aiosqlite.Row
         async with db.execute(sql, params) as cursor:
             rows = [dict(r) for r in await cursor.fetchall()]
+    if only_ids is not None:
+        rows = [r for r in rows if r.get("id") in only_ids]
 
     if not include_all:
         # A list for another sequencer is still contact: leave out anyone on
@@ -133,6 +136,7 @@ async def export_prospects_csv(
     statuses: list[str] | None = None,
     include_all: bool = False,
     config=None,
+    only_ids: set[str] | None = None,
 ) -> tuple[int, str]:
     """Export prospects to CSV. Returns (row_count, csv_text).
 
@@ -145,6 +149,7 @@ async def export_prospects_csv(
         statuses=statuses,
         include_all=include_all,
         config=config,
+        only_ids=only_ids,
     )
     text = to_csv(rows)
     if out_path:

@@ -52,6 +52,122 @@ def _resolve_config_file() -> Path:
 # route except the static shell needs the token (see dashboard_auth).
 app = FastAPI(title="Xorora Prospector Dashboard", docs_url=None, redoc_url=None, openapi_url=None)
 token_store = auth.TokenStore(TOKEN_FILE)
+
+
+# ── Personal data: each signed-in person sees only their own campaigns ──
+#
+# Once the team has accounts, every dashboard call must come from a signed-in
+# member, and the data pages (Today, Outbox, Conversations, Companies,
+# Contacts, Sequences, exports) show only the companies that person's own
+# campaigns found, and those companies' contacts, emails and replies. Admins
+# too. The Team campaigns panel on Campaigns is the one place people see each
+# other's progress. A single-user install with no accounts sees everything.
+
+import contextvars  # noqa: E402
+
+_SCOPE: contextvars.ContextVar = contextvars.ContextVar("xp_scope", default=None)
+# Paths any signed-in caller reaches without a personal scope check (they hold
+# no one's prospect data): the shell, member routes and server status.
+_UNSCOPED_PREFIXES = ("/api/member/",)
+
+
+class Scope:
+    """The companies and people one member may see."""
+
+    def __init__(self, member: dict, companies: set[str], prospects: set[str], names: set[str]):
+        self.member = member
+        self.companies = companies
+        self.prospects = prospects
+        self.names = names            # campaign owner names that are theirs
+
+
+def _scope() -> "Scope | None":
+    return _SCOPE.get()
+
+
+def _cw(col: str, joiner: str = "AND", kind: str = "companies") -> tuple[str, tuple]:
+    """(" AND col IN (...)", ids) for the caller's scope, or ("", ()) unscoped."""
+    sc = _scope()
+    if sc is None:
+        return "", ()
+    ids = sorted(getattr(sc, kind))
+    if not ids:
+        return f" {joiner} 0", ()
+    return f" {joiner} {col} IN ({','.join('?' * len(ids))})", tuple(ids)
+
+
+def _mine_company(company_id: str) -> bool:
+    sc = _scope()
+    return sc is None or company_id in sc.companies
+
+
+def _mine_prospect(prospect_id: str) -> bool:
+    sc = _scope()
+    return sc is None or prospect_id in sc.prospects
+
+
+def _owns(req: dict, m: dict) -> bool:
+    """A team campaign is this member's: theirs by account, or (for ones
+    started before accounts) by the name on it. Admins get no exception."""
+    if req.get("member_id"):
+        return req.get("member_id") == m["id"]
+    owner = str(req.get("owner") or "").strip().lower()
+    return bool(owner) and owner in (m["name"].lower(), m["email"].lower(),
+                                     m["email"].split("@")[0].replace(".", " ").lower())
+
+
+async def build_scope(state, m: dict) -> Scope:
+    from harvey import team
+    mine = [r for r in await team.load_requests(state) if _owns(r, m)]
+    companies = {c for r in mine for c in (r.get("company_ids") or []) if c}
+    prospects: set[str] = set()
+    ids = sorted(companies)
+    for i in range(0, len(ids), 900):
+        chunk = ids[i:i + 900]
+        rows = await query_db(f"SELECT id FROM prospects WHERE company_id IN ({','.join('?' * len(chunk))})",
+                              tuple(chunk))
+        prospects.update(r["id"] for r in rows)
+    names = {str(r.get("owner") or "").strip() for r in mine if r.get("owner")}
+    return Scope(m, companies, prospects, names)
+
+
+class _PersonalScope:
+    """Sets the caller's scope for every dashboard API call (inside the guard)."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        path = scope.get("path", "")
+        if scope.get("type") != "http" or not path.startswith("/api/") or path.startswith(_UNSCOPED_PREFIXES):
+            return await self.app(scope, receive, send)
+        from harvey import members
+        state = _state()
+        try:
+            await state.init_db()
+            accounts = await members.load_members(state)
+        except Exception:
+            accounts = []
+        if not accounts:
+            return await self.app(scope, receive, send)        # single user: everything
+        headers = dict((k.decode().lower(), v.decode()) for k, v in scope.get("headers", []))
+        m = await members.member_for_token(state, headers.get("x-member-session", ""))
+        if not m:
+            body = json.dumps({"success": False, "error": "signed_out",
+                               "message": "Sign in with your own account to see your campaigns."}).encode()
+            await send({"type": "http.response.start", "status": 401,
+                        "headers": [(b"content-type", b"application/json"),
+                                    (b"content-length", str(len(body)).encode())]})
+            await send({"type": "http.response.body", "body": body})
+            return
+        token = _SCOPE.set(await build_scope(state, m))
+        try:
+            return await self.app(scope, receive, send)
+        finally:
+            _SCOPE.reset(token)
+
+
+app.add_middleware(_PersonalScope)      # inside the guard: runs after the token check
 app.add_middleware(auth.DashboardGuard, store=token_store)
 
 # Xorora Prospector process tracking
@@ -548,11 +664,12 @@ COMPANIES_TAB_LIMIT = 2000
 @app.get("/api/companies")
 async def get_companies():
     """Companies with contact counts, fit score and register status, best fit first."""
-    rows = await query_db("""
+    where, args = _cw("c.id", "WHERE")
+    rows = await query_db(f"""
         SELECT c.*,
             (SELECT COUNT(*) FROM prospects p WHERE p.company_id = c.id) as contact_count
-        FROM companies c ORDER BY c.created_at DESC
-    """)
+        FROM companies c {where} ORDER BY c.created_at DESC
+    """, args)
     try:
         from harvey.config import load_config
         from harvey.register import build_register
@@ -575,7 +692,7 @@ async def export_companies():
     from harvey.config import load_config
     from harvey.register import build_register, to_csv
     try:
-        text = to_csv(await build_register(query_db, load_config()))
+        text = to_csv([r for r in await build_register(query_db, load_config()) if _mine_company(r.get("id"))])
     except Exception as e:
         logger.warning("Company register export failed: %s", e)
         return PlainTextResponse(f"Company register export failed: {e}", status_code=500)
@@ -591,7 +708,7 @@ async def get_company_profile(company_id: str):
     """One company's facts for its detail card: the register row plus what
     Xorora Prospector observed on its site (latest value per signal, with the page)."""
     rows = await query_db("SELECT * FROM companies WHERE id = ?", (company_id,))
-    if not rows:
+    if not rows or not _mine_company(company_id):
         return JSONResponse({"error": "not found"}, status_code=404)
     observations = await query_db(
         "SELECT o.signal_code, o.value_text, o.value_num, o.evidence_url, o.observed_at, "
@@ -613,6 +730,8 @@ async def get_company_profile(company_id: str):
 @app.get("/api/companies/{company_id}/contacts")
 async def get_company_contacts(company_id: str):
     """Get all contacts for a specific company."""
+    if not _mine_company(company_id):
+        return []
     rows = await query_db(
         "SELECT * FROM prospects WHERE company_id = ? ORDER BY score DESC",
         (company_id,),
@@ -874,8 +993,9 @@ def _pipeline_bucket(status: str | None, stage: str | None, intent: str | None,
 async def get_stats():
     """Pipeline overview stats."""
     try:
+        pw, pa = _cw("company_id", "WHERE")
         prospects = await query_db(
-            "SELECT status, COUNT(*) as count FROM prospects GROUP BY status"
+            f"SELECT status, COUNT(*) as count FROM prospects {pw} GROUP BY status", pa
         )
         prospect_total = sum(r["count"] for r in prospects)
         prospect_map = {r["status"]: r["count"] for r in prospects}
@@ -885,20 +1005,23 @@ async def get_stats():
         )
         campaign_map = {r["status"]: r["count"] for r in campaigns}
 
+        cw, ca = _cw("prospect_id", "WHERE", "prospects")
         conversations = await query_db(
-            "SELECT status, COUNT(*) as count FROM conversations GROUP BY status"
+            f"SELECT status, COUNT(*) as count FROM conversations {cw} GROUP BY status", ca
         )
         convo_map = {r["status"]: r["count"] for r in conversations}
 
         # Where each contact stands. Prospect status alone stops at
         # "replied"; how a reply went lives on its latest conversation.
-        rows = await query_db("""
+        sw, sa = _cw("p.company_id", "WHERE")
+        rows = await query_db(f"""
             SELECT p.status, p.email_status, l.stage, l.intent, COUNT(*) AS count FROM prospects p
             LEFT JOIN (SELECT prospect_id, stage, intent, ROW_NUMBER() OVER (
                          PARTITION BY prospect_id ORDER BY updated_at DESC, created_at DESC) AS rn
                        FROM conversations) l ON l.prospect_id = p.id AND l.rn = 1
+            {sw}
             GROUP BY p.status, p.email_status, l.stage, l.intent
-        """)
+        """, sa)
         pipeline = dict.fromkeys(
             ("to_write", "contacted", "replied", "interested", "ready_to_meet", "closed_out"), 0)
         for r in rows:
@@ -1044,7 +1167,8 @@ async def get_usage():
 
 @app.get("/api/prospects")
 async def get_prospects():
-    rows = await query_db("SELECT * FROM prospects ORDER BY created_at DESC LIMIT 200")
+    where, args = _cw("company_id", "WHERE")
+    rows = await query_db(f"SELECT * FROM prospects {where} ORDER BY created_at DESC LIMIT 200", args)
     # Someone whose opt-out was undone keeps a way to see what happened.
     undone = {r["pid"] for r in await query_db(
         "SELECT DISTINCT json_extract(details_json, '$.prospect_id') AS pid FROM actions "
@@ -1063,6 +1187,13 @@ def _state():
 OUTBOX_CONTEXT_SIGNALS = (
     "TECH_STACK", "INCUMBENT_AGENCY", "HIRING_ROLE", "RUNNING_GOOGLE_ADS", "NO_ONLINE_BOOKING",
 )
+
+
+async def _mine_outbox(state, item_id: str) -> bool:
+    if _scope() is None:
+        return True
+    item = await state.get_outbox_item(item_id)
+    return bool(item) and _mine_prospect(item.get("prospect_id"))
 
 
 def _in(ids) -> str:
@@ -1149,20 +1280,23 @@ async def get_outbox_api():
         # A send cut off mid-way shows up under Didn't send even when Xorora Prospector
         # isn't running.
         await state.fail_stale_sending_outbox()
+        mine = lambda items: [i for i in items if _mine_prospect(i.get("prospect_id"))]  # noqa: E731
+        ow, oa = _cw("prospect_id", "AND", "prospects")
+        big = 2000 if _scope() is not None else None
         return {
             **_compliance_view(),
             "paused": await state.get_setting("sending_paused"),
             "pending": await _with_context(
-                await state.get_outbox(status="pending_review", limit=100)),
+                mine(await state.get_outbox(status="pending_review", limit=big or 100))[:100]),
             # Mail going out right now leads the list.
-            "approved": (await state.get_outbox(status="sending", limit=10)
-                         + await state.get_outbox(status="approved", limit=50)),
+            "approved": (mine(await state.get_outbox(status="sending", limit=big or 10))[:10]
+                         + mine(await state.get_outbox(status="approved", limit=big or 50))[:50]),
             "sent": (await query_db(
-                "SELECT * FROM outbox WHERE status = 'sent' "
-                "ORDER BY sent_at DESC LIMIT 25")),
+                f"SELECT * FROM outbox WHERE status = 'sent'{ow} "
+                "ORDER BY sent_at DESC LIMIT 25", oa)),
             "failed": (await query_db(
-                "SELECT * FROM outbox WHERE status IN ('failed','rejected','cancelled') "
-                "ORDER BY updated_at DESC LIMIT 25")),
+                f"SELECT * FROM outbox WHERE status IN ('failed','rejected','cancelled'){ow} "
+                "ORDER BY updated_at DESC LIMIT 25", oa)),
         }
     except Exception as e:
         return {"error": str(e)}
@@ -1226,6 +1360,13 @@ async def outbox_approve_all():
     try:
         state = _state()
         await state.init_db()
+        if _scope() is not None:
+            # Only the caller's own drafts: one by one, through the same check.
+            n = 0
+            for item in await state.get_outbox(status="pending_review", limit=2000):
+                if _mine_prospect(item.get("prospect_id")):
+                    n += await state.approve_outbox(item["id"]) or 0
+            return {"success": True, "approved": n, "held": await state.count_held_for_review()}
         n = await state.approve_outbox()
         # Held ones (possible planted link or leak) are approved one by one.
         return {"success": True, "approved": n, "held": await state.count_held_for_review()}
@@ -1238,6 +1379,8 @@ async def outbox_approve(item_id: str):
     try:
         state = _state()
         await state.init_db()
+        if not await _mine_outbox(state, item_id):
+            return _refuse("That email isn't in your campaigns.", 403)
         n = await state.approve_outbox(item_id)
         return {"success": bool(n)}
     except Exception as e:
@@ -1259,6 +1402,8 @@ async def outbox_edit(item_id: str, request: Request):
         state = _state()
         await state.init_db()
         item = await state.get_outbox_item(item_id)
+        if item and not _mine_prospect(item.get("prospect_id")):
+            return _refuse("That email isn't in your campaigns.", 403)
         if not item or item.get("status") != "pending_review":
             return JSONResponse({"success": False,
                                  "message": "Only drafts awaiting review can be edited."},
@@ -1420,7 +1565,7 @@ async def mark_prospect_sent(prospect_id: str, request: Request):
             return _refuse('expected {"sent": true|false}', 400)
         sent = body.get("sent", True)
         rows = await query_db("SELECT status FROM prospects WHERE id = ?", (prospect_id,))
-        if not rows:
+        if not rows or not _mine_prospect(prospect_id):
             return _refuse("unknown prospect", 404)
         current = rows[0].get("status") or "new"
         state = _state()
@@ -1487,6 +1632,8 @@ async def outbox_reject(item_id: str):
     try:
         state = _state()
         await state.init_db()
+        if not await _mine_outbox(state, item_id):
+            return _refuse("That email isn't in your campaigns.", 403)
         if not await state.reject_outbox_item(item_id):
             return _refuse("That email is already sending or sent, so it can't be rejected.")
         return {"success": True}
@@ -1523,6 +1670,7 @@ async def export_prospects(all: bool = False, min_score: int = 0, email_status: 
         statuses = [s.strip() for s in email_status.split(",") if s.strip()] or None
         _, text = await export_prospects_csv(
             state, email_statuses=statuses, min_score=min_score, include_all=all,
+            only_ids=_scope().prospects if _scope() is not None else None,
         )
     except Exception as e:
         logger.warning("Prospect export failed: %s", e)
@@ -1536,7 +1684,17 @@ async def export_prospects(all: bool = False, min_score: int = 0, email_status: 
 
 @app.get("/api/campaigns")
 async def get_campaigns():
-    rows = await query_db("SELECT * FROM campaigns ORDER BY created_at DESC LIMIT 100")
+    sc = _scope()
+    rows = await query_db("SELECT * FROM campaigns ORDER BY created_at DESC LIMIT "
+                          + ("1000" if sc is not None else "100"))
+    if sc is not None:
+        def _theirs(row):
+            try:
+                ids = json.loads(row.get("prospect_ids_json") or "[]")
+            except (json.JSONDecodeError, TypeError):
+                ids = []
+            return (row.get("owner") or "") in sc.names or any(i in sc.prospects for i in ids or [])
+        rows = [r for r in rows if _theirs(r)][:100]
     harvey_sends = _harvey_can_send()
     send_as = "" if harvey_sends else _send_as()
     footer = _compliance_view()["footer"]
@@ -2219,7 +2377,7 @@ async def _team_discovery_loop():
 async def get_opt_out(prospect_id: str):
     """Why this person is opted out: the rule, the words and their message."""
     rows = await query_db("SELECT status FROM prospects WHERE id = ?", (prospect_id,))
-    if not rows:
+    if not rows or not _mine_prospect(prospect_id):
         return _refuse("unknown prospect", 404)
     status = rows[0].get("status") or "new"
     state = _state()
@@ -2263,7 +2421,7 @@ async def undo_opt_out(prospect_id: str, request: Request):
     if not isinstance(body, dict) or body.get("confirm") is not True:
         return _refuse('expected {"confirm": true}', 400)
     rows = await query_db("SELECT email FROM prospects WHERE id = ?", (prospect_id,))
-    if not rows:
+    if not rows or not _mine_prospect(prospect_id):
         return _refuse("unknown prospect", 404)
     state = _state()
     await state.init_db()
@@ -2278,13 +2436,15 @@ async def undo_opt_out(prospect_id: str, request: Request):
 
 @app.get("/api/conversations")
 async def get_conversations(awaiting: bool = False):
-    rows = await query_db("""
+    where, args = _cw("c.prospect_id", "WHERE", "prospects")
+    rows = await query_db(f"""
         SELECT c.*, p.first_name, p.last_name, p.email as prospect_email, p.company,
                p.status as prospect_status
         FROM conversations c
         LEFT JOIN prospects p ON c.prospect_id = p.id
+        {where}
         ORDER BY c.updated_at DESC LIMIT 100
-    """)
+    """, args)
     # The stored thread holds replies and Xorora Prospector's answers; the cold emails
     # a reply answers live in the Outbox. Attach those (sent ones only) and
     # any answer still waiting for approval, so the page shows the exchange.
@@ -2333,10 +2493,10 @@ async def _awaiting_reply() -> list[dict]:
         "JOIN prospects p ON p.id = o.prospect_id "
         "WHERE o.kind = 'sequence' AND o.status = 'sent' "
         "AND p.status NOT IN ('replied', 'opted_out', 'lost', 'meeting', 'closed') "
-        "AND COALESCE(p.email_status, '') != 'invalid' "
+        "AND COALESCE(p.email_status, '') != 'invalid' " + _cw("p.company_id")[0] + " "
         "AND NOT EXISTS (SELECT 1 FROM conversations c JOIN prospects q ON q.id = c.prospect_id "
         "WHERE q.id = p.id OR (q.company_id = p.company_id AND COALESCE(p.company_id, '') != '')) "
-        "ORDER BY o.sent_at DESC LIMIT 2000")
+        "ORDER BY o.sent_at DESC LIMIT 2000", _cw("p.company_id")[1])
     for e in reversed(sent):
         pid = e["prospect_id"]
         row = waiting.setdefault(pid, {
@@ -2368,8 +2528,8 @@ async def set_conversation_status(convo_id: str, request: Request):
     if status not in ("open", "closed"):
         return JSONResponse({"success": False, "message": "status must be open or closed"},
                             status_code=400)
-    rows = await query_db("SELECT status FROM conversations WHERE id = ?", (convo_id,))
-    if not rows:
+    rows = await query_db("SELECT status, prospect_id FROM conversations WHERE id = ?", (convo_id,))
+    if not rows or not _mine_prospect(rows[0].get("prospect_id")):
         return JSONResponse({"success": False, "message": "No such conversation."},
                             status_code=404)
     state = _state()
@@ -2391,18 +2551,20 @@ async def get_trend(days: int = 14, tz: int = 0):
     today = (datetime.now(timezone.utc) + timedelta(minutes=tz)).date()
     labels = [(today - timedelta(days=n)).isoformat() for n in range(days - 1, -1, -1)]
 
-    async def per_day(table: str, column: str, where: str = "") -> list[int]:
+    async def per_day(table: str, column: str, where: str = "", scope_col: str = "",
+                      kind: str = "companies") -> list[int]:
+        extra, args = _cw(scope_col, "AND", kind) if scope_col else ("", ())
         rows = await query_db(
             f"SELECT date({column}, ?) AS d, COUNT(*) AS n FROM {table} "
-            f"WHERE date({column}, ?) >= ? {where} GROUP BY d", (shift, shift, labels[0]))
+            f"WHERE date({column}, ?) >= ? {where}{extra} GROUP BY d", (shift, shift, labels[0], *args))
         counts = {r["d"]: r["n"] for r in rows}
         return [counts.get(day, 0) for day in labels]
 
     return {
         "days": labels,
-        "found": await per_day("prospects", "created_at"),
-        "sent": await per_day("outbox", "sent_at", "AND status = 'sent'"),
-        "replies": await per_day("conversations", "created_at"),
+        "found": await per_day("prospects", "created_at", scope_col="company_id"),
+        "sent": await per_day("outbox", "sent_at", "AND status = 'sent'", "prospect_id", "prospects"),
+        "replies": await per_day("conversations", "created_at", scope_col="prospect_id", kind="prospects"),
     }
 
 
@@ -2668,17 +2830,19 @@ async def get_live_status():
     read), so a finished step always reaches 100% instead of sticking.
     """
     now = datetime.now(timezone.utc).replace(tzinfo=None)  # DB stores naive UTC
-    has_site = "COALESCE(domain, '') != ''"
-    companies = await _scalar("SELECT COUNT(*) FROM companies")
-    with_site = await _scalar(f"SELECT COUNT(*) FROM companies WHERE {has_site}")
+    kw, ka = _cw("id")
+    has_site = "COALESCE(domain, '') != ''" + kw      # scoped to the caller's companies
+    companies = await _scalar("SELECT COUNT(*) FROM companies WHERE 1" + kw, ka)
+    with_site = await _scalar(f"SELECT COUNT(*) FROM companies WHERE {has_site}", ka)
     no_site = companies - with_site
     profiled = await _scalar(
-        f"SELECT COUNT(*) FROM companies WHERE {has_site} AND profile_checked_at IS NOT NULL")
+        f"SELECT COUNT(*) FROM companies WHERE {has_site} AND profile_checked_at IS NOT NULL", ka)
     checked = await _scalar(
         f"SELECT COUNT(*) FROM companies WHERE {has_site} "
-        "AND profile_checked_at IS NOT NULL AND prospects_checked_at IS NOT NULL")
+        "AND profile_checked_at IS NOT NULL AND prospects_checked_at IS NOT NULL", ka)
 
-    prospects = await query_db("SELECT id, email, email_status, status FROM prospects")
+    pw, pa = _cw("company_id", "WHERE")
+    prospects = await query_db(f"SELECT id, email, email_status, status FROM prospects {pw}", pa)
     with_email = [p for p in prospects if p.get("email")]
     by_status: dict[str, int] = {}
     for p in with_email:
@@ -2691,18 +2855,20 @@ async def get_live_status():
 
     # Drafts are counted per person, not per campaign: one campaign can cover many.
     drafted: set[str] = set()
+    mine_ids = {p["id"] for p in prospects}
     for row in await query_db("SELECT prospect_ids_json FROM campaigns"):
         try:
             ids = json.loads(row.get("prospect_ids_json") or "[]")
         except (json.JSONDecodeError, TypeError):
             ids = []
         if isinstance(ids, list):
-            drafted.update(i for i in ids if isinstance(i, str))
+            drafted.update(i for i in ids if isinstance(i, str) and (_scope() is None or i in mine_ids))
     sent = {p["id"] for p in prospects if p.get("status") in SENT_STATUSES}
     # Who is left for the user to send by hand: only when Xorora Prospector can't send
     # itself, and never someone Xorora Prospector has queued, sent to, or can't reach.
     harvey_sends = _harvey_can_send()
-    awaiting_review = await _scalar("SELECT COUNT(*) FROM outbox WHERE status = 'pending_review'")
+    ow, oa = _cw("prospect_id", "AND", "prospects")
+    awaiting_review = await _scalar("SELECT COUNT(*) FROM outbox WHERE status = 'pending_review'" + ow, oa)
     by_hand: set[str] = set()
     if not harvey_sends:
         skip = await _harvey_committed_ids() | await _hand_sent_ids()
@@ -2730,7 +2896,7 @@ async def get_live_status():
         if run.get("stage") == "profile" and started:
             done_in_run = await _scalar(
                 f"SELECT COUNT(*) FROM companies WHERE {has_site} AND profile_checked_at >= ?",
-                (run["started_at"],))
+                (*ka, run["started_at"]))
             left = max(0, with_site - profiled)
             if left and done_in_run and elapsed > 0:
                 item["eta_min"] = left / (done_in_run / elapsed) / 60
@@ -2841,23 +3007,39 @@ async def get_today():
         codes = await state.get_signal_codes()
         proposed = [c for c in codes if c.get("status") == "proposed"]
         confirmed = [c for c in codes if c.get("status") == "confirmed"]
-        pending = await state.get_outbox(status="pending_review", limit=200)
-        approved = await state.get_outbox(status="approved", limit=200)
+        sc = _scope()
+        cap = 5000 if sc is not None else 200
+        pending = [i for i in await state.get_outbox(status="pending_review", limit=cap)
+                   if _mine_prospect(i.get("prospect_id"))][:200]
+        approved = [i for i in await state.get_outbox(status="approved", limit=cap)
+                    if _mine_prospect(i.get("prospect_id"))][:200]
         paused = await state.get_setting("sending_paused")
-        counts = await state.count_prospects_by_status()
+        if sc is None:
+            counts = await state.count_prospects_by_status()
+        else:
+            pw, pa = _cw("company_id", "WHERE")
+            counts = {r["status"]: r["n"] for r in await query_db(
+                f"SELECT status, COUNT(*) AS n FROM prospects {pw} GROUP BY status", pa)}
 
+        cw, ca = _cw("prospect_id", "AND", "prospects")
         convos = await query_db(
-            "SELECT COUNT(*) AS n FROM conversations WHERE status = 'open'"
+            f"SELECT COUNT(*) AS n FROM conversations WHERE status = 'open'{cw}", ca
         )
         open_convos = convos[0]["n"] if convos else 0
         handed = await query_db(
-            "SELECT COUNT(*) AS n FROM conversations WHERE status = 'needs_human'"
+            f"SELECT COUNT(*) AS n FROM conversations WHERE status = 'needs_human'{cw}", ca
         )
         needs_human = handed[0]["n"] if handed else 0
-        companies = await query_db("SELECT COUNT(*) AS n FROM companies")
+        kw, ka = _cw("id", "WHERE")
+        companies = await query_db(f"SELECT COUNT(*) AS n FROM companies {kw}", ka)
         n_companies = companies[0]["n"] if companies else 0
 
-        unprofiled_count = await state.count_companies_needing_profile()
+        if sc is None:
+            unprofiled_count = await state.count_companies_needing_profile()
+        else:
+            uw, ua = _cw("id")
+            unprofiled_count = await _scalar(
+                "SELECT COUNT(*) FROM companies WHERE domain != '' AND profile_checked_at IS NULL" + uw, ua)
         stats = {
             "companies": n_companies,
             "prospects": sum(counts.values()),
@@ -3276,6 +3458,8 @@ async def export_cohort(require: str = "", exclude: str = "", ranges: str = ""):
         if codes or bounds:
             _, rows = await _cohort_companies(codes, excluded, ranges=bounds)
             for r in rows:
+                if not _mine_company(r.get("id")):
+                    continue
                 writer.writerow([_csv_cell(r.get(k)) for k in
                                  ("name", "domain", "website", "industry", "location")])
     except ValueError as e:
