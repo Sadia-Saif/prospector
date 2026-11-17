@@ -2788,7 +2788,7 @@ async function loadTeamPanel(force) {
   const o = opts || {services: [], headcounts: [], providers: []};
   if (keep) keep.owner = me();
   const v = Object.assign({owner: me(), provider: o.default_provider || '',
-    max_spend: '1', max_leads: '100'}, keep || {});
+    max_spend: '1', max_leads: '100', daily_limit: '30'}, keep || {});
 
   let accHtml;
   if (!acc || !acc.connected) {
@@ -2835,6 +2835,8 @@ async function loadTeamPanel(force) {
     '<div class="team-grid">' +
       '<label><span>Contacts to reach</span><input id="tm-leads" type="number" min="1" max="2000" class="team-input" value="' + escHtml(v.max_leads) + '">' +
         '</label>' +
+      '<label><span>Emails per day</span><input id="tm-daily" type="number" min="1" max="50" class="team-input" value="' + escHtml(v.daily_limit) + '">' +
+        '<span class="team-hint">From your mailbox, follow-ups included. 30 keeps a warmed domain healthy; 50 is the most it allows.</span></label>' +
     '</div>' +
     '<div class="team-grid"><label class="span2"><span>Campaign name (optional)</span><input id="tm-name" class="team-input" placeholder="Filled in from service, industry and region" value="' + escHtml(v.name || '') + '"></label></div>' +
     '<div class="team-actions"><button class="btn btn-primary" onclick="startTeamCampaign(this)">Start campaign</button>' +
@@ -2865,7 +2867,8 @@ async function loadTeamPanel(force) {
       '<div class="tc-meta">' + escHtml(c.service) + ' &middot; ' + escHtml((c.industries || []).join(', ')) +
         ' &middot; ' + escHtml((c.regions || []).join(', ')) +
         (c.headcount ? ' &middot; ' + escHtml(c.headcount) + ' employees' : '') +
-        ' &middot; from ' + escHtml((c.accounts || []).join(', ')) + '</div>' +
+        ' &middot; from ' + escHtml((c.accounts || []).join(', ')) +
+        ' &middot; ' + (c.daily_limit || 30) + ' emails/day</div>' +
       '<div class="tc-funnel">' +
         '<div><b>' + (c.companies || 0) + '</b><span>companies</span></div>' +
         '<div><b>' + (c.contacts || 0) + '</b><span>contacts found</span></div>' +
@@ -2881,6 +2884,7 @@ async function loadTeamPanel(force) {
           : '<button class="btn btn-secondary btn-sm" onclick="teamAction(\'' + c.id + '\',\'resume\')">Resume</button>') +
         '<button class="btn btn-secondary btn-sm" onclick="teamAction(\'' + c.id + '\',\'find-more\')"' +
           (c.discovery === 'running' || c.discovery === 'queued' ? ' disabled' : '') + '>Find more companies</button>' +
+        '<button class="btn btn-secondary btn-sm" onclick="teamLimit(\'' + c.id + '\',' + (c.daily_limit || 30) + ')">Emails per day</button>' +
         '<button class="btn btn-ghost btn-sm" onclick="if(confirm(\'Delete this campaign? Emails already sent stay sent.\'))teamAction(\'' + c.id + '\',\'delete\')">Delete</button>' +
       '</div></div>');
   }).join('');
@@ -2907,7 +2911,7 @@ function _teamFormValues() {
   if (!document.getElementById('tm-owner')) return null;
   return {owner: g('tm-owner'), account: g('tm-account'), service: g('tm-service'),
     industries: g('tm-industries'), regions: g('tm-regions'), headcount: g('tm-headcount'),
-    max_leads: g('tm-leads'), name: g('tm-name')};
+    max_leads: g('tm-leads'), daily_limit: g('tm-daily'), name: g('tm-name')};
 }
 
 function _serviceEditor(services) {
@@ -2959,6 +2963,7 @@ async function startTeamCampaign(btn) {
     body: JSON.stringify({owner: v.owner.trim(), accounts: [v.account], service: v.service,
       industries: split(v.industries), regions: split(v.regions), headcount: v.headcount,
       max_leads: parseInt(v.max_leads || '100', 10),
+      daily_limit: Math.max(1, Math.min(50, parseInt(v.daily_limit || '30', 10) || 30)),
       name: v.name}),
   });
   btn.disabled = false;
@@ -2967,6 +2972,16 @@ async function startTeamCampaign(btn) {
     (res.existing_companies ? ' ' + res.existing_companies + ' matching companies already in Xorora Prospector.' : '');
   ['tm-industries', 'tm-regions', 'tm-name'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
   _teamFilterValue = v.owner.trim();
+  loadCampaigns();
+}
+
+async function teamLimit(id, current) {
+  const raw = prompt('Emails per day from your mailbox (1–50). 30 keeps a warmed domain healthy.', current);
+  if (raw === null) return;
+  const n = parseInt(raw, 10);
+  if (!(n >= 1 && n <= 50)) { alert('Pick a number from 1 to 50.'); return; }
+  await api('/api/team/campaign/' + encodeURIComponent(id) + '/limit', {method: 'POST',
+    headers: {'Content-Type': 'application/json'}, body: JSON.stringify({daily_limit: n})});
   loadCampaigns();
 }
 

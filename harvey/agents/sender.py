@@ -368,8 +368,14 @@ class Sender:
         else:
             if campaign.sending_accounts:
                 # A team campaign sends only from its owner's own mailbox(es).
+                from harvey import team
+                limit = team.daily_limit_for(
+                    await team.load_requests(self.state), campaign.name)
+                kwargs = {"email_list": campaign.sending_accounts}
+                if limit:
+                    kwargs["daily_limit"] = limit
                 instantly_campaign = await self.instantly.create_campaign(
-                    campaign.name, email_list=campaign.sending_accounts)
+                    campaign.name, **kwargs)
             else:
                 instantly_campaign = await self.instantly.create_campaign(campaign.name)
             if not instantly_campaign or not isinstance(instantly_campaign, dict):

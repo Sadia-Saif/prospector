@@ -33,6 +33,26 @@ MAX_LIST = 20
 DEFAULT_MAX_LEADS = 100
 MAX_MAX_LEADS = 2000
 BATCH_SIZE = 25
+# Emails a day per mailbox, follow-ups included. 30 keeps a warmed mailbox
+# healthy; past 50 a domain's reputation starts to suffer.
+DEFAULT_DAILY_LIMIT = 30
+MAX_DAILY_LIMIT = 50
+
+
+def clean_daily_limit(raw) -> int:
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_DAILY_LIMIT
+    return max(1, min(n, MAX_DAILY_LIMIT))
+
+
+def daily_limit_for(requests: list[dict], campaign_name_: str) -> int | None:
+    """The daily limit of the team campaign an Instantly campaign belongs to."""
+    for r in requests:
+        if campaign_name(r.get("owner") or "", r.get("name") or "") == campaign_name_:
+            return clean_daily_limit(r.get("daily_limit"))
+    return None
 
 HEADCOUNTS = {
     "": (None, None),
@@ -199,7 +219,8 @@ async def add_company_ids(state, request_id: str, company_ids: list[str]):
 async def add_request(state, *, owner: str, accounts: list[str], name: str,
                       service: dict, industries: list[str], regions: list[str],
                       headcount: str, provider: str, max_spend: float,
-                      max_leads: int, company_ids: list[str]) -> dict:
+                      max_leads: int, company_ids: list[str],
+                      daily_limit: int = DEFAULT_DAILY_LIMIT) -> dict:
     request = {
         "id": uuid.uuid4().hex[:12],
         "owner": owner,
@@ -213,6 +234,7 @@ async def add_request(state, *, owner: str, accounts: list[str], name: str,
         "max_spend": max_spend,
         "max_leads": max(1, min(int(max_leads or DEFAULT_MAX_LEADS), MAX_MAX_LEADS)),
         "company_ids": list(dict.fromkeys(company_ids)),
+        "daily_limit": clean_daily_limit(daily_limit),
         "written": 0,
         "status": "active",          # active / stopped / complete
         "discovery": "queued",       # queued / running / done / failed / skipped

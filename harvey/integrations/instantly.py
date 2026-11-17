@@ -150,7 +150,8 @@ class InstantlyClient:
     # ── Campaigns ──
 
     async def create_campaign(self, name: str,
-                              email_list: list[str] | None = None) -> dict | None:
+                              email_list: list[str] | None = None,
+                              daily_limit: int | None = None) -> dict | None:
         """Create a new campaign. Returns campaign data with id.
 
         ``email_list`` limits sending to those Instantly accounts (a team
@@ -161,11 +162,24 @@ class InstantlyClient:
         payload = {"name": name, "stop_for_company": True}
         if email_list:
             payload["email_list"] = list(email_list)
+        if daily_limit:
+            payload["daily_limit"] = int(daily_limit)
         result = await self._request("POST", "/campaigns", payload)
         if isinstance(result, dict):
             logger.info(f"Created campaign: {name} (id={result.get('id')})")
             return result
         return None
+
+    async def set_campaign_daily_limit(self, campaign_id: str, limit: int) -> dict | None:
+        result = await self._request("PATCH", f"/campaigns/{campaign_id}",
+                                     {"daily_limit": int(limit)})
+        return result if isinstance(result, dict) else None
+
+    async def set_account_daily_limit(self, email: str, limit: int) -> dict | None:
+        """Cap what one mailbox sends a day, across every campaign it's in."""
+        result = await self._request("PATCH", f"/accounts/{email}",
+                                     {"daily_limit": int(limit)})
+        return result if isinstance(result, dict) else None
 
     async def get_campaign(self, campaign_id: str) -> dict | None:
         """Get campaign details."""

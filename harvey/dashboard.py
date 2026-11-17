@@ -1602,7 +1602,7 @@ async def team_overview():
     for r in await team.load_requests(state):
         view = {k: r.get(k) for k in (
             "id", "owner", "name", "accounts", "industries", "regions", "headcount",
-            "provider", "max_leads", "written", "status", "discovery",
+            "provider", "max_leads", "daily_limit", "written", "status", "discovery",
             "discovery_note", "created_at")}
         view["service"] = (r.get("service") or {}).get("name", "")
         view.update(await _team_stats(state, r))
@@ -1648,6 +1648,7 @@ async def team_start_campaign(request: Request):
         provider = "osm" if "osm" in PROVIDERS else next(iter(PROVIDERS))
         max_spend = 0.0
         max_leads = int(body.get("max_leads") or team.DEFAULT_MAX_LEADS)
+        daily_limit = team.clean_daily_limit(body.get("daily_limit"))
         name = team.clean_name(body.get("name")) or (
             f"{service['name'].split(' (')[0]} · {industries[0]} · {regions[0]}")
     except (ValueError, TypeError) as e:
@@ -1658,18 +1659,56 @@ async def team_start_campaign(request: Request):
         state, owner=owner, accounts=accounts, name=name, service=service,
         industries=industries, regions=regions, headcount=headcount,
         provider=provider, max_spend=max_spend, max_leads=max_leads,
-        company_ids=existing,
+        company_ids=existing, daily_limit=daily_limit,
     )
+    await _apply_mailbox_limits(accounts, daily_limit)
     _kick_team_discovery()
     return {"success": True, "id": req["id"], "campaign": team.campaign_name(owner, name),
             "existing_companies": len(existing)}
 
 
+async def _apply_mailbox_limits(accounts: list[str], limit: int, campaign_ids=()):
+    """Set the daily cap on the mailboxes (and any live Instantly campaigns)
+    in Instantly itself, so it holds whatever else uses those mailboxes."""
+    key = _instantly_key()
+    if not key:
+        return
+    from harvey.integrations.instantly import InstantlyClient
+    client = InstantlyClient(key)
+    for email in accounts:
+        try:
+            await client.set_account_daily_limit(email, limit)
+        except Exception as e:  # best effort: the campaign's own cap still applies
+            logger.warning(f"Team: couldn't set the daily limit on {email}: {e}")
+    for cid in campaign_ids:
+        try:
+            await client.set_campaign_daily_limit(cid, limit)
+        except Exception as e:
+            logger.warning(f"Team: couldn't set the daily limit on campaign {cid}: {e}")
+
+
 @app.post("/api/team/campaign/{request_id}/{action}")
-async def team_campaign_action(request_id: str, action: str):
+async def team_campaign_action(request_id: str, action: str, request: Request):
     from harvey import team
     state = _state()
     await state.init_db()
+    if action == "limit":
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        limit = team.clean_daily_limit((body or {}).get("daily_limit"))
+        req = await team.update_request(state, request_id, daily_limit=limit)
+        if not req:
+            return JSONResponse({"success": False, "error": "no such campaign"}, status_code=404)
+        name = team.campaign_name(req.get("owner") or "", req.get("name") or "")
+        async with state._connect() as db:
+            async with db.execute(
+                "SELECT instantly_campaign_id FROM campaigns WHERE name = ? "
+                "AND COALESCE(instantly_campaign_id, '') != ''", (name,)) as cur:
+                ids = [r[0] for r in await cur.fetchall()]
+        await _apply_mailbox_limits(list(req.get("accounts") or []), limit, ids)
+        return {"success": True, "daily_limit": limit}
     if action == "stop":
         await team.update_request(state, request_id, status="stopped")
     elif action == "resume":
