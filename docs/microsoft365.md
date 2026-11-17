@@ -56,8 +56,8 @@ channels:
 ### 3. Sign in once
 
 ```bash
-harvey microsoft auth   # opens the browser; sign in as persona.email
-harvey microsoft test   # → ✓ Connected as you@yourdomain.com
+xorora-prospector microsoft auth   # opens the browser; sign in as persona.email
+xorora-prospector microsoft test   # → ✓ Connected as you@yourdomain.com
 ```
 
 Prospector asks for four **delegated** permissions:
@@ -83,7 +83,7 @@ approve the app once:
 1. In Entra, open **App registrations → Prospector → API permissions**. Add the
    four Microsoft Graph delegated permissions above, then click
    **Grant admin consent**.
-2. Run `harvey microsoft auth` again and sign in as the **sending mailbox**,
+2. Run `xorora-prospector microsoft auth` again and sign in as the **sending mailbox**,
    not as the admin. Prospector always acts as whoever signs in.
 
 To make sure nobody else in the tenant can use the app, go to
@@ -129,8 +129,8 @@ To make sure nobody else in the tenant can use the app, go to
 | `Timed out waiting for the browser round-trip` | The browser never came back to `localhost:8766`. Check that nothing else uses the port, and that the redirect URI is `http://localhost:8766` under *Mobile and desktop applications* (not *Web*). |
 | `AADSTS50011` (redirect URI mismatch) | Same as above: the URI and its platform must match exactly. |
 | `Need admin approval` | See [If you see "Need admin approval"](#if-you-see-need-admin-approval). |
-| `signed in as X, but persona.email is Y` | Run `harvey microsoft auth` again and pick the right account. Use "Use another account" if the browser is already signed in as someone else. |
-| `token refresh rejected` | The login expired (90 days unused) or was revoked. Run `harvey microsoft auth` again. |
+| `signed in as X, but persona.email is Y` | Run `xorora-prospector microsoft auth` again and pick the right account. Use "Use another account" if the browser is already signed in as someone else. |
+| `token refresh rejected` | The login expired (90 days unused) or was revoked. Run `xorora-prospector microsoft auth` again. |
 
 To revoke Prospector's access, go to
 [myaccount.microsoft.com](https://myaccount.microsoft.com) → **Apps**, or
@@ -151,7 +151,7 @@ delete the app registration. Then delete `data/m365_token.json`.
 |---|---|
 | `harvey/integrations/microsoft.py` | `MicrosoftProvider` (a `MailProvider`) and `run_auth_flow` |
 | `harvey/integrations/mail_provider.py` | Registers `microsoft` in `NATIVE_PROVIDERS` and `get_mail_provider` |
-| `harvey/cli.py` | `harvey microsoft auth\|test` |
+| `harvey/cli.py` | `xorora-prospector microsoft auth\|test` |
 | `tests/test_microsoft.py` | Graph and login faked with `httpx.MockTransport`; no network |
 
 `get_replies` **raises** `GraphError` when the inbox can't be read, instead

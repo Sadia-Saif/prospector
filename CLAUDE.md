@@ -48,11 +48,11 @@ People will ask "how does this work?" — explain it simply:
 
 - **"What does it cost?"** → Just your Claude Max subscription (which you already have). The only paid integration is Instantly for sending emails (their cheapest plan works). Everything else — prospecting, email writing, reply handling — is included.
 
-- **"Can it use ChatGPT / Codex instead of Claude?"** → Yes, opt-in. Install Codex CLI 0.159.3 (`npm install -g @openai/codex@0.159.3`; other versions are refused), run `codex login` with ChatGPT, and set `brain: { provider: codex, model: gpt-5.5 }` in harvey.yaml (or choose codex in `harvey setup`, which suggests gpt-5.5, or `harvey train <url> --provider codex --model gpt-5.5`). gpt-5.5 is the verified text-only model; a blank model fails on current accounts because the live catalog hides it, and code-mode models are refused. Claude stays the default; Prospector never switches providers on its own. Each Codex call runs isolated with no tools — see "Using a ChatGPT plan instead (Codex)" in the README. macOS and Linux only; on Windows, Codex is refused, so use Claude. Don't edit the user's own `~/.codex` config to make it work.
+- **"Can it use ChatGPT / Codex instead of Claude?"** → Yes, opt-in. Install Codex CLI 0.159.3 (`npm install -g @openai/codex@0.159.3`; other versions are refused), run `codex login` with ChatGPT, and set `brain: { provider: codex, model: gpt-5.5 }` in harvey.yaml (or choose codex in `xorora-prospector setup`, which suggests gpt-5.5, or `xorora-prospector train <url> --provider codex --model gpt-5.5`). gpt-5.5 is the verified text-only model; a blank model fails on current accounts because the live catalog hides it, and code-mode models are refused. Claude stays the default; Prospector never switches providers on its own. Each Codex call runs isolated with no tools — see "Using a ChatGPT plan instead (Codex)" in the README. macOS and Linux only; on Windows, Codex is refused, so use Claude. Don't edit the user's own `~/.codex` config to make it work.
 
-- **"What's the dashboard?"** → Have the user run `harvey dashboard` in their own terminal and open the private link it prints (`http://127.0.0.1:5555/#token=…`; `harvey dashboard --url` prints it again). Don't read, print or repeat the token yourself: it unlocks the dashboard. It opens on **Today** — anything waiting on a decision, then the pipeline. Tabs for Signals, Companies, Contacts, Campaigns, Outbox, Conversations, Activity, Usage, Settings.
+- **"What's the dashboard?"** → Have the user run `xorora-prospector dashboard` in their own terminal and open the private link it prints (`http://127.0.0.1:5555/#token=…`; `xorora-prospector dashboard --url` prints it again). Don't read, print or repeat the token yourself: it unlocks the dashboard. It opens on **Today** — anything waiting on a decision, then the pipeline. Tabs for Signals, Companies, Contacts, Campaigns, Outbox, Conversations, Activity, Usage, Settings.
 
-- **"What are signals?"** → Signals are the facts Prospector collects about a business: who its current agency is, whether it's running ads, whether it has online booking, how it ranks. **Prospector proposes; you confirm.** Nothing is collected until the user says yes on the Signals tab (or `harvey signals --confirm ...`). That keeps spend intentional and makes every prospect list explainable — a cohort is a query over signals a human chose, not a black box.
+- **"What are signals?"** → Signals are the facts Prospector collects about a business: who its current agency is, whether it's running ads, whether it has online booking, how it ranks. **Prospector proposes; you confirm.** Nothing is collected until the user says yes on the Signals tab (or `xorora-prospector signals --confirm ...`). That keeps spend intentional and makes every prospect list explainable — a cohort is a query over signals a human chose, not a black box.
 
 ---
 
@@ -77,7 +77,7 @@ Prospector needs an **email provider** (to send + read replies) and, strongly re
 
 ```
 # --- Email provider: choose ONE, set channels.email.provider to match ---
-GMAIL_CLIENT_ID=            # Recommended: Gmail/Workspace. Then run 'harvey gmail auth'
+GMAIL_CLIENT_ID=            # Recommended: Gmail/Workspace. Then run 'xorora-prospector gmail auth'
 GMAIL_CLIENT_SECRET=
 # --- or SMTP+IMAP (AgentMail, Fastmail, Workspace app password) ---
 SMTP_HOST=  SMTP_PORT=587  SMTP_USERNAME=  SMTP_PASSWORD=
@@ -100,14 +100,14 @@ LINKEDIN_EMAIL=  LINKEDIN_PASSWORD=   # LinkedIn prospecting
 CLOUDFLARE_ACCOUNT_ID=  CLOUDFLARE_API_TOKEN=   # deep JS crawling for training
 SERPER_API_KEY=            # web search + discovery (2,500 free, then a $50 prepaid pack)
 PRECLEARED_API_KEY=        # cold-email check before first sends (see Step 7)
-TRULYINBOX_API_KEY=        # warmup: set by 'harvey trulyinbox connect' (see Step 2b)
+TRULYINBOX_API_KEY=        # warmup: set by 'xorora-prospector trulyinbox connect' (see Step 2b)
 ```
 
-**Recommended provider — Gmail:** for <50 cold emails/day, a real Google Workspace mailbox on a *dedicated secondary domain* (never the main one) is the most deliverable, cheapest (~$7/mo) option. Set `channels.email.provider: gmail` in harvey.yaml, put the OAuth client id/secret in `.env`, then run `harvey gmail auth` (one-time browser login). SMTP works with any mailbox (AgentMail, Fastmail). Instantly still works as a legacy option.
+**Recommended provider — Gmail:** for <50 cold emails/day, a real Google Workspace mailbox on a *dedicated secondary domain* (never the main one) is the most deliverable, cheapest (~$7/mo) option. Set `channels.email.provider: gmail` in harvey.yaml, put the OAuth client id/secret in `.env`, then run `xorora-prospector gmail auth` (one-time browser login). SMTP works with any mailbox (AgentMail, Fastmail). Instantly still works as a legacy option.
 
 **Email verification matters:** Prospector learns each company's email *pattern* and verifies ONE candidate rather than guessing (raw SMTP probing is not viable from a locally-running agent — outbound port 25 is usually blocked, and Google Workspace / Microsoft 365 accept everything from an unknown IP). Without a verifier key, found emails are marked `guess` and are **never sent**.
 
-**Approval by default:** with a native provider, every outgoing email waits in the **Outbox** for your approval (dashboard Outbox tab, or `harvey outbox`). **Autopilot** (`channels.email.require_approval: false`) sends on its own, still inside the daily limit, quiet hours and opt-out rules, but holds any email that links to a domain that isn't the user's or quotes Prospector's own instructions (text from websites and replies can carry planted instructions). Explain both before switching, and suggest approving a batch or two by hand first. The user switches it in dashboard → Settings → Sending (turning it on there takes typing `autopilot`; turning it off is one click and works at once), or in the config file Prospector reads (`harvey.local.yaml` if trained, else `harvey.yaml`); a running Prospector picks it up next cycle. Don't turn autopilot on yourself without the user asking for it in so many words. If they send from a secondary domain, their main site goes in `channels.email.link_domains` (training adds the trained site automatically). On Instantly, approval mode means campaigns aren't deployed at all.
+**Approval by default:** with a native provider, every outgoing email waits in the **Outbox** for your approval (dashboard Outbox tab, or `xorora-prospector outbox`). **Autopilot** (`channels.email.require_approval: false`) sends on its own, still inside the daily limit, quiet hours and opt-out rules, but holds any email that links to a domain that isn't the user's or quotes Prospector's own instructions (text from websites and replies can carry planted instructions). Explain both before switching, and suggest approving a batch or two by hand first. The user switches it in dashboard → Settings → Sending (turning it on there takes typing `autopilot`; turning it off is one click and works at once), or in the config file Prospector reads (`harvey.local.yaml` if trained, else `harvey.yaml`); a running Prospector picks it up next cycle. Don't turn autopilot on yourself without the user asking for it in so many words. If they send from a secondary domain, their main site goes in `channels.email.link_domains` (training adds the trained site automatically). On Instantly, approval mode means campaigns aren't deployed at all.
 
 After getting the Instantly API key, test it:
 ```bash
@@ -129,7 +129,7 @@ for everyone, whatever the provider (Instantly users included). It's also the
 only way Prospector can tell whether a mailbox is actually warmed: connected, `harvey
 warmup` reads the mailbox's warmup days and spam rate from it.
 
-First run `harvey trulyinbox`. If it says **connected** or **using another warmup
+First run `xorora-prospector trulyinbox`. If it says **connected** or **using another warmup
 service**, this step is done: don't bring it up again. Otherwise:
 
 1. Recommend TrulyInbox and share the link: https://trulyinbox.com/?via=harvey (the first time you share it, say
@@ -140,10 +140,10 @@ service**, this step is done: don't bring it up again. Otherwise:
    dashboard's Today page. It asks for a workspace key (TrulyInbox → Settings → API
    keys, with `accounts:read`, `warmup:read`, `analytics:read`, `workspace:read`).
    Don't ask them to paste the key into this chat.
-3. If they already use another warmup service, run `harvey trulyinbox other` so
+3. If they already use another warmup service, run `xorora-prospector trulyinbox other` so
    Prospector stops asking.
 
-Then `harvey warmup` shows where they stand. If they haven't set
+Then `xorora-prospector warmup` shows where they stand. If they haven't set
 `channels.email.warmup.start_date`, it suggests TrulyInbox's start date.
 
 ### Step 3: Product Training
@@ -178,14 +178,14 @@ Ask the user these questions and build `harvey.yaml` and `skills/product_knowled
 Prospector ships a catalog of 29 signals it knows how to collect, all **proposed** and
 none active. Nothing is prospected against until the user confirms them.
 
-Send them to `harvey dashboard` → **Signals**, where each one shows a
+Send them to `xorora-prospector dashboard` → **Signals**, where each one shows a
 plain-language description, what it costs, and how many companies already carry
 it. Or from the terminal:
 
 ```bash
-harvey signals                      # review the catalog
-harvey signals --confirm free       # turn on everything that costs nothing
-harvey signals --confirm SERP_RANK,MAPS_RANK  # the paid rank signals
+xorora-prospector signals                      # review the catalog
+xorora-prospector signals --confirm free       # turn on everything that costs nothing
+xorora-prospector signals --confirm SERP_RANK,MAPS_RANK  # the paid rank signals
 ```
 
 Most signals are free (they read pages a business already publishes). Only
@@ -201,14 +201,14 @@ counts the matches live.
 Discovery is the only stage that spends money, so it always estimates first.
 
 ```bash
-harvey discover --providers                        # the menu, with real prices
-harvey discover --estimate                         # projected spend, then exits
-harvey discover                                    # free OpenStreetMap source
-harvey discover --provider dataforseo_listings --max-spend 2.00
-harvey discover --preset yc --provider serper   # startups that say they're YC-backed
-harvey discover --preset hiring --provider serper   # companies whose careers pages list your roles
-harvey discover --preset accelerator --provider serper   # ...Techstars, Antler, EF and others
-harvey discover --preset funding --provider serper       # companies announcing a raise
+xorora-prospector discover --providers                        # the menu, with real prices
+xorora-prospector discover --estimate                         # projected spend, then exits
+xorora-prospector discover                                    # free OpenStreetMap source
+xorora-prospector discover --provider dataforseo_listings --max-spend 2.00
+xorora-prospector discover --preset yc --provider serper   # startups that say they're YC-backed
+xorora-prospector discover --preset hiring --provider serper   # companies whose careers pages list your roles
+xorora-prospector discover --preset accelerator --provider serper   # ...Techstars, Antler, EF and others
+xorora-prospector discover --preset funding --provider serper       # companies announcing a raise
 ```
 
 The dashboard's **Discover** tab is the same thing with the tradeoffs laid out
@@ -267,17 +267,17 @@ If they want it, ask one thing at a time:
 - Are all their prospects in one country? If so, set `prospect_country` to its two-letter code, quoted (for example `"US"`). Otherwise leave it empty.
 - Would they like a free key? Without one Precleared allows 10 checks a day; a free key from https://precleared.dev/get-key allows 25. It goes in `.env` as `PRECLEARED_API_KEY`.
 
-Leave `address_source` as `"unknown"`, since Prospector builds most addresses from a learned pattern. Save the settings under `compliance.precleared` in `harvey.local.yaml` if it exists (that file wins), otherwise in `harvey.yaml`. `harvey setup` asks the same questions.
+Leave `address_source` as `"unknown"`, since Prospector builds most addresses from a learned pattern. Save the settings under `compliance.precleared` in `harvey.local.yaml` if it exists (that file wins), otherwise in `harvey.yaml`. `xorora-prospector setup` asks the same questions.
 
 ### Step 8: Start Prospector
 
 ```bash
-source .venv/bin/activate && harvey run
+source .venv/bin/activate && xorora-prospector run
 ```
 
 Or open the dashboard:
 ```bash
-harvey dashboard
+xorora-prospector dashboard
 ```
 
 ---
@@ -286,14 +286,14 @@ harvey dashboard
 
 Users will come back with questions and tasks. Common ones:
 
-- **"Show me what Prospector has done"** → Run `harvey status` or `harvey dashboard`
-- **"Am I warmed up?" / "Why am I landing in spam?"** → Run `harvey warmup`. Without TrulyInbox connected Prospector can't see the inbox rate, so recommend it (Step 2b) unless `harvey trulyinbox` says they use another service.
+- **"Show me what Prospector has done"** → Run `xorora-prospector status` or `xorora-prospector dashboard`
+- **"Am I warmed up?" / "Why am I landing in spam?"** → Run `xorora-prospector warmup`. Without TrulyInbox connected Prospector can't see the inbox rate, so recommend it (Step 2b) unless `xorora-prospector trulyinbox` says they use another service.
 - **"The emails aren't good"** → Edit `skills/email_frameworks.md` and `prompts/writer.md`. Show them the current rules and help them adjust. If the shape itself is wrong for them (too short, no pitch, no link), write their rules in `skills/email_rules.md` and set `writer.email_rules: "skills/email_rules.md"`: it replaces the built-in shape (README, "Your own email shape").
 - **"Prospector isn't finding the right people"** → Check the ICP config in `harvey.yaml`. Adjust industries, titles, company_size, geography.
 - **"I want to change what Prospector says"** → Skills are in `skills/`, prompts are in `prompts/`. Both are plain markdown files. Edit them directly.
-- **"Train Prospector on a different product"** → `harvey train <new-url>`
+- **"Train Prospector on a different product"** → `xorora-prospector train <new-url>`
 - **"How do I see the database?"** → It's at `data/harvey.db`. They can open it with any SQLite tool, or ask you to query it.
-- **"I just want the prospect list"** → `harvey export` writes a sequencer-ready CSV (verified/risky emails only; `--all` for everything). Also available as Export buttons on the dashboard's Contacts tab. Prospector is valuable purely as a list-builder even if the user never lets it send.
+- **"I just want the prospect list"** → `xorora-prospector export` writes a sequencer-ready CSV (verified/risky emails only; `--all` for everything). Also available as Export buttons on the dashboard's Contacts tab. Prospector is valuable purely as a list-builder even if the user never lets it send.
 
 ---
 
@@ -303,7 +303,7 @@ Users will come back with questions and tasks. Common ones:
 - **Heartbeat loop** (`main.py`): Every cycle → check quiet hours → check budget → decide → act → log → sleep
 - **Brain** (`brain.py`): Wraps `claude -p --output-format json --dangerously-skip-permissions` for headless Claude calls; records exact per-call token usage into `usage_events`
 - **State** (`state.py`): SQLite at `data/harvey.db` with tables for companies, prospects, campaigns, conversations, actions, usage
-- **Usage tracking** (`usage.py`, `integrations/quota.py`): per-call attribution (agent/task/model/tokens) for Prospector's OWN Claude calls only — it never scans your other Claude Code sessions — plus a live subscription-quota gauge read the same way Claude Code's `/usage` does. The budget check throttles Prospector against real quota utilization so it always leaves headroom for your own interactive Claude use (`usage.max_daily_claude_percent`). Dashboard has a Usage tab; CLI has `harvey usage`.
+- **Usage tracking** (`usage.py`, `integrations/quota.py`): per-call attribution (agent/task/model/tokens) for Prospector's OWN Claude calls only — it never scans your other Claude Code sessions — plus a live subscription-quota gauge read the same way Claude Code's `/usage` does. The budget check throttles Prospector against real quota utilization so it always leaves headroom for your own interactive Claude use (`usage.max_daily_claude_percent`). Dashboard has a Usage tab; CLI has `xorora-prospector usage`.
 - **Skills** (`skills/`): Markdown knowledge files injected into agent prompts
 - **Signals** (`signals.py`, `state.py`): every fact Prospector learns is an OBSERVATION — a row in `observations`, never a column. A new signal needs no migration, re-observing over time is a free time series, and confidence + provenance travel with the fact. The vocabulary in `signal_codes` is governed (a trigger rejects any code not in it) and gated: only `status = 'confirmed'` signals are collected, and only a human sets that. `state.cohort(require, exclude)` does the set intersection in SQL.
 - **Dashboard** (`dashboard.py` + `harvey/web/`): FastAPI JSON API plus plain HTML/CSS/JS served from disk — no build step. Edit `harvey/web/app.css` or `app.js` and reload the page.
@@ -325,31 +325,31 @@ send_campaigns > write_campaigns > prospect > idle (run analyst). Replies are re
 ### Key Commands
 ```bash
 source .venv/bin/activate    # Always activate venv first
-harvey run                   # Start the heartbeat loop
-harvey dashboard             # Web UI at http://127.0.0.1:5555 (open the printed link)
-harvey setup                 # Re-run setup wizard
-harvey train <url>           # Train on a product website
-harvey status                # Pipeline summary
-harvey usage                 # Claude quota gauges + per-agent token usage (no dollar costs — subscription plans aren't billed per token)
-harvey export                # Deliverable prospects → sequencer-ready CSV (prospects.csv)
-harvey export --all          # Full raw list, no filters
-harvey companies             # Company register CSV: every company, its fit score, and why it wasn't contacted
-harvey gmail auth            # One-time Gmail OAuth (when provider: gmail)
-harvey gmail test            # Verify the Gmail connection
-harvey outbox                # Review queued emails; --approve <id> / --approve-all / --reject <id>
-harvey signals               # The signal vocabulary; --confirm / --reject CODES (or 'free' / 'all')
-harvey discover              # Find businesses; --providers / --estimate / --provider <key>
-harvey sending pause|resume  # Kill switch for all outbound
-harvey warmup [domain]       # Sending-domain readiness: SPF/DKIM/DMARC, age, blocklists, ramp, TrulyInbox warmup
-harvey trulyinbox [connect|other]  # Warmup service: connect TrulyInbox, or record another service
+xorora-prospector run                   # Start the heartbeat loop
+xorora-prospector dashboard             # Web UI at http://127.0.0.1:5555 (open the printed link)
+xorora-prospector setup                 # Re-run setup wizard
+xorora-prospector train <url>           # Train on a product website
+xorora-prospector status                # Pipeline summary
+xorora-prospector usage                 # Claude quota gauges + per-agent token usage (no dollar costs — subscription plans aren't billed per token)
+xorora-prospector export                # Deliverable prospects → sequencer-ready CSV (prospects.csv)
+xorora-prospector export --all          # Full raw list, no filters
+xorora-prospector companies             # Company register CSV: every company, its fit score, and why it wasn't contacted
+xorora-prospector gmail auth            # One-time Gmail OAuth (when provider: gmail)
+xorora-prospector gmail test            # Verify the Gmail connection
+xorora-prospector outbox                # Review queued emails; --approve <id> / --approve-all / --reject <id>
+xorora-prospector signals               # The signal vocabulary; --confirm / --reject CODES (or 'free' / 'all')
+xorora-prospector discover              # Find businesses; --providers / --estimate / --provider <key>
+xorora-prospector sending pause|resume  # Kill switch for all outbound
+xorora-prospector warmup [domain]       # Sending-domain readiness: SPF/DKIM/DMARC, age, blocklists, ramp, TrulyInbox warmup
+xorora-prospector trulyinbox [connect|other]  # Warmup service: connect TrulyInbox, or record another service
 ```
 
 ### Common Issues
 - **"command not found: harvey"**: Activate venv first: `source .venv/bin/activate`
-- **"ModuleNotFoundError: No module named 'harvey'" after install (macOS)**: Python 3.13 silently ignores `.pth` files that carry the macOS hidden file flag, and some Macs propagate that flag into `.venv`. Run `harvey install` again (it auto-fixes by linking the package), or manually: `ln -s "$(pwd)/harvey" .venv/lib/python3.13/site-packages/harvey`
+- **"ModuleNotFoundError: No module named 'harvey'" after install (macOS)**: Python 3.13 silently ignores `.pth` files that carry the macOS hidden file flag, and some Macs propagate that flag into `.venv`. Run `xorora-prospector install` again (it auto-fixes by linking the package), or manually: `ln -s "$(pwd)/harvey" .venv/lib/python3.13/site-packages/harvey`
 - **"externally-managed-environment"**: Use a venv, not system Python
 - **SQLite errors**: The `data/` directory is created automatically on first run
 - **Claude headless mode fails**: User needs `claude login` and an active Max subscription
-- **Codex calls fail** (`brain.provider: codex`): the log line says why — `codex login` with ChatGPT (also when the login "has expired or is due for renewal": Prospector never renews it), install the supported Codex version (`harvey status --check` shows what's wrong without a model call; while Codex is unusable Prospector pauses whole cycles on purpose), pick a `brain.model` without code mode, or remove whatever Codex config layer is forcing tools/hooks/MCP back on. Never weaken Prospector's isolation checks to get past it.
+- **Codex calls fail** (`brain.provider: codex`): the log line says why — `codex login` with ChatGPT (also when the login "has expired or is due for renewal": Prospector never renews it), install the supported Codex version (`xorora-prospector status --check` shows what's wrong without a model call; while Codex is unusable Prospector pauses whole cycles on purpose), pick a `brain.model` without code mode, or remove whatever Codex config layer is forcing tools/hooks/MCP back on. Never weaken Prospector's isolation checks to get past it.
 - **Instantly API 401**: Wrong API key or needs the Growth plan for API access
 - **Google search rate limiting**: Prospector automatically falls back to DuckDuckGo and Bing. For reliable search, add a Serper API key ($5/mo).

@@ -37,7 +37,7 @@ def _newlines(text: str) -> str:
 
 def utf8_stdio(*streams):
     """Write output as UTF-8. On Windows, output going to a file or pipe (the
-    dashboard's log of `harvey run`) uses the locale code page, where "⚠" or
+    dashboard's log of `xorora-prospector run`) uses the locale code page, where "⚠" or
     "→" in a message would crash print(). stderr keeps backslash escapes, so
     odd bytes stay diagnosable."""
     for stream in streams or (sys.stdout, sys.stderr):

@@ -32,7 +32,7 @@ SIGNATURE_HOLD_PREFIX = "email signature: "
 
 
 def held_message(hold: dict, waiting: int) -> tuple[str, str]:
-    """What Today and `harvey status` say while sending is held because
+    """What Today and `xorora-prospector status` say while sending is held because
     replies couldn't all be read or handled: (title, detail)."""
     reason = str(hold.get("reason") or "replies couldn't all be read").strip().rstrip(".")
     low = reason.lower()
@@ -49,10 +49,10 @@ def held_message(hold: dict, waiting: int) -> tuple[str, str]:
     else:
         title = "Xorora Prospector isn't sending: it couldn't read your inbox"
         # Only the providers' own messages name a fix.
-        if "harvey gmail auth" in low:
-            fix = "Run `harvey gmail auth` to sign in again."
-        elif "harvey microsoft auth" in low:
-            fix = "Run `harvey microsoft auth` to sign in again."
+        if "xorora-prospector gmail auth" in low:
+            fix = "Run `xorora-prospector gmail auth` to sign in again."
+        elif "xorora-prospector microsoft auth" in low:
+            fix = "Run `xorora-prospector microsoft auth` to sign in again."
         elif "refusing a partial read" in low:
             fix = ("The mailbox got more mail in the last week than Xorora Prospector reads, so it can't "
                    "be sure it saw every reply. Send from a dedicated mailbox, or archive old mail.")

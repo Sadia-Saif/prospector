@@ -76,7 +76,7 @@ def cmd_install(args):
         print("  ✓ Playwright browsers installed.\n")
 
     _ensure_importable(args._project_root)
-    print("  Xorora Prospector is installed. Run 'harvey setup' next.\n")
+    print("  Xorora Prospector is installed. Run 'xorora-prospector setup' next.\n")
 
 
 def _ensure_importable(project_root: str):
@@ -208,7 +208,7 @@ def cmd_status(args):
         write_failed = (summary.get("prospects") or {}).get("write_failed", 0)
         if write_failed:
             print(f"  Couldn't write for:   {write_failed} (the model's drafts kept coming back "
-                  "unusable; `harvey retry-writes` tries again)")
+                  "unusable; `xorora-prospector retry-writes` tries again)")
         print(f"  Draft campaigns:      {summary['draft_campaigns']}")
         print(f"  Active campaigns:     {summary['active_campaigns']}")
         print(f"  Open conversations:   {summary['open_conversations']}")
@@ -297,7 +297,7 @@ def cmd_status(args):
         return healthy
 
     if not asyncio.run(_status()):
-        # `harvey status --check` failing is something scripts can act on.
+        # `xorora-prospector status --check` failing is something scripts can act on.
         raise SystemExit(1)
 
 
@@ -402,7 +402,7 @@ def cmd_companies(args):
     from harvey.state import DB_PATH
 
     if not DB_PATH.exists():
-        print("\n  No database yet: run 'harvey discover' or 'harvey run' first.\n")
+        print("\n  No database yet: run 'xorora-prospector discover' or 'xorora-prospector run' first.\n")
         return
     rows = asyncio.run(build_register(sqlite_query(DB_PATH), load_config()))
     out = Path(args.out) if args.out else (
@@ -527,7 +527,7 @@ def cmd_outbox(args):
         paused = await state.get_setting("sending_paused")
         if paused:
             print(f"\n  ⚠ SENDING PAUSED: {paused}")
-            print("  Resume with: harvey sending resume")
+            print("  Resume with: xorora-prospector sending resume")
 
         pending = await state.get_outbox(status="pending_review", limit=50)
         approved = await state.get_outbox(status="approved", limit=10)
@@ -542,8 +542,8 @@ def cmd_outbox(args):
             for line in body_preview.splitlines():
                 print(f"    {line}")
         if pending:
-            print("\n  Approve: harvey outbox --approve <id>   |   all: harvey outbox --approve-all")
-            print("  Reject:  harvey outbox --reject <id>\n")
+            print("\n  Approve: xorora-prospector outbox --approve <id>   |   all: xorora-prospector outbox --approve-all")
+            print("  Reject:  xorora-prospector outbox --reject <id>\n")
         else:
             print("  Nothing awaiting review.\n")
 
@@ -575,7 +575,7 @@ def cmd_profile(args):
         companies, observations, _ = await run_profile_stage(
             state, limit=args.limit, stale_days=args.stale_days, config=config)
         print(f"  Read {companies} sites → {observations} observations (free)")
-        print("\n  See what turned up: harvey dashboard → Signals\n")
+        print("\n  See what turned up: xorora-prospector dashboard → Signals\n")
 
     asyncio.run(_profile())
 
@@ -602,12 +602,12 @@ def cmd_discover(args):
                     print(f"    Needs: {', '.join(m['env_keys'])} in .env  —  {m['signup_url']}")
                 if m["caveat"]:
                     print(f"    Note: {m['caveat']}")
-            print("\n  Run one with: harvey discover --provider <key> --estimate\n")
+            print("\n  Run one with: xorora-prospector discover --provider <key> --estimate\n")
             return
 
         if args.provider not in PROVIDERS:
             print(f"\n  Unknown provider {args.provider!r}. "
-                  f"See: harvey discover --providers\n")
+                  f"See: xorora-prospector discover --providers\n")
             return
 
         # Fail before collection; estimates need no credentials.
@@ -624,7 +624,7 @@ def cmd_discover(args):
             print(f"  Missing or empty: {names}")
             print("  Put a real value in .env (template placeholders don't"
                   " count), then retry.")
-            print("  All providers and their keys: harvey discover --providers")
+            print("  All providers and their keys: xorora-prospector discover --providers")
             print("  " + "!" * 68 + "\n")
             raise SystemExit(1)
 
@@ -700,7 +700,7 @@ def cmd_discover(args):
             print("  " + "=" * 68 + "\n")
             raise SystemExit(1)
 
-        print("\n  Next: harvey dashboard → Signals → cohort builder\n")
+        print("\n  Next: xorora-prospector dashboard → Signals → cohort builder\n")
 
     asyncio.run(_discover())
 
@@ -759,9 +759,9 @@ def cmd_signals(args):
             print(f"          {r['cost_note']}")
 
         if by_status["proposed"]:
-            print("\n  Confirm with: harvey signals --confirm CODE[,CODE...]")
-            print("  Everything free: harvey signals --confirm free")
-            print("  Details and descriptions: harvey dashboard → Signals\n")
+            print("\n  Confirm with: xorora-prospector signals --confirm CODE[,CODE...]")
+            print("  Everything free: xorora-prospector signals --confirm free")
+            print("  Details and descriptions: xorora-prospector dashboard → Signals\n")
         else:
             print("")
 
@@ -809,7 +809,7 @@ def cmd_warmup(args):
     sender = smtp_user if "@" in smtp_user else config.persona.email
     domain = (args.domain or sender.rpartition("@")[2]).strip().lower().rstrip(".")
     if not d.DOMAIN_RE.match(domain):
-        print("\n  No valid sending domain found. Pass one: harvey warmup yourdomain.com\n")
+        print("\n  No valid sending domain found. Pass one: xorora-prospector warmup yourdomain.com\n")
         raise SystemExit(1)
 
     async def _history():
@@ -856,7 +856,7 @@ def cmd_warmup(args):
     print("      it shows Gmail's spam rate and domain reputation once you send volume.")
     print("    - Inbox placement: send one email to a seed test (mail-tester.com is free)")
     print("      and aim for 9/10+. TrulyInbox shows the warmup inbox rate, and with it")
-    print("      connected (harvey trulyinbox connect) Xorora Prospector reads it into this report.")
+    print("      connected (xorora-prospector trulyinbox connect) Xorora Prospector reads it into this report.")
     print("      Wait for ~95%+ inbox for a week before relying on cold sends.\n")
     if failed or unknown:
         raise SystemExit(1)
@@ -982,19 +982,19 @@ def main():
     )
     subparsers = parser.add_subparsers(dest="command")
 
-    # harvey install
+    # xorora-prospector install
     sub = subparsers.add_parser("install", help="Install dependencies")
     sub.set_defaults(func=cmd_install)
 
-    # harvey setup
+    # xorora-prospector setup
     sub = subparsers.add_parser("setup", help="Run the interactive setup wizard")
     sub.set_defaults(func=cmd_setup)
 
-    # harvey run
+    # xorora-prospector run
     sub = subparsers.add_parser("run", help="Start Xorora Prospector's heartbeat loop")
     sub.set_defaults(func=cmd_run)
 
-    # harvey train <url>
+    # xorora-prospector train <url>
     sub = subparsers.add_parser("train", help="Train Xorora Prospector on a website")
     sub.add_argument("url", help="Website URL to crawl and learn from")
     sub.add_argument(
@@ -1015,7 +1015,7 @@ def main():
     )
     sub.set_defaults(func=cmd_train)
 
-    # harvey dashboard
+    # xorora-prospector dashboard
     sub = subparsers.add_parser("dashboard", help="Open the web dashboard")
     sub.add_argument("--host", default="127.0.0.1",
                      help="Loopback address to listen on (default: 127.0.0.1; "
@@ -1025,7 +1025,7 @@ def main():
                      help="Print the unlock link (with its token) and exit")
     sub.set_defaults(func=cmd_dashboard)
 
-    # harvey status
+    # xorora-prospector status
     sub = subparsers.add_parser("status", help="Show pipeline status")
     sub.add_argument(
         "--check", action="store_true",
@@ -1034,7 +1034,7 @@ def main():
     )
     sub.set_defaults(func=cmd_status)
 
-    # harvey export
+    # xorora-prospector export
     sub = subparsers.add_parser(
         "export", help="Export prospects as a sequencer-ready CSV"
     )
@@ -1048,33 +1048,33 @@ def main():
     sub.add_argument("--all", action="store_true", help="Export the raw list without filters, including opted-out contacts (not for outreach)")
     sub.set_defaults(func=cmd_export)
 
-    # harvey companies
+    # xorora-prospector companies
     sub = subparsers.add_parser(
         "companies", help="Export the company register: every company, why it fits, and why it wasn't contacted"
     )
     sub.add_argument("--out", default="", help="Output file (default: data/exports/company-register-<date>.csv)")
     sub.set_defaults(func=cmd_companies)
 
-    # harvey gmail auth|test
+    # xorora-prospector gmail auth|test
     sub = subparsers.add_parser("gmail", help="Gmail provider setup")
     sub.add_argument("gmail_action", choices=["auth", "test"],
                      help="auth: one-time OAuth; test: verify connection")
     sub.set_defaults(func=cmd_gmail)
 
-    # harvey microsoft auth|test
+    # xorora-prospector microsoft auth|test
     sub = subparsers.add_parser("microsoft", help="Microsoft 365 provider setup")
     sub.add_argument("microsoft_action", choices=["auth", "test"],
                      help="auth: one-time sign-in; test: verify connection")
     sub.set_defaults(func=cmd_microsoft)
 
-    # harvey outbox
+    # xorora-prospector outbox
     sub = subparsers.add_parser("outbox", help="Review/approve queued emails")
     sub.add_argument("--approve", metavar="ID", default="", help="Approve one item")
     sub.add_argument("--approve-all", action="store_true", help="Approve all pending")
     sub.add_argument("--reject", metavar="ID", default="", help="Reject one item")
     sub.set_defaults(func=cmd_outbox)
 
-    # harvey sending pause|resume|status
+    # xorora-prospector sending pause|resume|status
     sub = subparsers.add_parser("discover", help="Find businesses matching your ICP")
     sub.add_argument("--provider", default="osm",
                      help="Discovery provider (default: osm — free, no account)")
@@ -1143,7 +1143,7 @@ def main():
                           "or show the status (default)")
     sub.set_defaults(func=cmd_trulyinbox)
 
-    # harvey usage
+    # xorora-prospector usage
     sub = subparsers.add_parser("usage", help="Show brain usage and quota (Claude or Codex)")
     sub.add_argument("--days", type=int, default=30, help="Breakdown window (default: 30)")
     sub.set_defaults(func=cmd_usage)
@@ -1154,10 +1154,10 @@ def main():
     if args.command is None:
         parser.print_help()
         print("\n  Quick start:")
-        print("    harvey install   — Install dependencies")
-        print("    harvey setup     — Configure Xorora Prospector (first time)")
-        print("    harvey run       — Start closing deals")
-        print("    harvey dashboard — Open the web dashboard")
+        print("    xorora-prospector install   — Install dependencies")
+        print("    xorora-prospector setup     — Configure Xorora Prospector (first time)")
+        print("    xorora-prospector run       — Start closing deals")
+        print("    xorora-prospector dashboard — Open the web dashboard")
         print()
         sys.exit(0)
 

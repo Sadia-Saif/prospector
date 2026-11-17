@@ -1745,7 +1745,7 @@ async def run_discovery(
     if not confirmed:
         report.errors.append(
             "no signals confirmed — confirm signals first (dashboard → Signals, "
-            "or `harvey signals --confirm free`) or discovery has nothing to record")
+            "or `xorora-prospector signals --confirm free`) or discovery has nothing to record")
         report.stopped = "no confirmed signals"
         return report
 

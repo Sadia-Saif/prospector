@@ -264,7 +264,7 @@ def check_warmup_service(health, warmup=None, *, error: str = "", other_service:
         return Check("Warmup service", INFO, "Not connected, so Xorora Prospector can't see whether this "
                      "mailbox is warmed. We recommend TrulyInbox: it warms the mailbox, keeps "
                      f"it healthy, and Xorora Prospector reads its inbox rate here. {AFFILIATE_URL} "
-                     f"{AFFILIATE_TAG} Then run: harvey trulyinbox connect")
+                     f"{AFFILIATE_TAG} Then run: xorora-prospector trulyinbox connect")
     if not health.found:
         return Check("Warmup service", FAIL, f"{health.address} isn't in your TrulyInbox "
                      "account yet. Add it in TrulyInbox to start its warmup.")

@@ -283,7 +283,7 @@ function emptyState(glyph, title, copy) {
 
 function offlineState() {
   return emptyState('&#9888;', 'Dashboard can\'t reach the server',
-    'The dashboard process may have stopped. Restart it with <b>harvey dashboard</b> and refresh this page.');
+    'The dashboard process may have stopped. Restart it with <b>xorora-prospector dashboard</b> and refresh this page.');
 }
 
 async function api(path, opts) {
@@ -1268,13 +1268,13 @@ async function loadSettings() {
   const g = document.getElementById('gmail-status');
   if (g) {
     if (data.gmail_authorized) { g.className = 'email-tag verified'; g.textContent = 'authorized'; }
-    else if (data.gmail_client_secret_set) { g.className = 'email-tag risky'; g.textContent = 'run: harvey gmail auth'; }
+    else if (data.gmail_client_secret_set) { g.className = 'email-tag risky'; g.textContent = 'run: xorora-prospector gmail auth'; }
     else { g.className = 'email-tag guess'; g.textContent = 'not set up'; }
   }
   const m = document.getElementById('m365-status');
   if (m) {
     if (data.m365_authorized) { m.className = 'email-tag verified'; m.textContent = 'authorized'; }
-    else if (data.m365_client_id) { m.className = 'email-tag risky'; m.textContent = 'run: harvey microsoft auth'; }
+    else if (data.m365_client_id) { m.className = 'email-tag risky'; m.textContent = 'run: xorora-prospector microsoft auth'; }
     else { m.className = 'email-tag guess'; m.textContent = 'not set up'; }
   }
   tag('reoon-status', data.reoon_api_key_set, 'set');
@@ -1286,7 +1286,7 @@ function saveGmail() {
   const payload = {GMAIL_CLIENT_ID: document.getElementById('gmail-id').value.trim()};
   const sec = document.getElementById('gmail-secret').value;
   if (sec) payload.GMAIL_CLIENT_SECRET = sec;
-  saveEnv(payload, 'Gmail OAuth saved. Now run "harvey gmail auth" in your terminal.').then(loadSettings);
+  saveEnv(payload, 'Gmail OAuth saved. Now run "xorora-prospector gmail auth" in your terminal.').then(loadSettings);
 }
 
 function saveSmtp() {
@@ -1313,7 +1313,7 @@ function saveMicrosoft() {
   const client = document.getElementById('m365-client').value.trim();
   if (!client) { showToast('Paste the Application (client) ID first.', 'error'); return; }
   saveEnv({M365_CLIENT_ID: client, M365_TENANT_ID: document.getElementById('m365-tenant').value.trim()},
-          'Saved. Now run "harvey microsoft auth" in your terminal.').then(loadSettings);
+          'Saved. Now run "xorora-prospector microsoft auth" in your terminal.').then(loadSettings);
 }
 
 function saveVerifiers() {
@@ -1864,7 +1864,7 @@ function renderDesk(items, i) {
   const added = cur.kind === 'sequence' && !(cur.body || '').trimEnd().endsWith(_desk.footer)
     ? _desk.footer : '';
   const footer = added
-    ? '<div class="desk-footer" title="Added when it sends (compliance in harvey.yaml)">' +
+    ? '<div class="desk-footer" title="Added when it sends (compliance in the settings file)">' +
         escHtml(added) + '</div>' : '';
   const actions = editing
     ? '<button class="btn btn-primary" onclick="deskSave(' + jsq(cur.id) + ')">Save</button>' +
@@ -2172,7 +2172,7 @@ async function loadProspects() {
   _prospects = data;
   if (!data.length) {
     el.innerHTML = emptyState(icon('contacts'), 'No contacts yet',
-      'Xorora Prospector hasn\'t found any prospects. Once it\'s running, the Scout agent searches the web for people matching your ideal customer profile in <b>harvey.yaml</b>.');
+      'Xorora Prospector hasn\'t found any prospects. Once it\'s running, the Scout agent searches the web for people matching your ideal customer profile in <b>the settings file</b>.');
     return;
   }
   if (!document.getElementById('contact-rows')) {

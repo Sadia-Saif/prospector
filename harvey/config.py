@@ -92,7 +92,7 @@ class WarmupConfig(BaseModel):
     min_days: int = 14        # warmup-only days before any cold email
     start_sends: int = 5      # cold-email cap on the first sending day
     daily_increase: int = 3   # added to the cap each day after that
-    dkim_selector: str = ""   # for `harvey warmup`, if not a common one
+    dkim_selector: str = ""   # for `xorora-prospector warmup`, if not a common one
 
     @field_validator("start_date", "dkim_selector", mode="before")
     @classmethod
@@ -786,7 +786,7 @@ def load_config(config_path: str | None = None) -> ProspectorConfig:
     except FileNotFoundError:
         raise ConfigFileNotFoundError(
             f"Config file not found: {config_path}. "
-            "Create one from harvey.yaml.example or run 'harvey setup'."
+            "Create one from harvey.yaml.example or run 'xorora-prospector setup'."
         )
     except yaml.YAMLError as e:
         raise ConfigError(f"Invalid YAML in {config_path}:\n  {e}")
@@ -794,7 +794,7 @@ def load_config(config_path: str | None = None) -> ProspectorConfig:
         raise ConfigError(f"Could not read {config_path}: {e}")
 
     if data is None:
-        raise ConfigError(f"{config_path} is empty. Run 'harvey setup' to configure Xorora Prospector.")
+        raise ConfigError(f"{config_path} is empty. Run 'xorora-prospector setup' to configure Xorora Prospector.")
     if not isinstance(data, dict):
         raise ConfigError(
             f"{config_path} must contain a YAML mapping (key: value pairs), "
@@ -810,7 +810,7 @@ def load_config(config_path: str | None = None) -> ProspectorConfig:
         # ValidationError so callers (and tests) keep the pydantic type.
         logger.error(
             f"Invalid configuration in {config_path}:\n{_format_validation_error(e)}\n"
-            "Fix the fields above or re-run 'harvey setup'."
+            "Fix the fields above or re-run 'xorora-prospector setup'."
         )
         raise
 
@@ -1072,5 +1072,5 @@ def _find_config_file() -> str:
     raise ConfigFileNotFoundError(
         "harvey.yaml not found in "
         + ", ".join(str(p.parent) for p in candidates)
-        + ". Create one from harvey.yaml.example or run 'harvey setup'."
+        + ". Create one from harvey.yaml.example or run 'xorora-prospector setup'."
     )

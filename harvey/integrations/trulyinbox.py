@@ -3,9 +3,9 @@
 A new mailbox has no sending history, so it needs a few weeks of warmup before
 cold email, and a warmup service running alongside it keeps it healthy after.
 Xorora Prospector recommends TrulyInbox for that. With a key connected
-(TRULYINBOX_API_KEY, `harvey trulyinbox connect` or the dashboard), Xorora Prospector
+(TRULYINBOX_API_KEY, `xorora-prospector trulyinbox connect` or the dashboard), Xorora Prospector
 reads whether the sending mailbox is enrolled, whether its warmup is on and
-signed in, and how much of its warmup mail landed in spam, so `harvey warmup`
+signed in, and how much of its warmup mail landed in spam, so `xorora-prospector warmup`
 can say whether the mailbox is actually warmed instead of counting days.
 
 Only reads: every request is a GET, and nothing here can enroll, pause,
@@ -275,7 +275,7 @@ def key_from_env() -> tuple[str, str]:
 
 
 def describe_status(health: MailboxHealth | None, error: str, choice: str) -> str:
-    """One line for `harvey trulyinbox`: connected, another service, or not set up."""
+    """One line for `xorora-prospector trulyinbox`: connected, another service, or not set up."""
     if error:
         return f"connected, but: {error}"
     if health is not None:

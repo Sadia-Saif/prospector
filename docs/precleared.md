@@ -25,7 +25,7 @@ compliance:
 ```
 
 Quote `prospect_country` (YAML reads an unquoted `NO` as false).
-`harvey setup` asks the same questions.
+`xorora-prospector setup` asks the same questions.
 
 ## What is sent
 
@@ -92,7 +92,7 @@ rejected, or it cannot be reached), new checks wait for a later cycle.
 Valid cached verdicts still apply, using the same recipient-country facts
 as a fresh check. Replies still go out. Address-specific failures postpone
 that email six hours; failures at two distinct domains without a fresh answer
-pause further checks. The Today page and `harvey status` say how many cold
+pause further checks. The Today page and `xorora-prospector status` say how many cold
 emails are waiting and what fixes it. The next answered check clears the
 notice, and so does switching the check off.
 

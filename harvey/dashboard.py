@@ -216,12 +216,12 @@ async def get_setup_status():
         provider_done = _has("GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET") and \
             (PROJECT_ROOT / "data" / "gmail_token.json").is_file()
         provider_help = ("Set GMAIL_CLIENT_ID/SECRET in Settings, then run "
-                         "'harvey gmail auth' in your terminal.")
+                         "'xorora-prospector gmail auth' in your terminal.")
     elif provider == "microsoft":
         provider_done = _has("M365_CLIENT_ID") and \
             (PROJECT_ROOT / "data" / "m365_token.json").is_file()
         provider_help = ("Set the Microsoft 365 client and tenant IDs in Settings, then run "
-                         "'harvey microsoft auth' in your terminal.")
+                         "'xorora-prospector microsoft auth' in your terminal.")
     elif provider == "smtp":
         provider_done = _has("SMTP_HOST", "SMTP_USERNAME", "SMTP_PASSWORD")
         provider_help = "Enter your SMTP host, username, and password in Settings."
@@ -270,7 +270,7 @@ async def get_setup_status():
         "id": "product_trained", "label": "Product knowledge trained",
         "done": product_trained,
         "required": True,
-        "help": "Run: harvey train https://yourwebsite.com (or set up through Claude).",
+        "help": "Run: xorora-prospector train https://yourwebsite.com (or set up through Claude).",
     })
 
     # 7. LinkedIn (optional)
@@ -359,7 +359,7 @@ async def get_settings():
     def is_set(k):
         return bool((env_vars.get(k) or "").strip())
 
-    # Gmail is authorized once harvey gmail auth has stored a token file.
+    # Gmail is authorized once xorora-prospector gmail auth has stored a token file.
     gmail_token = (PROJECT_ROOT / "data" / "gmail_token.json").is_file()
 
     return {
@@ -670,7 +670,7 @@ async def start_harvey():
     from harvey.main import _needs_setup
     if _needs_setup():
         return {"success": False,
-                "message": "Xorora Prospector isn't set up yet. Run `harvey setup` in a terminal first."}
+                "message": "Xorora Prospector isn't set up yet. Run `xorora-prospector setup` in a terminal first."}
 
     # Ensure data dir exists
     (PROJECT_ROOT / "data").mkdir(parents=True, exist_ok=True)
@@ -2203,7 +2203,7 @@ async def get_live_status():
 
     Built for someone who would otherwise keep asking "what's the status?".
     Everything is derived from the database, so it is true whatever started
-    the work — `harvey run`, a CLI command, or a one-off script. Every total
+    the work — `xorora-prospector run`, a CLI command, or a one-off script. Every total
     counts only what the step can act on (a business with no website is never
     read), so a finished step always reaches 100% instead of sticking.
     """
@@ -2420,7 +2420,7 @@ async def get_today():
                 "title": f"{who} is paused, so Xorora Prospector is waiting",
                 "detail": (str(brain.get("reason") or "It can't be used right now.")[:300] +
                            " Replies and queued emails are untouched; Xorora Prospector resumes "
-                           "once it's fixed. harvey status --check says what's wrong."),
+                           "once it's fixed. xorora-prospector status --check says what's wrong."),
                 "action": "Open the log", "tab": "controls",
             })
 

@@ -7,7 +7,7 @@ Prospector finds businesses worth selling to, learns something specific about ea
 The unusual part: **there is no model API bill.** Prospector uses your Claude Pro or Max subscription through Claude Code, or your ChatGPT subscription through Codex. Model calls use the plan you already pay for, without an API key or per-token API billing. Claude is the default; [Codex is an opt-in provider on macOS and Linux](#using-a-chatgpt-plan-instead-codex).
 
 ```
-$ harvey run
+$ xorora-prospector run
 
 ============================================================
 Prospector is online. Always Be Closing.
@@ -116,8 +116,8 @@ Profiling and outbox draining ride along on **every** cycle regardless, because 
 ### Easiest: let Claude set it up
 
 ```bash
-git clone https://github.com/ethanplusai/harvey.git
-cd harvey
+git clone https://github.com/Sadia-Saif/prospector.git
+cd prospector
 claude
 ```
 
@@ -135,17 +135,17 @@ cp .env.example .env && $EDITOR .env
 
 # 3. Learn your product from your website (writes harvey.local.yaml; re-running
 #    it updates the product, targeting and company and keeps your other settings)
-harvey train https://your-company.com
+xorora-prospector train https://your-company.com
 
 # 4. Choose what makes a good prospect (see below — this one matters)
-harvey signals --confirm free
+xorora-prospector signals --confirm free
 
 # 5. Find businesses. Free source, no account needed.
-harvey discover
+xorora-prospector discover
 
 # 6. Watch it work
-harvey dashboard          # prints a private link to http://127.0.0.1:5555
-harvey run
+xorora-prospector dashboard          # prints a private link to http://127.0.0.1:5555
+xorora-prospector run
 ```
 
 ### Or deploy with Docker (Linux)
@@ -157,8 +157,8 @@ above on macOS or Windows. On a remote Linux host, reach the dashboard through
 an SSH tunnel rather than exposing its port to the network.
 
 ```bash
-git clone https://github.com/ethanplusai/harvey.git
-cd harvey
+git clone https://github.com/Sadia-Saif/prospector.git
+cd prospector
 
 # Create the credentials file only if you do not already have one.
 test -e .env || cp .env.example .env
@@ -169,7 +169,7 @@ export HARVEY_UID=$(id -u) HARVEY_GID=$(id -g)
 # Sign in to Claude on the host first; ~/.claude must already exist.
 # The image ships Claude only; Codex is not included.
 docker compose build
-docker compose run --rm harvey setup
+docker compose run --rm xorora-prospector setup
 
 docker compose up -d
 docker compose logs harvey
@@ -183,7 +183,7 @@ configuration saves; do not replace it with individual config-file mounts.
 Prospector loads `.env` directly. Restart the container after editing credentials.
 The checkout and Claude auth directory must be writable by the selected user.
 
-To train later, use `docker compose run --rm harvey train <product-url>`;
+To train later, use `docker compose run --rm xorora-prospector train <product-url>`;
 `harvey.local.yaml` is saved directly to the checkout. Back up this file, `.env`,
 `skills/`, and `data/` before moving installations. The running code also comes
 from the checkout: restart after updating it, and rebuild when dependencies or
@@ -203,9 +203,9 @@ This is the part that makes Prospector different from a black box, and it is del
 Prospector knows how to collect **29 signals** about a business. It does not collect any of them until you say so. On first run it *proposes* the catalog; you confirm, skip, or reject each one in the dashboard or from the terminal:
 
 ```bash
-harvey signals                       # review the catalog
-harvey signals --confirm free        # everything that costs nothing (26 of them)
-harvey signals --confirm SERP_RANK   # a paid one, opted into explicitly
+xorora-prospector signals                       # review the catalog
+xorora-prospector signals --confirm free        # everything that costs nothing (26 of them)
+xorora-prospector signals --confirm SERP_RANK   # a paid one, opted into explicitly
 ```
 
 Every signal shows what it is in plain language, **what it costs**, and how many companies already carry it.
@@ -250,9 +250,9 @@ Four stages. Each one runs independently, re-runs safely, and states its cost.
 The only stage that spends money, so it always estimates first and never calls anything until you press go.
 
 ```bash
-harvey discover --providers   # the menu, with real prices
-harvey discover --estimate    # projected spend, then exits
-harvey discover               # go
+xorora-prospector discover --providers   # the menu, with real prices
+xorora-prospector discover --estimate    # projected spend, then exits
+xorora-prospector discover               # go
 ```
 
 | Source | Cost | Free tier | Best for |
@@ -277,7 +277,7 @@ parts:
   | `accelerator` (*Accelerator startups*) | Ones backed by Techstars, 500 Global, Antler, Entrepreneur First, South Park Commons, Neo, AI Grant, a16z speedrun or Plug and Play (two searches per industry; the signal also reads Pioneer) | `ACCELERATOR`, with the program and cohort ("Techstars 2024") |
   | `funding` (*Recently funded*) | Companies announcing their own raise ("we raised", "announces $X Series A") in the last 18 months, news sites and funding databases excluded | `FUNDING_ROUND`: round, amount and date |
 
-  `harvey discover --preset accelerator --provider serper`, or the *Look for*
+  `xorora-prospector discover --preset accelerator --provider serper`, or the *Look for*
   menu on the Discover tab.
 - **The signals:** turn them on in the Signals tab. They read the homepage and
   About page (and for a raise, the page the search found on their own site and
@@ -302,7 +302,7 @@ Prospector never reads ycombinator.com, the accelerators' directories, Crunchbas
 PitchBook or LinkedIn, whose terms forbid scraping them; everything comes from
 the companies' own sites and your search provider.
 
-**Looking for companies hiring a role?** `harvey discover --preset hiring
+**Looking for companies hiring a role?** `xorora-prospector discover --preset hiring
 --provider serper` (or *Look for: Companies hiring for your roles*) searches
 your industries for companies whose own careers pages list one of your
 `icp.hiring_signals` roles (else `icp.titles`). Hosted boards and job sites
@@ -349,7 +349,7 @@ Prospector learns each company's **address pattern** and verifies one candidate,
 
 Every address is tagged honestly: `verified` / `risky` (catch-all) / `guess` / `invalid`. **Only deliverable ones are ever sent to.** A guess is never treated as a win.
 
-> Prospector is worth running even if you never let it send. `harvey export` writes a sequencer-ready CSV of everything it found.
+> Prospector is worth running even if you never let it send. `xorora-prospector export` writes a sequencer-ready CSV of everything it found.
 
 ---
 
@@ -388,7 +388,7 @@ The file replaces the built-in shape for the per-person first email and the 3-em
 
 **`linkedin_outreach.md`** — Connection sequences and rate limits, opening with the risk section it should open with: automating LinkedIn violates their ToS, never use a fake identity, and if someone asks whether this is automated, say yes immediately.
 
-**Generated for your product by `harvey train <url>`:**
+**Generated for your product by `xorora-prospector train <url>`:**
 
 - **`product_knowledge.md`** — what you sell, the benefits, pricing, use cases, the pain you solve, buying triggers
 - **`competitive_intel.md`** — battle cards per competitor, differentiation angles, migration paths
@@ -440,10 +440,10 @@ By default **every outgoing email waits for your approval.** Prospector is a cop
 The dashboard's Outbox is a decisions desk: one email fills the pane, the rest wait in a rail, and you work the queue with `A` approve, `R` reject, `J`/`K` to move. That shape is deliberate — a wall of stacked drafts invites a single approve-all reflex, which is exactly the review the approval ladder exists to force.
 
 ```bash
-harvey outbox                 # review from the terminal
-harvey outbox --approve-all
-harvey sending pause          # kill switch, stops everything mid-flight
-harvey retry-writes           # retry prospects the Writer gave up on after 3 unusable drafts
+xorora-prospector outbox                 # review from the terminal
+xorora-prospector outbox --approve-all
+xorora-prospector sending pause          # kill switch, stops everything mid-flight
+xorora-prospector retry-writes           # retry prospects the Writer gave up on after 3 unusable drafts
 ```
 
 Before anything leaves, a **deterministic pre-send gate** — no model involved — rejects: unrendered merge tags, banned phrases, emails over the length cap, too many links, HTML bodies, non-deliverable addresses, and any mismatch between the recipient and the database record.
@@ -527,10 +527,10 @@ running on Instantly; pause those in Instantly itself.
 ## The dashboard
 
 ```bash
-harvey dashboard     # prints the link to open, e.g. http://127.0.0.1:5555/#token=…
+xorora-prospector dashboard     # prints the link to open, e.g. http://127.0.0.1:5555/#token=…
 ```
 
-**Opening it.** The dashboard can change your mail settings, approve the outbox and start Prospector, so it is locked to you, not just to your machine. On first start it creates a random token in `data/dashboard-token` (readable only by you) and prints a link carrying it after the `#`. Open that link: the page keeps the token for that browser tab only and removes it from the address bar. A new tab, or a tab opened without the link, shows a locked screen; paste the token there, or run `harvey dashboard --url` to print the link again. Every API request needs the token as an `Authorization: Bearer` header — scripts and `curl` included — and the token is never accepted from a cookie or a query string. Delete `data/dashboard-token` and restart the dashboard to replace it.
+**Opening it.** The dashboard can change your mail settings, approve the outbox and start Prospector, so it is locked to you, not just to your machine. On first start it creates a random token in `data/dashboard-token` (readable only by you) and prints a link carrying it after the `#`. Open that link: the page keeps the token for that browser tab only and removes it from the address bar. A new tab, or a tab opened without the link, shows a locked screen; paste the token there, or run `xorora-prospector dashboard --url` to print the link again. Every API request needs the token as an `Authorization: Bearer` header — scripts and `curl` included — and the token is never accepted from a cookie or a query string. Delete `data/dashboard-token` and restart the dashboard to replace it.
 
 **It only listens on this machine.** `--host` accepts loopback addresses only (`127.0.0.1`, `::1`, `localhost`), and requests must name one of them in their `Host` header, which also stops a DNS name pointed at 127.0.0.1 from reaching it. Requests sent by other websites open in your browser are refused. To use it from another computer, tunnel instead of exposing it: `ssh -L 5555:127.0.0.1:5555 your-machine`, then open the printed link locally. The token protects against other users and other websites, not against programs already running as your own user account, which can read the token file just as they can read `.env` or the database.
 
@@ -623,27 +623,27 @@ If `harvey.local.yaml` exists it wins. It's gitignored, so a fork can carry real
 ### Commands
 
 ```bash
-harvey run                   # the heartbeat loop
-harvey dashboard             # web UI at 127.0.0.1:5555 (--url: print the unlock link)
-harvey signals               # review/confirm what to prospect against
-harvey discover              # find businesses; --providers / --estimate
-harvey profile               # read discovered companies' sites (free)
-harvey train <url>           # learn a product from its website (--provider codex --model gpt-5.5)
-harvey status                # pipeline summary
-harvey usage                 # active provider's quota + per-agent tokens
-harvey outbox                # review queued email
-harvey export                # deliverable prospects → CSV
-harvey companies             # company register → CSV: every company, fit, and why it wasn't contacted
-harvey sending pause|resume  # kill switch
-harvey warmup [domain]       # is the sending domain ready? (SPF/DKIM/DMARC, age, blocklists, warmup)
-harvey trulyinbox connect    # connect TrulyInbox so Prospector reads the mailbox's warmup
-harvey retry-writes          # retry prospects the Writer gave up on
-harvey gmail auth            # one-time Gmail OAuth
-harvey microsoft auth|test  # one-time Microsoft 365 sign-in (docs/microsoft365.md)
+xorora-prospector run                   # the heartbeat loop
+xorora-prospector dashboard             # web UI at 127.0.0.1:5555 (--url: print the unlock link)
+xorora-prospector signals               # review/confirm what to prospect against
+xorora-prospector discover              # find businesses; --providers / --estimate
+xorora-prospector profile               # read discovered companies' sites (free)
+xorora-prospector train <url>           # learn a product from its website (--provider codex --model gpt-5.5)
+xorora-prospector status                # pipeline summary
+xorora-prospector usage                 # active provider's quota + per-agent tokens
+xorora-prospector outbox                # review queued email
+xorora-prospector export                # deliverable prospects → CSV
+xorora-prospector companies             # company register → CSV: every company, fit, and why it wasn't contacted
+xorora-prospector sending pause|resume  # kill switch
+xorora-prospector warmup [domain]       # is the sending domain ready? (SPF/DKIM/DMARC, age, blocklists, warmup)
+xorora-prospector trulyinbox connect    # connect TrulyInbox so Prospector reads the mailbox's warmup
+xorora-prospector retry-writes          # retry prospects the Writer gave up on
+xorora-prospector gmail auth            # one-time Gmail OAuth
+xorora-prospector microsoft auth|test  # one-time Microsoft 365 sign-in (docs/microsoft365.md)
 ```
 
 Prospect CSV exports exclude opted-out contacts, including when using
-`--status` or `--email-status` filters. `harvey export --all` is an unfiltered
+`--status` or `--email-status` filters. `xorora-prospector export --all` is an unfiltered
 raw-data export for inspection: it includes opted-out and unverified contacts
 and should not be imported as an outreach list. The dashboard's prospect CSV
 download follows the same policy; `?all=true` selects its raw export.
@@ -658,7 +658,7 @@ npm install -g @openai/codex@0.159.3   # the Codex version Prospector has verifi
 codex login                            # choose "Sign in with ChatGPT" — API-key logins are refused
 ```
 
-Then either pick **codex** in `harvey setup` (it suggests `gpt-5.5`), run `harvey train <url> --provider codex --model gpt-5.5`, or add to your config:
+Then either pick **codex** in `xorora-prospector setup` (it suggests `gpt-5.5`), run `xorora-prospector train <url> --provider codex --model gpt-5.5`, or add to your config:
 
 ```yaml
 brain:
@@ -675,8 +675,8 @@ What to know:
 - **Your login only goes to OpenAI.** Before your login is put into the runtime at all, Prospector starts Codex without it and checks that requests would go to the built-in OpenAI provider and the default ChatGPT endpoint. Any custom provider, overridden built-in provider, base URL, telemetry exporter or other endpoint in any Codex config layer (for example `/etc/codex/config.toml` or a managed config) stops the call there.
 - **Login handling.** Prospector supports Codex's file credential storage (`~/.codex/auth.json`, or `$CODEX_HOME/auth.json`, mode `600`): the default unless you've configured an OS keyring. Keyring storage isn't supported. On every call Prospector reads that file (read-only, never writing or moving it) and gives the runtime a private copy *without the refresh token*, deleted after the call. Codex therefore can't change or renew your real login. When the login has expired, or is due for Codex's routine renewal (after about 8 days), Codex calls stop with "Your Codex login has expired or is due for renewal". Use Codex once yourself (it renews the login automatically) or run `codex login`, and Prospector picks up the renewed login on its next call. Prospector never renews it for you.
 - **Models.** Set `brain.model` to an exact model ID from your account's catalog, including Luna, Sol, and Terra models such as `gpt-5.6-luna`, `gpt-6.1-sol`, and `gpt-5.6-terra`. `gpt-5.5` remains supported when present in your account's catalog and is the setup suggestion. Prospector creates a private catalog copy that preserves model capabilities while selecting direct tool mode and removing experimental tools. The model receives no tools under Prospector's lockdown. A blank `model` selects the highest-priority listed model that can use this configuration; hidden models require an explicit ID. An explicit model is used exactly or the call fails. Unknown model IDs and unrecognized tool modes are rejected. Availability depends on your ChatGPT account.
-- **Quota.** The budget gate and dashboard read your ChatGPT plan's real rate-limit windows from Codex, for the limit bucket that applies to your model, and compare them to `usage.max_daily_claude_percent`. If Codex reports that usage is blocked, or a call fails on the plan's usage limit, Prospector treats the plan as full (even when no window is reported) and stops Codex calls for an hour. If the limits can't be read, the dashboard and `harvey usage` say "Quota unavailable" and the budget falls back to Prospector's own daily call count. Usage is recorded per provider; Codex calls are logged with tokens but no dollar cost, because the plan isn't billed per token.
-- **When Codex can't be used, Prospector pauses rather than guessing.** Before each heartbeat, Prospector checks everything a call needs except the prompt itself: the Codex CLI version, the isolation, your login (expired or due for renewal), your ChatGPT account, and that your configured model can run with no tools. No prompt is sent, so nothing is used from your plan beyond a quick account check. If something is wrong, the whole cycle is skipped: no reply is read or marked handled, nothing is drafted or sent. The log line, `harvey status`, and the dashboard's Actions card say "Codex paused" and why. If Codex stops working part-way through a cycle (for example the plan hits its usage limit), the reply being handled is left exactly as it was for a clean retry, not escalated, half-recorded or lost, and that cycle sends nothing. Fix the cause (usually `codex login`), and Prospector resumes on its next heartbeat: a renewed login or reinstalled CLI is noticed immediately, a usage-limit pause ends after an hour, and other fixes are picked up within 30 minutes. `harvey status --check` runs the same check on demand and exits non-zero if it fails. Brief failures (a crash or timeout) just skip one cycle. Prospector never falls back to Claude or an API key.
+- **Quota.** The budget gate and dashboard read your ChatGPT plan's real rate-limit windows from Codex, for the limit bucket that applies to your model, and compare them to `usage.max_daily_claude_percent`. If Codex reports that usage is blocked, or a call fails on the plan's usage limit, Prospector treats the plan as full (even when no window is reported) and stops Codex calls for an hour. If the limits can't be read, the dashboard and `xorora-prospector usage` say "Quota unavailable" and the budget falls back to Prospector's own daily call count. Usage is recorded per provider; Codex calls are logged with tokens but no dollar cost, because the plan isn't billed per token.
+- **When Codex can't be used, Prospector pauses rather than guessing.** Before each heartbeat, Prospector checks everything a call needs except the prompt itself: the Codex CLI version, the isolation, your login (expired or due for renewal), your ChatGPT account, and that your configured model can run with no tools. No prompt is sent, so nothing is used from your plan beyond a quick account check. If something is wrong, the whole cycle is skipped: no reply is read or marked handled, nothing is drafted or sent. The log line, `xorora-prospector status`, and the dashboard's Actions card say "Codex paused" and why. If Codex stops working part-way through a cycle (for example the plan hits its usage limit), the reply being handled is left exactly as it was for a clean retry, not escalated, half-recorded or lost, and that cycle sends nothing. Fix the cause (usually `codex login`), and Prospector resumes on its next heartbeat: a renewed login or reinstalled CLI is noticed immediately, a usage-limit pause ends after an hour, and other fixes are picked up within 30 minutes. `xorora-prospector status --check` runs the same check on demand and exits non-zero if it fails. Brief failures (a crash or timeout) just skip one cycle. Prospector never falls back to Claude or an API key.
 - **Requirements.** **macOS or Linux**, Codex CLI **0.159.3** exactly, and Node.js for its npm package. **Windows isn't supported for Codex:** Prospector refuses it there before reading your login; use the Claude provider on Windows. Prospector checks the Codex version before every call and refuses any other version, including newer ones, because a different Codex can add tools Prospector's lockdown doesn't know about. Support for a new version comes with a Prospector update. Live use with a real ChatGPT account has been verified on macOS and ARM64 Linux. The offline suites also passed on x86-64 Linux under CPU emulation; CI covers Linux and macOS. The Docker image ships the Claude CLI only, so Codex isn't supported in Docker. To re-verify the lockdown offline against your installed CLI, with no credentials or network: `HARVEY_CODEX_CLI_TESTS=1 pytest tests/test_codex_cli_surface.py`.
 - **Overhead.** Each call checks the CLI version, starts Codex once without your login to verify its configuration, reads the model catalog, then starts it again to run the prompt; each heartbeat's check does the same without the prompt. That adds a few seconds per call, and one Brain's Codex calls run one at a time.
 
@@ -686,15 +686,15 @@ What to know:
 
 Prospector automates outreach, but **you are the sender.** Cold email is legal in most places when done right and expensive when done wrong — CAN-SPAM penalties run to $53,088 per email. Prospector ships with compliant defaults. Keep them.
 
-**CAN-SPAM (US).** Truthful subject line and accurate from-address — Prospector's copywriting rules forbid fake "re:" threads and impersonation. A working opt-out, honored fast: every cold email ends with an opt-out line (`compliance.opt_out_line`, default *Not interested? Reply "no thanks" and I won't email again.*), and Prospector treats any opt-out wording as immediate and permanent, wherever in the reply the person wrote it (including a bare "STOP" or "No thanks"). If the same reply threatens legal action or complains ("stop emailing me, my attorney will be in touch"), the opt-out still stands and the conversation goes to you as well. Nothing Prospector does later moves someone off *opted out*: a later message from them is kept for you to read, never answered, and a complaint still goes to you. To see why someone was opted out (the rule that fired, the words, and their message), click **Why?** on their row in Contacts. If it was a mistake, **Undo opt-out** there marks them as replied: Prospector sends nothing on its own, and their next reply gets a draft for your approval. Your physical mailing address in the footer: set `compliance.postal_address` in `harvey.yaml` before your first campaign. Prospector adds both lines under every cold email when it sends (replies don't get them), shows them under each draft in the Outbox, and warns on `harvey run`, `harvey status` and the Outbox tab until the address is set. Text in a reply that repeats what Prospector wrote for that person (its emails, campaign templates, and every footer it has used) is set aside as quoted, not read as their words, so quoting Prospector's own footer isn't an opt-out; the model also reads replies without the quoted email. The opt-out line must ask for a reply Prospector recognises (`Reply "no thanks"`, `Reply STOP`, also "unsubscribe", "remove me", "opt out") and can't contain a link or email address. Hebrew works the same way: a line such as `השיבו "הסר"` or `תגידו לי "לא תודה"` is accepted, and Prospector catches Hebrew opt-outs without the model: a bare "הסר", "תורידו אותי מהרשימה", "תפסיקו לשלוח", "אל תכתבו לי", "לא מעוניין, תודה". A Hebrew legal threat or complaint ("עורכת הדין שלי", "אתבע אתכם", "תלונה על ספאם", "חוק הספאם") comes to you the same way, with no draft, while "תביעות ביטוח" or "סליחה על ההטרדה" are read as ordinary replies. Spanish too: `Responda BAJA` or `Responda "no, gracias"` is accepted, and Prospector catches "no, gracias", a bare "BAJA", "denme de baja", "no me escriba más", "dejen de enviarme correos", "sáquenme de su lista" and "no me interesa" said on its own, but not "¡cómo no, gracias!", "queremos dar de baja a nuestro proveedor actual" or "no me interesa el plan anual, pero sí el mensual", which go to the model. Spanish legal threats aren't matched by rule yet; the model reads those.
+**CAN-SPAM (US).** Truthful subject line and accurate from-address — Prospector's copywriting rules forbid fake "re:" threads and impersonation. A working opt-out, honored fast: every cold email ends with an opt-out line (`compliance.opt_out_line`, default *Not interested? Reply "no thanks" and I won't email again.*), and Prospector treats any opt-out wording as immediate and permanent, wherever in the reply the person wrote it (including a bare "STOP" or "No thanks"). If the same reply threatens legal action or complains ("stop emailing me, my attorney will be in touch"), the opt-out still stands and the conversation goes to you as well. Nothing Prospector does later moves someone off *opted out*: a later message from them is kept for you to read, never answered, and a complaint still goes to you. To see why someone was opted out (the rule that fired, the words, and their message), click **Why?** on their row in Contacts. If it was a mistake, **Undo opt-out** there marks them as replied: Prospector sends nothing on its own, and their next reply gets a draft for your approval. Your physical mailing address in the footer: set `compliance.postal_address` in `harvey.yaml` before your first campaign. Prospector adds both lines under every cold email when it sends (replies don't get them), shows them under each draft in the Outbox, and warns on `xorora-prospector run`, `xorora-prospector status` and the Outbox tab until the address is set. Text in a reply that repeats what Prospector wrote for that person (its emails, campaign templates, and every footer it has used) is set aside as quoted, not read as their words, so quoting Prospector's own footer isn't an opt-out; the model also reads replies without the quoted email. The opt-out line must ask for a reply Prospector recognises (`Reply "no thanks"`, `Reply STOP`, also "unsubscribe", "remove me", "opt out") and can't contain a link or email address. Hebrew works the same way: a line such as `השיבו "הסר"` or `תגידו לי "לא תודה"` is accepted, and Prospector catches Hebrew opt-outs without the model: a bare "הסר", "תורידו אותי מהרשימה", "תפסיקו לשלוח", "אל תכתבו לי", "לא מעוניין, תודה". A Hebrew legal threat or complaint ("עורכת הדין שלי", "אתבע אתכם", "תלונה על ספאם", "חוק הספאם") comes to you the same way, with no draft, while "תביעות ביטוח" or "סליחה על ההטרדה" are read as ordinary replies. Spanish too: `Responda BAJA` or `Responda "no, gracias"` is accepted, and Prospector catches "no, gracias", a bare "BAJA", "denme de baja", "no me escriba más", "dejen de enviarme correos", "sáquenme de su lista" and "no me interesa" said on its own, but not "¡cómo no, gracias!", "queremos dar de baja a nuestro proveedor actual" or "no me interesa el plan anual, pero sí el mensual", which go to the model. Spanish legal threats aren't matched by rule yet; the model reads those.
 
-**Do not contact.** List competitors, existing customers, or anyone else Prospector must never email under `compliance.do_not_contact`, one address or domain per line, in the config file Prospector reads: `harvey.local.yaml` if you trained Prospector (that file wins), otherwise `harvey.yaml`. A domain covers its subdomains (`acme.example` also blocks `mail.acme.example`, not `notacme.example`), an address covers its plus-tags (`jane@` also blocks `jane+news@`), and a pasted link such as `https://www.acme.example/about` or `Jane Doe <jane@acme.example>` counts as what it names. An entry that is neither an address nor a domain stops Prospector from starting, with the entry named, rather than quietly protecting nobody. A running Prospector picks up an edit at once, and the send gate checks the list as each email leaves, cold or reply, so it holds even for an email you already approved. If someone on the list writes back, Prospector doesn't draft an answer: the conversation comes to you. `harvey export` and the dashboard's Export buttons leave them out too. On Instantly, listed leads are left out of the upload and a reply to one comes to you, but Prospector can't take back a lead Instantly already has: remove it there.
+**Do not contact.** List competitors, existing customers, or anyone else Prospector must never email under `compliance.do_not_contact`, one address or domain per line, in the config file Prospector reads: `harvey.local.yaml` if you trained Prospector (that file wins), otherwise `harvey.yaml`. A domain covers its subdomains (`acme.example` also blocks `mail.acme.example`, not `notacme.example`), an address covers its plus-tags (`jane@` also blocks `jane+news@`), and a pasted link such as `https://www.acme.example/about` or `Jane Doe <jane@acme.example>` counts as what it names. An entry that is neither an address nor a domain stops Prospector from starting, with the entry named, rather than quietly protecting nobody. A running Prospector picks up an edit at once, and the send gate checks the list as each email leaves, cold or reply, so it holds even for an email you already approved. If someone on the list writes back, Prospector doesn't draft an answer: the conversation comes to you. `xorora-prospector export` and the dashboard's Export buttons leave them out too. On Instantly, listed leads are left out of the upload and a reply to one comes to you, but Prospector can't take back a lead Instantly already has: remove it there.
 
 **GDPR / PECR (EU & UK).** B2B cold email needs a defensible legitimate interest: the pitch must be genuinely relevant to that person's role, you must know where the data came from, and objecting must be effortless. If you can't say why a specific person would care, Prospector shouldn't email them — and its qualification rules say so.
 
 **Per-recipient check (optional).** Those rules turn on facts about each recipient: a UK sole trader needs consent where a limited company doesn't, Germany wants prior consent even for business email, and Canada's CASL depends on whether the address was published. With `compliance.precleared.enabled: true`, Prospector asks [Precleared](https://precleared.dev) about each new recipient before the first cold email. Anything other than `ok_to_email` holds that email back, with the rule and the next step shown in the Outbox, and the signed receipt id is logged with every send. One check per address, cached for 30 days (changing the sender country, address source, product description or the country sent with it triggers a fresh check); replies are never checked; native providers (Gmail, Microsoft 365, SMTP) only. Prospector tells Precleared the recipient's country when it is sure of it from the company's location (a country, a US state, a Canadian province or an Australian state named there, as for the send window), and Precleared takes that as settled; otherwise Precleared works the country out from the address, company records or the company's website. If all your prospects are in one country, also set `prospect_country` (for example `US`), which Precleared uses only when none of those show it; without it, the one country every `icp.geography` entry is in serves as that default. Precleared receives the recipient's address, your sender country, the address source, your product description and the recipient's country when Prospector is sure of it, else your prospects' country if there is one. It also receives the company's name and the person's name when Prospector has them, which it uses to find a UK company on the Companies House register when the domain alone doesn't (it doesn't store the person's name). Without a key it allows 10 checks a day, and a free key (`PRECLEARED_API_KEY`) allows 25. Put the setting in `harvey.yaml`, or in `harvey.local.yaml` if you trained Prospector, since that file wins. [docs/precleared.md](docs/precleared.md) has the details, verdict by verdict.
 
-**If the check is held up.** When Precleared can't answer (the day's free checks are used up, the key is out of checks, was rejected or is being rate limited, or Precleared can't be reached), cold email to new addresses waits and replies still go out; email to people Precleared has already cleared keeps going. If Precleared can't check one address, that email is tried again six hours later and the rest carry on, unless that happens at two different domains with no answer in between, which holds new addresses as above. The Today page and `harvey status` say how many cold emails are waiting on the check and what fixes it.
+**If the check is held up.** When Precleared can't answer (the day's free checks are used up, the key is out of checks, was rejected or is being rate limited, or Precleared can't be reached), cold email to new addresses waits and replies still go out; email to people Precleared has already cleared keeps going. If Precleared can't check one address, that email is tried again six hours later and the rest carry on, unless that happens at two different domains with no answer in between, which holds new addresses as above. The Today page and `xorora-prospector status` say how many cold emails are waiting on the check and what fixes it.
 
 **Bot disclosure.** Some jurisdictions require disclosing automation. Prospector is instructed to answer truthfully, always, if a prospect asks whether they're talking to an AI. Never configure it otherwise.
 
@@ -707,7 +707,7 @@ your explicit choice.
 **Deliverability — warm up or burn out.** Sending cold email from your main domain, or at volume on day one, lands you in spam permanently.
 
 1. Buy a **dedicated sending domain** (`getacme.com`, not `acme.com`).
-2. Set up **SPF, DKIM and DMARC** on it. Without all three, Gmail junks you. `harvey warmup` checks them, plus domain age, blocklists, your warmup progress and bounce rate, and ends with READY / NOT READY. It only reads public DNS and Prospector's own records.
+2. Set up **SPF, DKIM and DMARC** on it. Without all three, Gmail junks you. `xorora-prospector warmup` checks them, plus domain age, blocklists, your warmup progress and bounce rate, and ends with READY / NOT READY. It only reads public DNS and Prospector's own records.
 3. **Warm up for 2–4 weeks** before real volume, and keep warmup running after. We recommend [TrulyInbox](https://trulyinbox.com/?via=harvey); see [Warmup with TrulyInbox](#warmup-with-trulyinbox).
 4. **Ramp slowly** — 10–20/day per inbox, adding ~5/day. The `max_daily_sends: 50` default is a ceiling, not a target. Set `channels.email.warmup.start_date` and Prospector does this for you (Gmail, Microsoft, SMTP; Instantly has its own warmup): no cold email for `min_days`, then a cold-email cap that climbs by `daily_increase` a day. Replies always go out.
 5. **Watch bounces.** Above ~3%, stop and fix list quality. Prospector trips its own kill switch past your configured threshold.
@@ -718,22 +718,22 @@ your explicit choice.
 
 Whether a mailbox is warmed isn't something DNS can tell you: only the warmup
 service sees where its mail lands. We recommend [TrulyInbox](https://trulyinbox.com/?via=harvey), and Prospector
-connects to it so `harvey warmup` can say whether your mailbox is actually ready:
+connects to it so `xorora-prospector warmup` can say whether your mailbox is actually ready:
 
 1. **Get TrulyInbox** at [trulyinbox.com](https://trulyinbox.com/?via=harvey) and add your sending mailbox.
    Connecting Prospector needs API access, which starts on the Starter plan.
 2. **Create a key.** In TrulyInbox, open Settings > API keys and create a
    workspace key with `accounts:read`, `warmup:read`, `analytics:read` and
    `workspace:read`.
-3. **Connect it**: `harvey trulyinbox connect`, or paste it into the warmup step
+3. **Connect it**: `xorora-prospector trulyinbox connect`, or paste it into the warmup step
    on the dashboard's Today page. Prospector checks the key before saving it to `.env`.
 
-`harvey warmup` then reads the mailbox from TrulyInbox and calls it ready only
+`xorora-prospector warmup` then reads the mailbox from TrulyInbox and calls it ready only
 when it's enrolled, signed in, has warmed for `min_days` (14 by default), and
 less than 5% of its warmup mail landed in spam. Prospector only reads: it never
 enrolls, pauses or changes anything in your TrulyInbox account.
 
-Already warming with another service? `harvey trulyinbox other` (or *I use
+Already warming with another service? `xorora-prospector trulyinbox other` (or *I use
 another service* on the dashboard) and Prospector stops suggesting it.
 
 ---
@@ -742,27 +742,27 @@ another service* on the dashboard) and Prospector stops suggesting it.
 
 **`command not found: harvey`** — `source .venv/bin/activate` first.
 
-**`ModuleNotFoundError: No module named 'harvey'` after install (macOS)** — Python 3.13 silently ignores `.pth` files carrying the macOS hidden flag, and some Macs propagate that flag into `.venv`. Run `harvey install` again (it auto-fixes), or: `ln -s "$(pwd)/harvey" .venv/lib/python3.13/site-packages/harvey`
+**`ModuleNotFoundError: No module named 'harvey'` after install (macOS)** — Python 3.13 silently ignores `.pth` files carrying the macOS hidden flag, and some Macs propagate that flag into `.venv`. Run `xorora-prospector install` again (it auto-fixes), or: `ln -s "$(pwd)/harvey" .venv/lib/python3.13/site-packages/harvey`
 
 **`externally-managed-environment`** — Use a venv, not system Python.
 
 **`SyntaxError` or odd `ImportError`s right after install (macOS)** — Your venv is Python 3.9. `python3 -m venv` builds from `/usr/bin/python3`, which macOS keeps at 3.9. Check with `.venv/bin/python -V`, then rebuild: `rm -rf .venv && python3.13 -m venv .venv && source .venv/bin/activate && pip install -e .`
 
-**Claude headless mode fails** — `claude login`, and confirm the subscription is active. Test with `claude -p "say hi"`. In Docker, mount `~/.claude` into the container (writable: the CLI refreshes its login there). If the log says the Claude CLI "lacks --safe-mode" (or another flag), run `claude update` (in Docker, rebuild the image); Prospector resumes on its own. If your Claude login depends on `env` or `apiKeyHelper` entries in your Claude settings files, set those variables in Prospector's environment instead: Prospector's calls don't read settings files. `harvey status --check` confirms the CLI without sending a prompt.
+**Claude headless mode fails** — `claude login`, and confirm the subscription is active. Test with `claude -p "say hi"`. In Docker, mount `~/.claude` into the container (writable: the CLI refreshes its login there). If the log says the Claude CLI "lacks --safe-mode" (or another flag), run `claude update` (in Docker, rebuild the image); Prospector resumes on its own. If your Claude login depends on `env` or `apiKeyHelper` entries in your Claude settings files, set those variables in Prospector's environment instead: Prospector's calls don't read settings files. `xorora-prospector status --check` confirms the CLI without sending a prompt.
 
-**Dashboard says "locked"** — Open the link `harvey dashboard` printed (or `harvey dashboard --url`). If it says the token file can't be used, follow the message: usually delete `data/dashboard-token` and restart the dashboard. Visit it as `127.0.0.1` or `localhost`; other host names are refused.
+**Dashboard says "locked"** — Open the link `xorora-prospector dashboard` printed (or `xorora-prospector dashboard --url`). If it says the token file can't be used, follow the message: usually delete `data/dashboard-token` and restart the dashboard. Visit it as `127.0.0.1` or `localhost`; other host names are refused.
 
 **Codex calls fail** — Read the log line; every Codex error says what to do. "Not logged in" or "expired or is due for renewal" → use Codex once or run `codex login` with ChatGPT. "Hasn't been verified with Prospector" → install the supported Codex version named in the message. "Isolation could not be verified" → a Codex config layer outside your `~/.codex` (for example a managed or `/etc/codex` config) forces a tool, hook, MCP server, instructions or custom endpoint back on; Prospector refuses to send prompts until it's gone. Model catalog errors → choose an available model ID from the catalog shown in the message, or leave `brain.model` blank to select a listed model. Prospector never switches to Claude on its own.
 
-**Discovery finds nothing** — Confirm signals first (`harvey signals --confirm free`); nothing is collected until you do. If you're on the free OpenStreetMap source, it only covers mapped trades and is thin for service-area businesses — `harvey discover --providers` shows the alternatives.
+**Discovery finds nothing** — Confirm signals first (`xorora-prospector signals --confirm free`); nothing is collected until you do. If you're on the free OpenStreetMap source, it only covers mapped trades and is thin for service-area businesses — `xorora-prospector discover --providers` shows the alternatives.
 
 **Overpass is throttling** — It's free volunteer infrastructure. Prospector walks three mirrors before giving up. Wait a few minutes, or use a paid provider for bulk work.
 
-**Emails land in spam** — Almost always the domain, not the copy. Check SPF/DKIM/DMARC, confirm warmup ran ([TrulyInbox](https://trulyinbox.com/?via=harvey) shows the inbox rate; `harvey warmup` reads it once connected), halve your volume.
+**Emails land in spam** — Almost always the domain, not the copy. Check SPF/DKIM/DMARC, confirm warmup ran ([TrulyInbox](https://trulyinbox.com/?via=harvey) shows the inbox rate; `xorora-prospector warmup` reads it once connected), halve your volume.
 
-**Prospector does nothing during the day** — Check `quiet_hours` and whether it hit `max_daily_claude_percent`. `harvey status` shows current state; the `actions` table logs every decision.
+**Prospector does nothing during the day** — Check `quiet_hours` and whether it hit `max_daily_claude_percent`. `xorora-prospector status` shows current state; the `actions` table logs every decision.
 
-**How do I stop it right now?** — `Ctrl+C`, or `harvey sending pause` to stop outbound while leaving the loop running. State is in SQLite, so it resumes cleanly.
+**How do I stop it right now?** — `Ctrl+C`, or `xorora-prospector sending pause` to stop outbound while leaving the loop running. State is in SQLite, so it resumes cleanly.
 
 **Where does my data live?** — All local: `data/harvey.db`, `.env`, `harvey.yaml`. Nothing goes anywhere except the APIs you configured.
 

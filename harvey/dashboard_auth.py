@@ -368,7 +368,7 @@ class DashboardGuard:
             return await deny(503, "token_unavailable", str(e))
         if not bearer_ok(headers.get("authorization", []), token):
             return await deny(401, "unauthorized",
-                              "Open the link printed by 'harvey dashboard' to unlock.",
+                              "Open the link printed by 'xorora-prospector dashboard' to unlock.",
                               extra=[(b"www-authenticate", b'Bearer realm="harvey"')])
 
         # 4. Mutations carry JSON or nothing.

@@ -82,7 +82,7 @@ def _read_env_file() -> dict[str, str]:
 
 
 def _config_file() -> Path:
-    """The config Xorora Prospector loads: harvey.local.yaml (what `harvey train` writes)
+    """The config Xorora Prospector loads: harvey.local.yaml (what `xorora-prospector train` writes)
     wins over harvey.yaml when it exists, as in config._find_config_file.
     Setup reads and writes this file, so its answers are the ones Xorora Prospector uses."""
     local = CONFIG_FILE.with_name("harvey.local.yaml")
@@ -840,13 +840,13 @@ class SetupWizard:
     - {_config_file().name} (your configuration)
 
   To start Xorora Prospector:
-    harvey run          (or: python -m harvey)
+    xorora-prospector run          (or: python -m harvey)
 
   To re-train on a different product:
-    harvey train https://newproduct.com
+    xorora-prospector train https://newproduct.com
 
   To re-run this setup:
-    harvey setup
+    xorora-prospector setup
 
   Before you send a single email:
     1. Use a dedicated sending domain (not your main domain) with
@@ -856,7 +856,7 @@ class SetupWizard:
        option and your physical mailing address (CAN-SPAM).
     See the "Legal & Deliverability" section of the README.
 """)
-        _print_harvey("I'm ready. Run 'harvey run' and I'll start closing.")
+        _print_harvey("I'm ready. Run 'xorora-prospector run' and I'll start closing.")
         _print_harvey("Always be closing.\n")
 
 

@@ -47,7 +47,7 @@ REVIEW_NEXT_REPLY_KEY = "review_next_reply:"
 # autopilot_review): approve-all skips these, they're approved one by one.
 HELD_FOR_REVIEW = "held for your review: "
 # Set while the heartbeat holds sending because replies couldn't all be read
-# (JSON: since, last_seen, reason), so Today and `harvey status` can say so.
+# (JSON: since, last_seen, reason), so Today and `xorora-prospector status` can say so.
 SENDS_HELD_KEY = "sends_held"
 # Outbox error on a sequence email cancelled because someone else at the
 # company replied: one answer from a company stops the cold email to all of it.
@@ -1946,7 +1946,7 @@ class StateManager:
     ) -> list[dict]:
         """Companies with a domain, zero prospects, and no recent check.
 
-        `harvey discover` (and other company-only sources) can add companies
+        `xorora-prospector discover` (and other company-only sources) can add companies
         without ever finding a named contact at them. This is what lets a
         prospecting pass go back and fill that in, instead of only ever
         looking at companies it stumbles into fresh in the same cycle.

@@ -131,7 +131,7 @@ def unusable_backlog_notice(summary: dict) -> str:
         "or catch-all email, so it paused prospecting for about a day to save search "
         "and verifier credits. Add an email verifier key (REOON_API_KEY, "
         "ZEROBOUNCE_API_KEY or HUNTER_API_KEY in .env) or check it still has credits. "
-        "`harvey export --all` exports the list as it is."
+        "`xorora-prospector export --all` exports the list as it is."
     )
 
 
@@ -250,7 +250,7 @@ def send_hold_reason(unread: list, paused: str, read_problem: str) -> str | None
 
 
 async def record_send_phase(state, held_reason: str):
-    """Note why sending was held this cycle (Today and `harvey status` show
+    """Note why sending was held this cycle (Today and `xorora-prospector status` show
     it), or clear the note when sending ran. Never stops the loop."""
     try:
         if held_reason:
@@ -549,7 +549,7 @@ def main():
     if _needs_setup():
         if not sys.stdin.isatty():
             # Started by the dashboard or a service: nobody can answer the wizard.
-            print("Xorora Prospector isn't set up yet. Run `harvey setup` in a terminal first.")
+            print("Xorora Prospector isn't set up yet. Run `xorora-prospector setup` in a terminal first.")
             sys.exit(1)
         print("\n  First time running Xorora Prospector? Let's get you set up.\n")
         from harvey.setup import run_setup

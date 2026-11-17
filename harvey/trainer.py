@@ -562,7 +562,7 @@ class Trainer:
         else:
             print(f"\n  Review {config_path} and adjust as needed. Emails still go out as")
             print(f"  {config['persona'].get('name', '')} <{config['persona']['email']}>.")
-        print(f"  Then run: harvey run\n")
+        print(f"  Then run: xorora-prospector run\n")
 
         return config
 

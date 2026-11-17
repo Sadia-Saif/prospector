@@ -655,7 +655,7 @@ class Scout:
     async def _prospect_via_known_companies(self) -> int:
         """Scrape team pages for companies already on file with no contacts.
 
-        Company-only sources (`harvey discover`, directory scraping, etc.)
+        Company-only sources (`xorora-prospector discover`, directory scraping, etc.)
         add rows to `companies` without ever finding a named person there.
         Left alone, those companies never get a contacts pass — every other
         strategy here skips a domain the moment it recognizes it, since

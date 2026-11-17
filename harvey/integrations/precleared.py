@@ -47,7 +47,7 @@ Beyond that, a key draws on a prepaid pack. When a key runs out, the held
 reason gives the checkout link from Precleared's answer.
 
 A hold is also recorded under STATUS_KEY, so the dashboard's Today page and
-`harvey status` say that cold email is waiting and how to fix it (a free
+`xorora-prospector status` say that cold email is waiting and how to fix it (a free
 key, a pack, or nothing but time). The next fresh answer clears it.
 """
 
@@ -93,7 +93,7 @@ MAX_RECIPIENT_NAME = 120
 BUY_URL = "https://precleared.dev/buy"
 GET_KEY_URL = "https://precleared.dev/get-key"
 MAX_BUY_URL = 2048
-# What `harvey status` and the dashboard's Today page read about the check:
+# What `xorora-prospector status` and the dashboard's Today page read about the check:
 # {"status": "held", "kind", "reason", "url", "waiting", "since", "at"}, or
 # "" when the last fresh call got an answer. Written by the sender.
 STATUS_KEY = "precleared_status"
@@ -609,7 +609,7 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-# ── Holds: what `harvey status` and the Today page show ──
+# ── Holds: what `xorora-prospector status` and the Today page show ──
 
 
 def parse_status(raw: str) -> dict:
@@ -690,7 +690,7 @@ async def current_hold(state, config=None) -> dict:
 def hold_message(hold: dict) -> dict:
     """Title, detail, tone and link for a recorded hold, in plain words.
 
-    Shared by the Today page and `harvey status`, so both say the same thing.
+    Shared by the Today page and `xorora-prospector status`, so both say the same thing.
     """
     kind = hold.get("kind")
     url = _text(hold.get("url"))

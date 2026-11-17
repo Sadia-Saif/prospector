@@ -53,7 +53,7 @@ SEQUENCE_SHAPE = """- Email 1: Personalized cold observation + one question. Und
 - Email 3: Break-up email 4 days after that. Under 40 words. Gracious, not guilt-tripping."""
 SEQUENCE_STYLE = """- Never be pushy or salesy. Be consultative and value-driven.
 - Subject lines: lowercase, 2-5 words."""
-# Why the Writer stopped: Today and `harvey status` show it.
+# Why the Writer stopped: Today and `xorora-prospector status` show it.
 EMAIL_RULES_PROBLEM_KEY = "email_rules_problem"
 BUILT_IN_FOOTER = "- No postal address, unsubscribe or opt-out line: Xorora Prospector adds them when it sends."
 

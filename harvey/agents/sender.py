@@ -567,7 +567,7 @@ class Sender:
         if paused:
             logger.warning(
                 f"Sender: SENDING PAUSED ({paused}). Resume from the dashboard "
-                "or `harvey sending resume` once the cause is fixed."
+                "or `xorora-prospector sending resume` once the cause is fixed."
             )
             return
 
@@ -885,7 +885,7 @@ class Sender:
         # cold emails wait for a later cycle, replies still go out.
         compliance_paused = False
         held_cold = 0
-        # For the Today page and `harvey status`: what held cold email this
+        # For the Today page and `xorora-prospector status`: what held cold email this
         # cycle, how many waited behind it, and whether a fresh call was
         # answered (which clears an earlier hold).
         hold = None
@@ -1125,7 +1125,7 @@ class Sender:
             if days is not None and cold_cap < max_daily:
                 logger.info(
                     f"Sender: warmup day {days}: {held_cold} cold email(s) wait; today's "
-                    f"cold cap is {cold_cap}. Replies still go out. See `harvey warmup`.")
+                    f"cold cap is {cold_cap}. Replies still go out. See `xorora-prospector warmup`.")
             else:
                 logger.info(f"Sender: cold email cap reached for today ({cold_cap}).")
         if sent_cold:

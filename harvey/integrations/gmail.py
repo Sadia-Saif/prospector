@@ -5,7 +5,7 @@ Setup (one-time):
 2. OAuth consent screen (internal or testing) → create an OAuth client of
    type "Desktop app". Put its id/secret in .env as GMAIL_CLIENT_ID /
    GMAIL_CLIENT_SECRET.
-3. Run ``harvey gmail auth`` — opens a browser, stores the refresh token
+3. Run ``xorora-prospector gmail auth`` — opens a browser, stores the refresh token
    in data/gmail_token.json. Done: Xorora Prospector can send and read.
 
 Deliverability notes: use a mailbox on a dedicated SECONDARY domain (never
@@ -120,7 +120,7 @@ class GmailProvider(MailProvider):
             return self._access_token
         stored = _load_token()
         if not stored:
-            self._token_problem = "not signed in to Gmail. Run 'harvey gmail auth'."
+            self._token_problem = "not signed in to Gmail. Run 'xorora-prospector gmail auth'."
             logger.error("Gmail: " + self._token_problem)
             return None
         # Why there's no token, for whoever asked (get_replies says it).
@@ -140,9 +140,9 @@ class GmailProvider(MailProvider):
             return None
         if resp.status_code in (400, 401, 403):
             self._token_problem = (f"Google rejected the saved Gmail sign-in ({resp.status_code}). "
-                                   "Run 'harvey gmail auth'.")
+                                   "Run 'xorora-prospector gmail auth'.")
             logger.error(f"Gmail token refresh rejected ({resp.status_code}). "
-                         "Re-run 'harvey gmail auth'.")
+                         "Re-run 'xorora-prospector gmail auth'.")
             return None
         if resp.status_code != 200:
             self._token_problem = unreachable.format(f" (HTTP {resp.status_code})")
@@ -278,7 +278,7 @@ class GmailProvider(MailProvider):
         """
         if not await self._token():
             raise GmailError(self._token_problem
-                             or "not signed in to Gmail. Run 'harvey gmail auth'.")
+                             or "not signed in to Gmail. Run 'xorora-prospector gmail auth'.")
         self._pending = None
         recent_full = (self._last_full_read
                        and time.time() - self._last_full_read < FULL_READ_EVERY_SECONDS)
@@ -541,7 +541,7 @@ class GmailProvider(MailProvider):
         if not self.client_id or not self.client_secret:
             return False, "GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET missing from .env"
         if not _load_token():
-            return False, "Not authorized yet — run 'harvey gmail auth'"
+            return False, "Not authorized yet — run 'xorora-prospector gmail auth'"
         data = await self._request("GET", "/profile")
         if data and data.get("emailAddress"):
             return True, f"Connected as {data['emailAddress']}"
