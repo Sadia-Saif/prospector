@@ -1759,10 +1759,11 @@ async def _team_discovery_loop():
         try:
             config = load_config().model_copy(deep=True)
             config.icp.industries = list(req.get("industries") or [])
-            config.icp.geography = list(req.get("regions") or [])
+            cities = team.expand_regions(list(req.get("regions") or []))
+            config.icp.geography = cities
             if req.get("headcount"):
                 config.icp.company_size = req["headcount"] + " employees"
-            queries = build_queries(config, cities=list(req.get("regions") or []),
+            queries = build_queries(config, cities=cities,
                                     depth=30, limit=100)
             async with state._connect() as db:
                 async with db.execute("SELECT id FROM companies") as cursor:
@@ -1781,8 +1782,7 @@ async def _team_discovery_loop():
                 async with db.execute("SELECT id FROM companies") as cursor:
                     after = [r[0] for r in await cursor.fetchall()]
             found = [c for c in after if c not in before]
-            found += await team.matching_company_ids(state, req.get("industries") or [],
-                                                     req.get("regions") or [])
+            found += await team.matching_company_ids(state, req.get("industries") or [], cities)
             await team.add_company_ids(state, req["id"], found)
             note = f"Found {len(set(found))} companies."
             if result.errors:

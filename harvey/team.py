@@ -324,3 +324,96 @@ async def pending_writable(state) -> int:
         seen.update(ids)
         total += len(ids)
     return total
+
+
+# ── Suggestions and regions ──
+
+# Business types the free company search (OpenStreetMap) can find; the
+# campaign builder suggests these as people type.
+INDUSTRY_SUGGESTIONS = [
+    "Restaurants", "Cafes", "Hotels", "Real estate agencies", "Property management",
+    "Insurance agencies", "Accounting firms", "Tax advisors", "Law firms",
+    "Dental clinics", "Medical clinics", "Healthcare", "Hospitals", "Pharmacies",
+    "Veterinary clinics", "Opticians", "Fitness centres", "Gyms", "Beauty salons",
+    "Spas", "Travel agencies", "Auto repair", "Car dealerships", "Automotive",
+    "Retail stores", "Fashion boutiques", "Clothing stores", "Furniture stores",
+    "Jewelry stores", "Electronics stores", "Grocery stores", "Supermarkets",
+    "Bakeries", "Florists", "Hardware stores", "Wholesale distributors",
+    "Construction companies", "Contractors", "Roofing", "Plumbing", "HVAC",
+    "Electricians", "Landscaping", "Architecture firms", "Engineering firms",
+    "Logistics companies", "Freight and shipping", "Software companies",
+    "IT services", "Marketing agencies", "Advertising agencies", "Consulting firms",
+    "Financial services", "Fintech", "Recruitment agencies", "Staffing agencies",
+    "Telecom", "Energy companies", "Solar companies", "Manufacturing",
+    "Printing services", "Photography studios", "Coworking spaces", "Event venues",
+    "Nonprofits", "Education and training", "Storage facilities",
+]
+
+# A state or country is too big for one map search, so it becomes its main
+# cities. Cities typed directly are searched as they are.
+REGION_CITIES = {
+    # United States
+    "california": ["Los Angeles, CA", "San Francisco, CA", "San Diego, CA", "San Jose, CA", "Sacramento, CA"],
+    "texas": ["Houston, TX", "Dallas, TX", "Austin, TX", "San Antonio, TX"],
+    "florida": ["Miami, FL", "Orlando, FL", "Tampa, FL", "Jacksonville, FL"],
+    "new york": ["New York, NY", "Brooklyn, NY", "Buffalo, NY"],
+    "illinois": ["Chicago, IL"],
+    "georgia": ["Atlanta, GA"],
+    "washington": ["Seattle, WA"],
+    "massachusetts": ["Boston, MA"],
+    "arizona": ["Phoenix, AZ", "Scottsdale, AZ"],
+    "colorado": ["Denver, CO"],
+    "nevada": ["Las Vegas, NV"],
+    "north carolina": ["Charlotte, NC", "Raleigh, NC"],
+    "new jersey": ["Newark, NJ", "Jersey City, NJ"],
+    "pennsylvania": ["Philadelphia, PA", "Pittsburgh, PA"],
+    "ohio": ["Columbus, OH", "Cleveland, OH"],
+    "michigan": ["Detroit, MI"],
+    "tennessee": ["Nashville, TN"],
+    "virginia": ["Virginia Beach, VA", "Richmond, VA"],
+    "utah": ["Salt Lake City, UT"],
+    "oregon": ["Portland, OR"],
+    "minnesota": ["Minneapolis, MN"],
+    "usa": ["New York, NY", "Los Angeles, CA", "Chicago, IL", "Houston, TX", "Miami, FL"],
+    "united states": ["New York, NY", "Los Angeles, CA", "Chicago, IL", "Houston, TX", "Miami, FL"],
+    # Canada
+    "canada": ["Toronto, ON", "Vancouver, BC", "Montreal, QC", "Calgary, AB"],
+    "ontario": ["Toronto, ON", "Ottawa, ON"],
+    "british columbia": ["Vancouver, BC"],
+    "alberta": ["Calgary, AB", "Edmonton, AB"],
+    # UK and Europe
+    "uk": ["London, UK", "Manchester, UK", "Birmingham, UK", "Leeds, UK"],
+    "united kingdom": ["London, UK", "Manchester, UK", "Birmingham, UK", "Leeds, UK"],
+    "england": ["London, UK", "Manchester, UK", "Birmingham, UK"],
+    "scotland": ["Edinburgh, UK", "Glasgow, UK"],
+    "ireland": ["Dublin, Ireland", "Cork, Ireland"],
+    "germany": ["Berlin, Germany", "Munich, Germany", "Hamburg, Germany", "Frankfurt, Germany"],
+    "netherlands": ["Amsterdam, Netherlands", "Rotterdam, Netherlands"],
+    # Australia
+    "australia": ["Sydney, Australia", "Melbourne, Australia", "Brisbane, Australia", "Perth, Australia"],
+    # Middle East
+    "uae": ["Dubai, UAE", "Abu Dhabi, UAE", "Sharjah, UAE"],
+    "united arab emirates": ["Dubai, UAE", "Abu Dhabi, UAE", "Sharjah, UAE"],
+    "saudi arabia": ["Riyadh, Saudi Arabia", "Jeddah, Saudi Arabia", "Dammam, Saudi Arabia"],
+    "ksa": ["Riyadh, Saudi Arabia", "Jeddah, Saudi Arabia"],
+    "qatar": ["Doha, Qatar"],
+}
+
+CITY_SUGGESTIONS = list(dict.fromkeys(
+    [c for cities in REGION_CITIES.values() for c in cities]
+    + ["Austin, TX", "Fort Lauderdale, FL", "Boca Raton, FL", "West Palm Beach, FL",
+       "Irvine, CA", "Oakland, CA", "Fort Worth, TX", "Kansas City, MO", "St. Louis, MO",
+       "Indianapolis, IN", "Milwaukee, WI", "Baltimore, MD", "Washington, DC",
+       "Mississauga, ON", "Liverpool, UK", "Bristol, UK", "Gold Coast, Australia",
+       "Adelaide, Australia", "Auckland, New Zealand", "Muscat, Oman", "Manama, Bahrain",
+       "Kuwait City, Kuwait", "Cologne, Germany", "Stuttgart, Germany", "Utrecht, Netherlands"]))
+
+REGION_SUGGESTIONS = [k.title() if len(k) > 3 else k.upper() for k in REGION_CITIES] + CITY_SUGGESTIONS
+
+
+def expand_regions(regions: list[str]) -> list[str]:
+    """States and countries become their main cities; cities stay as typed."""
+    out = []
+    for r in regions or []:
+        out += REGION_CITIES.get(r.strip().lower().rstrip("."), [r])
+    return list(dict.fromkeys(out))
