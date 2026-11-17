@@ -1682,9 +1682,17 @@ async def team_overview(request: Request):
             "provider", "max_leads", "daily_limit", "titles", "written", "status", "discovery",
             "discovery_note", "created_at")}
         view["service"] = (r.get("service") or {}).get("name", "")
-        view.update(await _team_stats(state, r))
         view["can_edit"] = _may_change(r, caller)
         view["mine"] = bool(caller) and r.get("member_id") == caller["id"]
+        if view["can_edit"]:
+            view.update(await _team_stats(state, r))
+        else:
+            # Someone else's campaign: who runs it and what it targets, never
+            # its progress, contacts, mailbox or numbers.
+            for k in ("accounts", "max_leads", "daily_limit", "written", "discovery",
+                      "discovery_note", "provider"):
+                view.pop(k, None)
+            view["private"] = True
         out.append(view)
     owners = sorted({r["owner"] for r in out if r.get("owner")})
     _kick_team_discovery()
@@ -2089,7 +2097,8 @@ async def member_campaigns(request: Request):
             base.update(stats)
             mine.append(base)
         else:
-            others.append(base)
+            others.append({k: base[k] for k in ("id", "owner", "name", "service", "status",
+                                                 "industries", "regions", "headcount", "created_at")})
     _kick_team_discovery()
     return {"success": True, "mine": mine, "team": others,
             "agent_running": _check_harvey_pid() is not None}

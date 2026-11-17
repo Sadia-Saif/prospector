@@ -398,7 +398,7 @@ async function loadCampaigns() {
       '<strong>' + esc(c.name) + '</strong><small>' + esc(c.service) + '</small>' +
       '<small>' + esc((c.industries || []).join(', ')) + ' · ' + esc((c.regions || []).join(', ')) +
         (c.headcount ? ' · ' + esc(c.headcount) + ' employees' : '') + '</small>' +
-      '<small>' + (c.companies || 0) + ' companies · ' + (c.written || 0) + '/' + (c.max_leads || 0) + ' emailed</small></div>' +
+      '</div>' +
       pill(c) + '</div>').join('')
     : '<p class="m-empty">No one else has a campaign yet.</p>';
 }

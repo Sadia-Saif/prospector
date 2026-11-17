@@ -2945,13 +2945,22 @@ async function loadTeamPanel(force) {
     return ['Running', 't-good'];
   };
   const list = shown.map(c => {
+    if (c.private) {
+      return '<div class="tc-card tc-private">' +
+        '<div class="tc-top"><div class="tc-title"><span class="owner-chip">' + escHtml(personName(c.owner)) + '</span>' +
+          '<strong>' + escHtml(c.name) + '</strong></div>' + livePill(c) + '</div>' +
+        '<div class="tc-meta">' + escHtml(c.service) + ' &middot; ' + escHtml((c.industries || []).join(', ')) +
+          ' &middot; ' + escHtml((c.regions || []).join(', ')) +
+          (c.headcount ? ' &middot; ' + escHtml(c.headcount) + ' employees' : '') + '</div>' +
+        '<div class="team-hint" style="margin-top:8px">Progress is private to ' + escHtml(personName(c.owner)) + '.</div></div>';
+    }
     const [label, tone] = statusLabel(c);
     const pct = Math.min(100, Math.round(100 * (c.written || 0) / Math.max(1, c.max_leads || 1)));
     return '<div class="tc-card' + (mine(c) ? ' tc-mine' : '') + '">' +
-      '<div class="tc-top"><div><span class="owner-chip">' + escHtml(personName(c.owner) + (mine(c) ? ' (you)' : '')) + '</span> ' +
-        '<strong>' + escHtml(c.name) + '</strong></div>' +
+      '<div class="tc-top"><div class="tc-title"><span class="owner-chip">' + escHtml(personName(c.owner) + (mine(c) ? ' (you)' : '')) + '</span>' +
+        '<strong>' + escHtml(c.name) + '</strong>' +
+        (c.status === 'active' ? '<span class="tc-stage">' + escHtml(label) + '</span>' : '') + '</div>' +
         livePill(c) + '</div>' +
-      '<div class="team-hint" style="margin:-4px 0 6px">' + escHtml(label) + '</div>' +
       '<div class="tc-meta">' + escHtml(c.service) + ' &middot; ' + escHtml((c.industries || []).join(', ')) +
         ' &middot; ' + escHtml((c.regions || []).join(', ')) +
         (c.headcount ? ' &middot; ' + escHtml(c.headcount) + ' employees' : '') +
@@ -2964,7 +2973,7 @@ async function loadTeamPanel(force) {
         '<div><b>' + (c.written || 0) + ' / ' + (c.max_leads || 0) + '</b><span>emailed</span></div>' +
       '</div>' +
       '<div class="tc-bar"><i style="width:' + pct + '%"></i></div>' +
-      (c.discovery_note ? '<div class="team-hint">' + escHtml(c.discovery_note) + '</div>' : '') +
+      (c.discovery_note && c.discovery !== 'running' && c.discovery !== 'queued' ? '<div class="tc-note">' + escHtml(c.discovery_note) + '</div>' : '') +
       (!c.can_edit ? '<div class="tc-actions"><span class="team-hint">Run by ' + escHtml(personName(c.owner)) + '. Only they or an admin can change it.</span></div></div>' :
       '<div class="tc-actions">' +
         '<button class="btn btn-secondary btn-sm" onclick="editTeamCampaign(\'' + c.id + '\')">Edit</button>' +

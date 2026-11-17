@@ -151,3 +151,42 @@ input,select,textarea{border-radius:12px}
 .whoami-role{font-style:normal;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:1px 6px;border-radius:999px;background:#F26B21;color:#fff;margin-left:4px}
 
 .keys-locked{margin:0 0 16px;padding:12px 16px;border-radius:12px;background:var(--accent-soft);color:var(--text);font-size:13.5px}
+
+/* ── Spacing pass: campaign builder and cards ── */
+.team-layout{gap:32px !important;align-items:start}
+.team-form,.team-list{min-width:0}
+.team-head p{margin-top:6px !important;line-height:1.55}
+.team-section{margin-top:28px !important;margin-bottom:12px;padding-top:20px;border-top:1px solid var(--line)}
+.team-head + .team-section{border-top:none;padding-top:0;margin-top:22px !important}
+.team-grid{grid-template-columns:repeat(2,minmax(0,1fr)) !important;gap:18px 16px !important;margin-top:4px}
+@media (max-width:640px){.team-grid{grid-template-columns:1fr !important}}
+.team-grid label{gap:7px !important;color:var(--text-2) !important;font-size:13px !important;font-weight:500}
+.team-grid label .team-hint{font-weight:400}
+.team-input{min-height:42px;border-radius:12px !important}
+.team-actions{margin-top:28px !important;gap:12px !important}
+.team-actions .btn{height:42px;padding:0 22px}
+.team-list-head{margin-bottom:16px !important}
+.team-list > .team-hint{margin-top:18px !important;line-height:1.55}
+.team-list .muted{line-height:1.55}
+.tc-card{padding:20px !important;border-radius:16px !important;margin-bottom:14px !important;box-shadow:inset 0 0 0 1px var(--line)}
+.tc-card.tc-mine{box-shadow:inset 3px 0 0 #F26B21,inset 0 0 0 1px var(--line)}
+.tc-top{align-items:flex-start !important;gap:14px !important}
+.tc-title{display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0}
+.tc-title strong{font-size:15.5px;line-height:1.35}
+.tc-title .owner-chip{padding:3px 11px;font-size:12px}
+.tc-stage{font-size:12.5px;color:var(--text-3)}
+.tc-meta{margin-top:12px !important;line-height:1.6 !important;font-size:13px !important;color:var(--text-2) !important;overflow-wrap:anywhere}
+.tc-funnel{margin-top:18px !important;gap:12px !important}
+.tc-funnel div{gap:3px}
+.tc-funnel b{font-size:22px !important;line-height:1.1}
+.tc-funnel span{font-size:12px !important}
+.tc-bar{margin:16px 0 4px !important;height:5px !important}
+.tc-note{margin-top:12px;font-size:12.5px;line-height:1.5;color:var(--text-3)}
+.tc-actions{margin-top:16px !important;gap:8px !important;align-items:center}
+.tc-actions .team-hint{line-height:1.5}
+.tc-private .tc-meta{margin-top:10px !important}
+.live-pill{flex:none}
+/* general breathing room */
+.section-head{margin-bottom:28px}
+.section-head p{margin-top:8px;line-height:1.55}
+.sidebar .harvey-status{gap:10px}
