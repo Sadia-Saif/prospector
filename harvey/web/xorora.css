@@ -201,3 +201,7 @@ input,select,textarea{border-radius:12px}
 .sidebar .brand{margin-bottom:6px}
 .sidebar-foot{margin-top:auto}
 .sidebar .harvey-status{padding:2px 8px !important}
+
+/* Sidebar: hide the scrollbar, keep wheel/touch scrolling */
+.sidebar,.sidebar nav{scrollbar-width:none !important;-ms-overflow-style:none !important}
+.sidebar::-webkit-scrollbar,.sidebar nav::-webkit-scrollbar{width:0 !important;height:0 !important;display:none !important}
