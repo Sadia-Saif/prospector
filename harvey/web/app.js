@@ -326,7 +326,14 @@ async function lockIfRefused(r) {
 
 function showLock(reason) {
   // No admin token in this browser: this is a teammate, send them to their portal.
-  if (!authToken()) { location.replace('/member'); return; }
+  // An old or missing admin token: this browser belongs to a teammate (or an
+  // admin whose token changed). Send them to sign in; admins get back here
+  // with the Admin dashboard button.
+  if (!/token file/.test(reason || '')) {
+    if (typeof clearAuthToken === 'function') clearAuthToken();
+    location.replace('/member');
+    return;
+  }
   _locked = true;
   const el = document.getElementById('lock-screen');
   if (!el) return;
