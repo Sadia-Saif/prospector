@@ -95,11 +95,17 @@ async def load_members(state) -> list[dict]:
     return [m for m in await _load(state, MEMBERS_KEY, []) if isinstance(m, dict) and m.get("id")]
 
 
+def is_admin(member: dict | None) -> bool:
+    return bool(member) and member.get("role") == "admin"
+
+
 def public(member: dict) -> dict:
-    return {"id": member["id"], "name": member["name"], "email": member["email"]}
+    return {"id": member["id"], "name": member["name"], "email": member["email"],
+            "role": member.get("role") or "member"}
 
 
-async def signup(state, *, name: str, email: str, password: str) -> tuple[dict, str]:
+async def signup(state, *, name: str, email: str, password: str,
+                 role: str = "member") -> tuple[dict, str]:
     from harvey import team
     name = team.clean_name(name, 60)
     if not name:
@@ -114,7 +120,8 @@ async def signup(state, *, name: str, email: str, password: str) -> tuple[dict, 
         raise MemberError("Someone on the team already uses this name. Add your surname.")
     salt = secrets.token_hex(16)
     member = {"id": uuid.uuid4().hex[:12], "name": name, "email": email,
-              "salt": salt, "hash": _hash(password, salt), "created_at": _now()}
+              "salt": salt, "hash": _hash(password, salt), "created_at": _now(),
+              "role": "admin" if role == "admin" else "member"}
     members.append(member)
     await state.set_setting(MEMBERS_KEY, json.dumps(members))
     return member, await _new_session(state, member["id"])
@@ -164,6 +171,18 @@ async def logout(state, token: str):
     sessions = await _load(state, SESSIONS_KEY, {})
     if sessions.pop(_token_key(token or ""), None) is not None:
         await state.set_setting(SESSIONS_KEY, json.dumps(sessions))
+
+
+async def set_role(state, member_id: str, role: str) -> dict | None:
+    members = await load_members(state)
+    found = None
+    for m in members:
+        if m["id"] == member_id:
+            m["role"] = "admin" if role == "admin" else "member"
+            found = m
+    if found:
+        await state.set_setting(MEMBERS_KEY, json.dumps(members))
+    return found
 
 
 async def remove_member(state, member_id: str):

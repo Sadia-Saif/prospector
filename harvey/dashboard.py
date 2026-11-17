@@ -1786,6 +1786,17 @@ async def team_campaign_action(request_id: str, action: str, request: Request):
 # ── Team member portal: each person signs in and sees only their own ──
 
 TEAM_INVITE_FILE = PROJECT_ROOT / "data" / "team-invite"
+ADMIN_INVITE_FILE = PROJECT_ROOT / "data" / "admin-invite"
+
+
+def _invite_role(code) -> str:
+    """'admin' for the admin link's code, 'member' for the team link's, else ''."""
+    from harvey import members
+    if members.invite_ok(code, members.load_or_create_invite(ADMIN_INVITE_FILE)):
+        return "admin"
+    if members.invite_ok(code, members.load_or_create_invite(TEAM_INVITE_FILE)):
+        return "member"
+    return ""
 
 
 @app.get("/member", response_class=HTMLResponse)
@@ -1818,15 +1829,15 @@ async def _json_body(request: Request) -> dict:
 async def member_signup(request: Request):
     from harvey import members
     body = await _json_body(request)
-    invite = members.load_or_create_invite(TEAM_INVITE_FILE)
-    if not members.invite_ok(body.get("invite"), invite):
+    role = _invite_role(body.get("invite"))
+    if not role:
         return JSONResponse({"success": False, "error": "Open the team link you were sent to create an account."},
                             status_code=403)
     state = _state()
     await state.init_db()
     try:
         member, token = await members.signup(state, name=body.get("name"), email=body.get("email"),
-                                             password=str(body.get("password") or ""))
+                                             password=str(body.get("password") or ""), role=role)
     except members.MemberError as e:
         return JSONResponse({"success": False, "error": str(e)}, status_code=400)
     return {"success": True, "session": token, "member": members.public(member)}
@@ -1843,7 +1854,52 @@ async def member_login(request: Request):
                                             password=str(body.get("password") or ""))
     except members.MemberError as e:
         return JSONResponse({"success": False, "error": str(e)}, status_code=400)
+    # Signing in through the admin link makes an existing member an admin.
+    if _invite_role(body.get("invite")) == "admin" and not members.is_admin(member):
+        member = await members.set_role(state, member["id"], "admin") or member
     return {"success": True, "session": token, "member": members.public(member)}
+
+
+@app.get("/api/member/admin-token")
+async def member_admin_token(request: Request):
+    """Admins open the full dashboard with the dashboard's own token."""
+    from harvey import members
+    state, m = await _member(request)
+    if not m:
+        return _signin_needed()
+    if not members.is_admin(m):
+        return JSONResponse({"success": False, "error": "Admins only."}, status_code=403)
+    return {"success": True, "token": token_store.get()}
+
+
+@app.get("/api/member/people")
+async def member_people(request: Request):
+    from harvey import members
+    state, m = await _member(request)
+    if not m:
+        return _signin_needed()
+    if not members.is_admin(m):
+        return JSONResponse({"success": False, "error": "Admins only."}, status_code=403)
+    return {"success": True, "people": [members.public(x) for x in await members.load_members(state)]}
+
+
+@app.post("/api/member/people/{member_id}/{action}")
+async def member_people_action(member_id: str, action: str, request: Request):
+    from harvey import members
+    state, m = await _member(request)
+    if not m:
+        return _signin_needed()
+    if not members.is_admin(m):
+        return JSONResponse({"success": False, "error": "Admins only."}, status_code=403)
+    if member_id == m["id"]:
+        return JSONResponse({"success": False, "error": "You can't change your own account here."}, status_code=400)
+    if action in ("admin", "member"):
+        await members.set_role(state, member_id, action)
+    elif action == "remove":
+        await members.remove_member(state, member_id)
+    else:
+        return JSONResponse({"success": False, "error": "unknown action"}, status_code=400)
+    return {"success": True}
 
 
 @app.post("/api/member/logout")

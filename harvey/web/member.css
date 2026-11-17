@@ -90,3 +90,6 @@ body.member{background:var(--bg);min-height:100dvh}
 
 .m-brand{align-items:center !important}
 .m-mark{width:32px;height:32px;border-radius:50%;box-shadow:0 0 0 1px rgba(255,255,255,.18)}
+
+.m-role{font-style:normal;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  padding:2px 7px;border-radius:999px;background:#F26B21;color:#fff;margin-left:4px;vertical-align:middle}

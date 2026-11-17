@@ -16,9 +16,13 @@ const store = {
 (function takeInvite() {
   const hash = location.hash || '';
   if (!hash) return;
-  const code = new URLSearchParams(hash.slice(1)).get('invite');
+  const q = new URLSearchParams(hash.slice(1));
+  const code = q.get('admin') || q.get('invite');
   history.replaceState(null, '', location.pathname);
-  if (code && /^[A-Za-z0-9_-]{16,80}$/.test(code)) store.set(INVITE_KEY, code);
+  if (code && /^[A-Za-z0-9_-]{16,80}$/.test(code)) {
+    store.set(INVITE_KEY, code);
+    store.set(INVITE_KEY + '.admin', q.get('admin') ? '1' : '');
+  }
 })();
 
 async function call(path, opts = {}) {
@@ -44,6 +48,7 @@ function showAuth(mode) {
   $('m-user').innerHTML = '';
   $('m-app').innerHTML =
     '<div class="m-auth"><div class="m-auth-card">' +
+      (store.get(INVITE_KEY + '.admin') ? '<span class="owner-chip" style="align-self:flex-start">Admin invite</span>' : '') +
       '<h1>' + (mode === 'signup' ? 'Create your account' : 'Welcome back') + '</h1>' +
       '<p class="muted">' + (mode === 'signup'
         ? 'Your campaigns go out under your name. Only you can see and change them.'
@@ -62,12 +67,14 @@ function showAuth(mode) {
   const go = async () => {
     const btn = $('a-go'); btn.disabled = true; $('a-err').textContent = '';
     const body = {email: $('a-email').value, password: $('a-pass').value};
-    if (mode === 'signup') { body.name = $('a-name').value; body.invite = store.get(INVITE_KEY); }
+    if (mode === 'signup') body.name = $('a-name').value;
+    if (store.get(INVITE_KEY)) body.invite = store.get(INVITE_KEY);
     const r = await call('/api/member/' + (mode === 'signup' ? 'signup' : 'login'),
       {method: 'POST', body: JSON.stringify(body)});
     btn.disabled = false;
     if (!r || !r.success) { $('a-err').textContent = (r && (r.error || r.message)) || 'That didn’t work. Try again.'; return; }
     store.set(SESSION_KEY, r.session);
+    if (store.get(INVITE_KEY + '.admin')) { store.del(INVITE_KEY + '.admin'); store.del(INVITE_KEY); }
     boot();
   };
   $('a-go').onclick = go;
@@ -159,12 +166,19 @@ async function boot() {
   if (!r || !r.success) return;
   me = r.member;
   $('m-user').innerHTML = '<span class="m-avatar">' + esc(me.name.charAt(0).toUpperCase()) + '</span>' +
-    '<span class="m-who"><b>' + esc(me.name) + '</b><small>' + esc(me.email) + '</small></span>' +
+    '<span class="m-who"><b>' + esc(me.name) + (me.role === 'admin' ? ' <em class="m-role">Admin</em>' : '') +
+      '</b><small>' + esc(me.email) + '</small></span>' +
+    (me.role === 'admin' ? '<button class="btn btn-secondary btn-sm" id="m-admin">Admin dashboard</button>' : '') +
     '<button class="btn btn-secondary btn-sm" id="m-out">Sign out</button>';
-  $('m-out').onclick = async () => { await call('/api/member/logout', {method: 'POST'}); store.del(SESSION_KEY); showAuth('signin'); };
+  $('m-out').onclick = async () => {
+    await call('/api/member/logout', {method: 'POST'});
+    store.del(SESSION_KEY); store.del('harvey-dashboard-token'); showAuth('signin');
+  };
+  if ($('m-admin')) $('m-admin').onclick = openAdmin;
   opts = await call('/api/member/options');
   if (!opts) return;
   renderPortal();
+  if (me.role === 'admin') loadPeople();
   loadCampaigns();
   clearInterval(refreshTimer);
   refreshTimer = setInterval(loadCampaigns, 15000);
@@ -222,6 +236,7 @@ function renderPortal() {
     '<section class="m-side">' +
       '<div class="m-card"><div class="m-card-head"><h2>My campaigns</h2><span class="m-agent" id="m-agent"></span></div><div id="m-mine" class="m-list"><p class="muted">Loading…</p></div></div>' +
       '<div class="m-card"><div class="m-card-head"><h2>Team campaigns</h2><small class="muted">Read only</small></div><div id="m-team" class="m-list"></div></div>' +
+      (me.role === 'admin' ? '<div class="m-card"><div class="m-card-head"><h2>Team members</h2><small class="muted">Admins only</small></div><div id="m-people" class="m-list"></div></div>' : '') +
     '</section></div>';
   ['f-ind', 'f-reg', 'f-titles'].forEach(wireChips);
   $('f-service').onchange = () => applyService($('f-service').value);
@@ -360,3 +375,35 @@ async function toggleContacts(id) {
 }
 
 boot();
+
+
+// ── Admins ──
+
+async function openAdmin() {
+  const r = await call('/api/member/admin-token');
+  if (!r || !r.success) { alert((r && r.error) || 'Couldn’t open the admin dashboard.'); return; }
+  store.set('harvey-dashboard-token', r.token);
+  location.href = '/';
+}
+
+async function loadPeople() {
+  const box = $('m-people');
+  if (!box) return;
+  const r = await call('/api/member/people');
+  if (!r || !r.success) return;
+  box.innerHTML = r.people.map(p =>
+    '<div class="m-row"><div class="m-row-main"><strong>' + esc(p.name) +
+      (p.role === 'admin' ? ' <em class="m-role">Admin</em>' : '') + '</strong><small>' + esc(p.email) + '</small></div>' +
+    (p.id === me.id ? '<small class="muted">You</small>' :
+      '<div class="m-camp-actions" style="margin:0">' +
+        (p.role === 'admin'
+          ? '<button class="btn btn-secondary btn-sm" data-p="member" data-id="' + p.id + '">Make member</button>'
+          : '<button class="btn btn-secondary btn-sm" data-p="admin" data-id="' + p.id + '">Make admin</button>') +
+        '<button class="btn btn-ghost btn-sm" data-p="remove" data-id="' + p.id + '">Remove</button></div>') +
+    '</div>').join('');
+  box.querySelectorAll('[data-p]').forEach(b => b.onclick = async () => {
+    if (b.dataset.p === 'remove' && !confirm('Remove this person? They’ll be signed out. Their campaigns stay.')) return;
+    await call('/api/member/people/' + encodeURIComponent(b.dataset.id) + '/' + b.dataset.p, {method: 'POST'});
+    loadPeople();
+  });
+}
