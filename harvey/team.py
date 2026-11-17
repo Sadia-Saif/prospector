@@ -312,6 +312,17 @@ async def matching_company_ids(state, industries: list[str], regions: list[str])
         params += [f"%{_place_key(r)}%" for r in regions]
     if industries:
         ors = []
+        # A map-listed business carries its map category ("clothes",
+        # "dentist") as its industry, so search those words too.
+        terms = list(industries)
+        try:
+            from harvey.collectors.discover import OpenStreetMap
+            osm = OpenStreetMap.__new__(OpenStreetMap)
+            for t in industries:
+                terms += [tag.split("=", 1)[1].replace("_", " ") for tag in osm._tags(t)]
+        except Exception:
+            pass
+        industries = list(dict.fromkeys(terms))
         for term in industries:
             for col in ("industry", "name", "description"):
                 ors.append(f"lower(COALESCE({col}, '')) LIKE ?")
