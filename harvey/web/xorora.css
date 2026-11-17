@@ -190,3 +190,14 @@ input,select,textarea{border-radius:12px}
 .section-head{margin-bottom:28px}
 .section-head p{margin-top:8px;line-height:1.55}
 .sidebar .harvey-status{gap:10px}
+
+/* Sidebar nav: line-height 1 with overflow hidden clipped descenders (g, p, y) */
+.sidebar nav{gap:16px !important}
+.sidebar .nav-group{gap:3px !important}
+.sidebar .nav-label{padding:0 12px 8px !important;font-size:11px !important}
+.sidebar nav button{height:auto !important;min-height:34px;padding:6px 12px !important;line-height:1.35 !important;gap:12px !important;font-size:14px !important;border-radius:10px !important}
+.sidebar nav button .label{line-height:1.35 !important;padding:1px 0;overflow:visible !important;white-space:nowrap}
+.sidebar nav button .icon{flex:none;width:16px;height:16px}
+.sidebar .brand{margin-bottom:6px}
+.sidebar-foot{margin-top:auto}
+.sidebar .harvey-status{padding:2px 8px !important}
