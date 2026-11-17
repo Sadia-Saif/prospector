@@ -223,7 +223,7 @@ function renderPortal() {
         '<label class="m-field"><span>Contacts to reach</span><input id="f-leads" type="number" min="1" max="2000" value="100" class="team-input"></label>' +
       '</div>' +
       '<label class="m-field"><span>Who to email (persona)</span>' + chipInput('f-titles', [], sg.titles || [], 'e.g. CEO, Founder…') +
-        '<small class="team-hint">Only these decision makers’ own mailboxes, never info@ or contact@.</small></label>' +
+        '<small class="team-hint">Their own mailboxes first. A small business in your target industry may be reached at info@ when the owner reads it.</small></label>' +
       '<div class="m-step"><span>3</span>How it sends</div>' +
       '<div class="m-two">' +
         '<label class="m-field"><span>Send from (Instantly)</span>' + mailbox + '</label>' +
@@ -249,14 +249,23 @@ function applyService(name) {
   const reco = $('f-reco');
   if (!svc || !svc.icp) { reco.hidden = true; return; }
   const icp = svc.icp;
-  chips['f-ind'].set(icp.industries || []);
-  chips['f-titles'].set(icp.titles || []);
-  if (icp.headcount) $('f-head').value = icp.headcount;
+  const group = (label, field, items) => !items.length ? '' :
+    '<div class="m-sug"><span>' + label + '</span><div>' + items.map(v =>
+      '<button type="button" class="m-sug-chip" data-f="' + field + '" data-v="' + esc(v) + '">+ ' + esc(v) + '</button>').join('') +
+    '</div></div>';
   reco.hidden = false;
-  reco.innerHTML = '<b>Best fit filled in for ' + esc(svc.name.split(' (')[0]) + '.</b> ' +
-    esc((icp.industries || []).slice(0, 3).join(', ')) + (icp.industries.length > 3 ? '…' : '') +
-    (icp.headcount ? ' · ' + esc(icp.headcount) + ' employees' : '') +
-    ' · emailing ' + esc((icp.titles || []).slice(0, 3).join(', ')) + '. Change anything you like.';
+  reco.innerHTML = '<b>Suggested for ' + esc(svc.name.split(' (')[0]) + '</b>' +
+    '<small>Click what fits your campaign. Nothing is added until you choose it.</small>' +
+    group('Decision makers', 'f-titles', icp.titles || []) +
+    group('Industries', 'f-ind', icp.industries || []) +
+    group('Cities', 'f-reg', icp.regions || []) +
+    (icp.headcount ? group('Company size', 'f-head', [icp.headcount + ' employees']) : '');
+  reco.querySelectorAll('.m-sug-chip').forEach(b => b.onclick = () => {
+    const f = b.dataset.f, v = b.dataset.v;
+    if (f === 'f-head') $('f-head').value = v.replace(' employees', '');
+    else { const st = chips[f]; if (!st.values.some(x => x.toLowerCase() === v.toLowerCase())) { st.values.push(v); st.set(st.values); } }
+    b.classList.add('on'); b.textContent = '✓ ' + v;
+  });
 }
 
 async function startCampaign() {
@@ -271,6 +280,7 @@ async function startCampaign() {
   if (!body.service) { msg.textContent = 'Pick the service to offer.'; return; }
   if (!body.industries.length) { msg.textContent = 'Add at least one industry.'; return; }
   if (!body.regions.length) { msg.textContent = 'Add at least one city or region.'; return; }
+  if (!body.titles.length) { msg.textContent = 'Add who to email, e.g. CEO or Founder.'; return; }
   if (!body.accounts.length) { msg.textContent = 'Pick the mailbox to send from.'; return; }
   btn.disabled = true; msg.textContent = 'Starting…';
   const r = await call('/api/member/campaign', {method: 'POST', body: JSON.stringify(body)});

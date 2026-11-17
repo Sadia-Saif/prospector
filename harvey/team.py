@@ -120,17 +120,23 @@ DEFAULT_SERVICES = [
 # The best-fit targets for each service: what the campaign builder fills in
 # when someone picks it (they can change any of it).
 SERVICE_ICP = {
-    'AI Automation & AI Agents': {"industries": ['Logistics companies', 'Real estate agencies', 'Insurance agencies', 'Medical clinics', 'Accounting firms', 'Law firms', 'Recruitment agencies'],
+    'AI Automation & AI Agents': {"regions": ['Dallas, TX', 'Houston, TX', 'Miami, FL', 'London, UK', 'Dubai, UAE', 'Toronto, ON'],
+        "industries": ['Logistics companies', 'Real estate agencies', 'Insurance agencies', 'Medical clinics', 'Accounting firms', 'Law firms', 'Recruitment agencies'],
         "headcount": '11-50', "titles": ['CEO', 'Founder', 'Owner', 'COO', 'Managing Director']},
-    'Custom Software Development': {"industries": ['Logistics companies', 'Healthcare', 'Financial services', 'Manufacturing', 'Real estate agencies', 'Education and training'],
+    'Custom Software Development': {"regions": ['New York, NY', 'Austin, TX', 'London, UK', 'Berlin, Germany', 'Dubai, UAE', 'Sydney, Australia'],
+        "industries": ['Logistics companies', 'Healthcare', 'Financial services', 'Manufacturing', 'Real estate agencies', 'Education and training'],
         "headcount": '51-200', "titles": ['CEO', 'Founder', 'CTO', 'COO', 'Head of Operations']},
-    'Shopify Store Development': {"industries": ['Retail stores', 'Fashion boutiques', 'Jewelry stores', 'Furniture stores', 'Beauty salons', 'Electronics stores'],
+    'Shopify Store Development': {"regions": ['Los Angeles, CA', 'Miami, FL', 'New York, NY', 'London, UK', 'Sydney, Australia', 'Dubai, UAE'],
+        "industries": ['Retail stores', 'Fashion boutiques', 'Jewelry stores', 'Furniture stores', 'Beauty salons', 'Electronics stores'],
         "headcount": '1-10', "titles": ['Owner', 'Founder', 'CEO', 'Head of Ecommerce']},
-    'Digital Marketing (Meta, Google & LinkedIn Ads)': {"industries": ['Dental clinics', 'Medical clinics', 'Real estate agencies', 'Law firms', 'Fitness centres', 'Restaurants', 'Car dealerships'],
+    'Digital Marketing (Meta, Google & LinkedIn Ads)': {"regions": ['Miami, FL', 'Houston, TX', 'Phoenix, AZ', 'Dubai, UAE', 'London, UK', 'Melbourne, Australia'],
+        "industries": ['Dental clinics', 'Medical clinics', 'Real estate agencies', 'Law firms', 'Fitness centres', 'Restaurants', 'Car dealerships'],
         "headcount": '11-50', "titles": ['Owner', 'Founder', 'CEO', 'Marketing Director', 'Head of Marketing']},
-    'Staff Augmentation (Dedicated Developers)': {"industries": ['Software companies', 'IT services', 'Marketing agencies', 'Consulting firms', 'Fintech'],
+    'Staff Augmentation (Dedicated Developers)': {"regions": ['San Francisco, CA', 'New York, NY', 'Austin, TX', 'London, UK', 'Amsterdam, Netherlands', 'Toronto, ON'],
+        "industries": ['Software companies', 'IT services', 'Marketing agencies', 'Consulting firms', 'Fintech'],
         "headcount": '11-50', "titles": ['CTO', 'CEO', 'Founder', 'VP Engineering', 'Head of Engineering']},
-    'CRM Implementation (Salesforce, HubSpot, Dynamics 365)': {"industries": ['Real estate agencies', 'Insurance agencies', 'Financial services', 'Recruitment agencies', 'Logistics companies', 'Wholesale distributors'],
+    'CRM Implementation (Salesforce, HubSpot, Dynamics 365)': {"regions": ['Chicago, IL', 'Dallas, TX', 'Atlanta, GA', 'London, UK', 'Riyadh, Saudi Arabia', 'Dubai, UAE'],
+        "industries": ['Real estate agencies', 'Insurance agencies', 'Financial services', 'Recruitment agencies', 'Logistics companies', 'Wholesale distributors'],
         "headcount": '51-200', "titles": ['CEO', 'COO', 'Head of Sales', 'Sales Director', 'Founder']},
 }
 DEFAULT_TITLES = ["CEO", "Founder", "Owner", "Managing Director"]
@@ -144,7 +150,8 @@ def icp_for(service_name: str) -> dict:
     rec = SERVICE_ICP.get(service_name) or {}
     return {"industries": list(rec.get("industries") or []),
             "headcount": rec.get("headcount", ""),
-            "titles": list(rec.get("titles") or DEFAULT_TITLES)}
+            "titles": list(rec.get("titles") or DEFAULT_TITLES),
+            "regions": list(rec.get("regions") or [])}
 
 
 def _now() -> str:

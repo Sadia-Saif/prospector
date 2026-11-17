@@ -93,3 +93,13 @@ body.member{background:var(--bg);min-height:100dvh}
 
 .m-role{font-style:normal;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
   padding:2px 7px;border-radius:999px;background:#F26B21;color:#fff;margin-left:4px;vertical-align:middle}
+
+.m-reco{display:flex;flex-direction:column;gap:10px}
+.m-reco small{color:var(--text-2);font-size:12px}
+.m-sug{display:flex;flex-direction:column;gap:6px}
+.m-sug > span{font-size:11.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3)}
+.m-sug > div{display:flex;flex-wrap:wrap;gap:6px}
+.m-sug-chip{border:1px dashed rgba(242,107,33,.55);background:var(--surface);color:var(--text);border-radius:999px;
+  padding:5px 12px;font:inherit;font-size:13px;cursor:pointer}
+.m-sug-chip:hover{border-style:solid;border-color:#F26B21}
+.m-sug-chip.on{background:#F26B21;border-color:#F26B21;border-style:solid;color:#fff}

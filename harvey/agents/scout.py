@@ -1664,7 +1664,10 @@ Respond ONLY with the JSON array."""
         # already a prospect (a revisit), or anyone already on file from
         # another source, means the company is covered.
         reachable = any(c.email_status in ("verified", "risky") for c in contacts)
-        personal_only = getattr(self.config.icp, "personal_inbox_only", False)
+        icp = getattr(getattr(self, "config", None), "icp", None)
+        personal_only = bool(getattr(icp, "personal_inbox_only", False))
+        if personal_only and await self._owner_reads_inbox(domain, industry):
+            personal_only = False
         if not personal_only and not reachable and (contacts or not named_on_site) \
                 and await self._company_uncontacted(company_id):
             inbox = await self._company_inbox_prospect(
@@ -1673,6 +1676,39 @@ Respond ONLY with the JSON array."""
             if inbox:
                 contacts.append(inbox)
         return contacts
+
+    async def _owner_reads_inbox(self, domain: str, industry: str) -> bool:
+        """Decision makers only, with one exception: a small business squarely
+        in a target industry, where the owner is the one reading info@ or
+        contact@. Better to reach them there than not at all."""
+        if not await self._known_small(domain):
+            return False
+        icp = getattr(getattr(self, "config", None), "icp", None)
+        targets = [t.lower() for t in (getattr(icp, "industries", None) or [])]
+        try:
+            from harvey import team
+            for r in await team.load_requests(self.state):
+                if r.get("status") == "active":
+                    targets += [t.lower() for t in r.get("industries") or []]
+        except Exception:
+            pass
+        ind = (industry or "").lower().replace("_", " ")
+        if not ind:
+            return False
+
+        def stem(w):
+            return w.rstrip("s")[:6]
+        words = {stem(w) for w in re.findall(r"[a-z]+", ind) if len(w) > 3}
+        try:  # an OpenStreetMap category ("dentist") the target maps to
+            from harvey.collectors.discover import OpenStreetMap
+            osm = OpenStreetMap.__new__(OpenStreetMap)
+            if any(ind.replace(" ", "_") == tag.split("=", 1)[1]
+                   for t in targets for tag in osm._tags(t)):
+                return True
+        except Exception:
+            pass
+        return any(t and (t in ind or ind in t or words & {stem(w) for w in re.findall(r"[a-z]+", t) if len(w) > 3})
+                   for t in targets)
 
     async def _observe_likely_owner(self, company_id: str, member: dict):
         """Record LIKELY_OWNER for a company — only when the user confirmed

@@ -1709,7 +1709,10 @@ async def _create_team_campaign(state, body: dict, member: dict | None = None):
         daily_limit = team.clean_daily_limit(body.get("daily_limit"))
         name = team.clean_name(body.get("name")) or (
             f"{service['name'].split(' (')[0]} · {industries[0]} · {regions[0]}")
-        titles = team.clean_list(body.get("titles")) or team.icp_for(service["name"])["titles"]
+        titles = team.clean_list(body.get("titles"))
+        if member and not titles:
+            raise ValueError("Add who to email, e.g. CEO or Founder.")
+        titles = titles or team.icp_for(service["name"])["titles"]
     except (ValueError, TypeError) as e:
         return JSONResponse({"success": False, "error": str(e)}, status_code=400)
 
