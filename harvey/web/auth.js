@@ -21,16 +21,16 @@ const AUTH_TOKEN_RE = /^[A-Za-z0-9_-]{43,128}$/;
 })();
 
 function authToken() {
-  try { return sessionStorage.getItem(AUTH_KEY) || ''; } catch { return ''; }
+  try { return localStorage.getItem(AUTH_KEY) || ''; } catch { return ''; }
 }
 
 function setAuthToken(token) {
   if (!AUTH_TOKEN_RE.test(token || '')) return false;
-  try { sessionStorage.setItem(AUTH_KEY, token); return true; } catch { return false; }
+  try { localStorage.setItem(AUTH_KEY, token); return true; } catch { return false; }
 }
 
 function clearAuthToken() {
-  try { sessionStorage.removeItem(AUTH_KEY); } catch { /* ignore */ }
+  try { localStorage.removeItem(AUTH_KEY); } catch { /* ignore */ }
 }
 
 // A same-origin URL for an absolute path ("/api/..."), or null.
