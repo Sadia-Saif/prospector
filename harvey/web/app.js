@@ -325,6 +325,8 @@ async function lockIfRefused(r) {
 }
 
 function showLock(reason) {
+  // No admin token in this browser: this is a teammate, send them to their portal.
+  if (!authToken()) { location.replace('/member'); return; }
   _locked = true;
   const el = document.getElementById('lock-screen');
   if (!el) return;
@@ -880,7 +882,8 @@ async function loadDiscoverProviders() {
     // A finished run leaves the button stuck on "Running…" otherwise.
     const btn = document.getElementById('disc-run');
     btn.disabled = true;
-    btn.textContent = 'Estimate first';
+    btn.disabled = false;
+    btn.textContent = 'Run — free';
     showToast(data.running_kind === 'profile' ? 'Finished reading websites.' : 'Discovery finished.', 'success');
   }
   renderDiscoverResult(data.last_report, running);
@@ -888,8 +891,8 @@ async function loadDiscoverProviders() {
 
 function pickProvider(key) {
   _provider = key;
-  document.getElementById('disc-run').disabled = true;
-  document.getElementById('disc-run').textContent = 'Estimate first';
+  document.getElementById('disc-run').disabled = false;
+  document.getElementById('disc-run').textContent = 'Run — free';
   document.getElementById('discover-estimate').innerHTML = '';
   loadDiscoverProviders();
 }
@@ -902,7 +905,7 @@ function discoverBody() {
     cities: raw ? raw.split(/[;\n]/).map(c => c.trim()).filter(Boolean) : [],
     depth: Number(document.getElementById('disc-depth').value) || 30,
     limit: Number(document.getElementById('disc-limit').value) || 100,
-    max_spend: Number(document.getElementById('disc-cap').value) || 1,
+    max_spend: Number(document.getElementById('disc-cap').value) || 0,
     preset: (document.getElementById('disc-preset') || {}).value || '',
   };
 }

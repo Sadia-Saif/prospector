@@ -663,10 +663,41 @@ async def get_harvey_status():
 AUTOSTART_FILE = PROJECT_ROOT / "data" / "autostart"
 
 
+async def _keep_campaigns_supplied():
+    """Every 30 minutes: a live campaign with nobody left to write to, and
+    still short of its target, searches again wider, so sending keeps going
+    up to each mailbox's daily limit."""
+    from harvey import team
+    while True:
+        await asyncio.sleep(1800)
+        try:
+            state = _state()
+            await state.init_db()
+            for r in await team.load_requests(state):
+                if r.get("status") != "active" or r.get("discovery") in ("queued", "running"):
+                    continue
+                if int(r.get("written") or 0) >= int(r.get("max_leads") or 0):
+                    continue
+                last = r.get("discovered_at") or r.get("created_at") or ""
+                try:
+                    age = (datetime.now() - datetime.fromisoformat(last)).total_seconds()
+                except ValueError:
+                    age = 1e9
+                if age < 6 * 3600 or int(r.get("rounds") or 0) >= 10:
+                    continue
+                if (await _team_stats(state, r))["ready"] == 0:
+                    await team.update_request(state, r["id"], discovery="queued",
+                                              discovery_note="Looking further for more companies…")
+            _kick_team_discovery()
+        except Exception as e:
+            logger.warning("Campaign top-up failed: %s", e)
+
+
 @app.on_event("startup")
 async def _autostart_agent():
     """Bring the agent back after the dashboard restarts (a deploy, a reboot),
     unless someone stopped it on purpose."""
+    asyncio.get_running_loop().create_task(_keep_campaigns_supplied())
     if AUTOSTART_FILE.exists():
         try:
             await start_harvey()
@@ -1974,7 +2005,7 @@ async def _team_discovery_loop():
             if req.get("titles"):
                 config.icp.titles = list(req["titles"])
             queries = build_queries(config, cities=cities,
-                                    depth=30, limit=100)
+                                    depth=30, limit=min(1000, 100 * (int(req.get("rounds") or 0) + 1)))
             async with state._connect() as db:
                 async with db.execute("SELECT id FROM companies") as cursor:
                     before = {r[0] for r in await cursor.fetchall()}
@@ -1997,7 +2028,9 @@ async def _team_discovery_loop():
             note = f"Found {len(set(found))} companies."
             if result.errors:
                 note += " Some searches failed: " + "; ".join(map(str, result.errors[:2]))[:300]
-            await team.update_request(state, req["id"], discovery="done", discovery_note=note)
+            await team.update_request(state, req["id"], discovery="done", discovery_note=note,
+                                      rounds=int(req.get("rounds") or 0) + 1,
+                                      discovered_at=datetime.now().isoformat())
         except Exception as exc:
             logger.exception("team discovery failed")
             await team.update_request(state, req["id"], discovery="failed",

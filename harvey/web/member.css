@@ -87,3 +87,6 @@ body.member{background:var(--bg);min-height:100dvh}
 .m-err{min-height:18px;font-size:13px;color:var(--bad)}
 .m-switch{text-align:center;font-size:13px}
 .m-switch a{color:#F26B21;font-weight:600}
+
+.m-brand{align-items:center !important}
+.m-mark{width:32px;height:32px;border-radius:50%;box-shadow:0 0 0 1px rgba(255,255,255,.18)}

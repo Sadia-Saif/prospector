@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="referrer" content="no-referrer">
 <title>Xorora Prospector</title>
+<link rel="icon" type="image/png" href="/static/favicon.png">
 <!-- First, so the token leaves the address bar before anything else runs. -->
 <script src="/static/auth.js"></script>
 <link rel="stylesheet" href="/static/app.css">
@@ -45,11 +46,11 @@
 <div id="lock-screen"
      style="display:none;position:fixed;inset:0;z-index:1000;align-items:center;justify-content:center;padding:24px">
   <div class="card" style="max-width:500px;width:100%">
-    <h2>Dashboard locked</h2>
-    <p class="lede" id="lock-reason" role="alert"></p>
-    <p class="lede">Open the link that <code>xorora-prospector dashboard</code> printed in your terminal,
-      or run <code>xorora-prospector dashboard --url</code> to print it again. You can also paste the
-      token from <code>data/dashboard-token</code>:</p>
+    <h2>Admin dashboard</h2>
+    <p class="lede">On the Xorora team? Your campaigns live in the team portal.</p>
+    <p style="margin:6px 0 18px"><a class="btn btn-primary" href="/member">Go to team sign-in</a></p>
+    <p class="lede muted" id="lock-reason" role="alert" style="font-size:13px"></p>
+    <p class="lede muted" style="font-size:13px">Admins: open your admin link, or paste the admin token:</p>
     <form onsubmit="unlockWithToken(event)" class="form-row">
       <div class="form-group" style="margin-bottom:0">
         <label class="form-label" for="lock-token">Dashboard token</label>
@@ -63,9 +64,10 @@
 <div class="app">
 
 <aside class="sidebar">
-  <div class="brand">
-    <h1>Xorora<span class="x-dot">.</span></h1>
-    <div class="tagline">Prospector</div>
+  <div class="brand brand-with-mark">
+    <img class="brand-mark" src="/static/favicon.png" alt="" width="34" height="34">
+    <div><h1>Xorora<span class="x-dot">.</span></h1>
+    <div class="tagline">Prospector</div></div>
   </div>
 
   <nav aria-label="Sections">
@@ -211,14 +213,14 @@
       </div>
       <div class="form-group">
         <label class="form-label" for="disc-cap">Spend cap ($)</label>
-        <input class="form-input" id="disc-cap" type="number" value="1.00" min="0" step="0.25">
+        <input class="form-input" id="disc-cap" type="number" value="0" min="0" step="0.25">
       </div>
     </div>
     <div id="discover-estimate"></div>
     <div class="btn-group">
       <button class="btn btn-secondary" onclick="estimateDiscovery()">Estimate cost</button>
-      <button class="btn btn-primary" id="disc-run" onclick="runDiscovery()" disabled>
-        Estimate first</button>
+      <button class="btn btn-primary" id="disc-run" onclick="runDiscovery()">
+        Run — free</button>
       <button class="btn btn-danger" id="disc-stop" onclick="stopDiscovery()" style="display:none">
         Stop</button>
     </div>
