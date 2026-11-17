@@ -2831,7 +2831,7 @@ async function loadTeamPanel(force) {
   const svc = services.find(x => x.name === v.service);
 
   const form =
-    '<div class="team-head"><div><h3>New campaign</h3>' +
+    '<div class="team-head"><div><h3>' + (_teamEditing ? 'Edit campaign' : 'New campaign') + '</h3>' +
       '<p class="muted">Pick who you want to reach and what you’re offering. Xorora Prospector finds the companies, ' +
       'finds the owner’s email, writes the emails as you and sends them from your mailbox.</p></div></div>' +
     '<div class="team-section">Who’s sending</div>' +
@@ -2845,11 +2845,14 @@ async function loadTeamPanel(force) {
       '<option value="">Choose a service…</option>' +
       services.map(x => _opt(x.name, x.name, x.name === v.service)).join('') + '</select>' +
       (svc ? '<span class="team-hint">' + escHtml(svc.pitch) + '</span>' : '') + '</label></div>' +
+    (svc && svc.icp ? _teamSuggestions(svc) : '') +
     (_teamEditServices ? _serviceEditor(services) : '') +
     '<div class="team-section">Who you’re targeting</div>' +
     '<div class="team-grid">' +
-      '<label><span>Industries</span><input id="tm-industries" class="team-input" placeholder="restaurants, dental clinics" value="' + escHtml(v.industries || '') + '"><span class="team-hint">Separate with commas</span></label>' +
-      '<label><span>Regions / cities</span><input id="tm-regions" class="team-input" placeholder="Miami, FL, Dubai, London" value="' + escHtml(v.regions || '') + '"><span class="team-hint">One city per entry works best, e.g. “Miami, FL; Austin, TX”</span></label>' +
+      '<label><span>Industries</span><input id="tm-industries" list="dl-ind" class="team-input" placeholder="restaurants; dental clinics" value="' + escHtml(v.industries || '') + '"><span class="team-hint">Separate with semicolons</span></label>' +
+      '<label><span>Regions / cities</span><input id="tm-regions" list="dl-reg" class="team-input" placeholder="Miami, FL; Dubai, UAE" value="' + escHtml(v.regions || '') + '"><span class="team-hint">One city per entry works best, e.g. “Miami, FL; Austin, TX”</span></label>' +
+      '<label class="span2"><span>Who to email (persona)</span><input id="tm-titles" list="dl-titles" class="team-input" placeholder="CEO; Founder; Owner" value="' + escHtml(v.titles || '') + '"><span class="team-hint">Required. Pick from the suggestions above or type your own.</span></label>' +
+      _datalist('dl-ind', (o.suggest || {}).industries) + _datalist('dl-reg', (o.suggest || {}).regions) + _datalist('dl-titles', (o.suggest || {}).titles) +
       '<label><span>Company headcount</span><select id="tm-headcount" class="team-input">' + _opt('', 'Any size', !v.headcount) +
         (o.headcounts || []).map(h => _opt(h, h + ' employees', v.headcount === h)).join('') + '</select>' +
         '<span class="team-hint">Used when a company’s size is known</span></label>' +
@@ -2862,7 +2865,8 @@ async function loadTeamPanel(force) {
         '<span class="team-hint">From your mailbox, follow-ups included. 30 keeps a warmed domain healthy; 50 is the most it allows.</span></label>' +
     '</div>' +
     '<div class="team-grid"><label class="span2"><span>Campaign name (optional)</span><input id="tm-name" class="team-input" placeholder="Filled in from service, industry and region" value="' + escHtml(v.name || '') + '"></label></div>' +
-    '<div class="team-actions"><button class="btn btn-primary" onclick="startTeamCampaign(this)">Start campaign</button>' +
+    '<div class="team-actions"><button class="btn btn-primary" onclick="startTeamCampaign(this)">' + (_teamEditing ? 'Save changes' : 'Start campaign') + '</button>' +
+      (_teamEditing ? '<button class="btn btn-ghost" onclick="cancelTeamEdit()">Cancel</button>' : '') +
       '<span id="team-msg" class="muted" style="font-size:13px"></span></div>';
 
   const camps = (team && team.campaigns) || [];
@@ -2901,8 +2905,8 @@ async function loadTeamPanel(force) {
       '</div>' +
       '<div class="tc-bar"><i style="width:' + pct + '%"></i></div>' +
       (c.discovery_note ? '<div class="team-hint">' + escHtml(c.discovery_note) + '</div>' : '') +
-      (!mine(c) ? '<div class="tc-actions"><span class="team-hint">Run by ' + escHtml(personName(c.owner)) + '.</span></div></div>' :
-      '<div class="tc-actions">' +
+      ('<div class="tc-actions">' +
+        '<button class="btn btn-secondary btn-sm" onclick="editTeamCampaign(\'' + c.id + '\')">Edit</button>' +
         (c.status === 'active'
           ? '<button class="btn btn-secondary btn-sm" onclick="teamAction(\'' + c.id + '\',\'stop\')">Pause</button>'
           : '<button class="btn btn-secondary btn-sm" onclick="teamAction(\'' + c.id + '\',\'resume\')">Resume</button>') +
@@ -2934,7 +2938,7 @@ function _teamFormValues() {
   if (!document.getElementById('tm-owner')) return null;
   return {owner: g('tm-owner'), account: g('tm-account'), service: g('tm-service'),
     industries: g('tm-industries'), regions: g('tm-regions'), headcount: g('tm-headcount'),
-    max_leads: g('tm-leads'), daily_limit: g('tm-daily'), name: g('tm-name')};
+    max_leads: g('tm-leads'), daily_limit: g('tm-daily'), name: g('tm-name'), titles: g('tm-titles')};
 }
 
 function _serviceEditor(services) {
@@ -2975,19 +2979,35 @@ function showTabByName(name) {
 async function startTeamCampaign(btn) {
   const msg = document.getElementById('team-msg');
   const v = _teamFormValues();
-  const split = t => (t || '').split(/[;\n]|,(?!\s*[A-Z]{2}\b)/).map(x => x.trim()).filter(Boolean);
+  const split = t => (t || '').split(/[;\n,]/).map(x => x.trim()).filter(Boolean);
+  // Cities keep their commas ("Miami, FL"); only semicolons separate them.
+  const splitR = t => (t || '').split(/[;\n]/).map(x => x.trim()).filter(Boolean);
   v.owner = me();
   if (!v.owner) { askTeamName(true); return; }
   if (!v.account) { msg.textContent = 'Pick the mailbox to send from.'; return; }
   if (!v.service) { msg.textContent = 'Pick the service to offer.'; return; }
-  btn.disabled = true; msg.textContent = 'Starting…';
+  if (!split(v.titles).length) { msg.textContent = 'Add who to email, e.g. CEO; Founder.'; return; }
+  btn.disabled = true; msg.textContent = _teamEditing ? 'Saving…' : 'Starting…';
+  const payload = {owner: v.owner.trim(), accounts: [v.account], service: v.service,
+      industries: split(v.industries), regions: splitR(v.regions), headcount: v.headcount,
+      titles: split(v.titles), max_leads: parseInt(v.max_leads || '100', 10),
+      daily_limit: Math.max(1, Math.min(50, parseInt(v.daily_limit || '30', 10) || 30)),
+      name: v.name};
+  if (_teamEditing) {
+    delete payload.owner;
+    const r = await api('/api/team/campaign/' + encodeURIComponent(_teamEditing) + '/edit', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)});
+    btn.disabled = false;
+    if (!r || r.success === false) { msg.textContent = (r && r.error) || 'Couldn’t save it. Try again.'; return; }
+    _teamEditing = null;
+    await loadTeamPanel(true);
+    const m2 = document.getElementById('team-msg');
+    if (m2) m2.textContent = r.retargeted ? 'Saved. Searching for the new targets now.' : 'Saved. Changes apply right away.';
+    return;
+  }
   const res = await api('/api/team/campaign', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({owner: v.owner.trim(), accounts: [v.account], service: v.service,
-      industries: split(v.industries), regions: split(v.regions), headcount: v.headcount,
-      max_leads: parseInt(v.max_leads || '100', 10),
-      daily_limit: Math.max(1, Math.min(50, parseInt(v.daily_limit || '30', 10) || 30)),
-      name: v.name}),
+    body: JSON.stringify(payload),
   });
   btn.disabled = false;
   if (!res || res.success === false) { msg.textContent = (res && res.error) || 'Couldn’t start it. Try again.'; return; }
@@ -2996,6 +3016,60 @@ async function startTeamCampaign(btn) {
   ['tm-industries', 'tm-regions', 'tm-name'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
   _teamFilterValue = v.owner.trim();
   loadCampaigns();
+}
+
+let _teamEditing = null, _teamCamps = {};
+
+function _datalist(id, items) {
+  return '<datalist id="' + id + '">' + (items || []).map(x => '<option value="' + escHtml(x) + '">').join('') + '</datalist>';
+}
+
+function _teamSuggestions(svc) {
+  const icp = svc.icp || {};
+  const group = (label, field, items) => !items || !items.length ? '' :
+    '<div class="m-sug"><span>' + label + '</span><div>' + items.map(x =>
+      '<button type="button" class="m-sug-chip" onclick="teamSuggest(this,' + escHtml(JSON.stringify(field)) + ',' +
+      escHtml(JSON.stringify(x)) + ')">+ ' + escHtml(x) + '</button>').join('') + '</div></div>';
+  return '<div class="m-reco team-reco"><b>Suggested for ' + escHtml(svc.name.split(' (')[0]) + '</b>' +
+    '<small>Click what fits your campaign. Nothing is added until you choose it.</small>' +
+    group('Decision makers', 'tm-titles', icp.titles) + group('Industries', 'tm-industries', icp.industries) +
+    group('Cities', 'tm-regions', icp.regions) +
+    (icp.headcount ? group('Company size', 'tm-headcount', [icp.headcount]) : '') + '</div>';
+}
+
+function teamSuggest(btn, field, value) {
+  const el = document.getElementById(field);
+  if (!el) return;
+  if (field === 'tm-headcount') el.value = value;
+  else {
+    const parts = (el.value || '').split(';').map(x => x.trim()).filter(Boolean);
+    if (!parts.some(x => x.toLowerCase() === value.toLowerCase())) parts.push(value);
+    el.value = parts.join('; ');
+  }
+  btn.classList.add('on'); btn.textContent = '✓ ' + value;
+}
+
+async function editTeamCampaign(id) {
+  const t = await api('/api/team');
+  const c = ((t && t.campaigns) || []).find(x => x.id === id);
+  if (!c) return;
+  _teamEditing = id;
+  await loadTeamPanel(true);
+  const set = (k, v) => { const e = document.getElementById(k); if (e) e.value = v; };
+  set('tm-service', c.service || ''); await loadTeamPanel(true);
+  set('tm-account', (c.accounts || [])[0] || '');
+  set('tm-industries', (c.industries || []).join('; ')); set('tm-regions', (c.regions || []).join('; '));
+  set('tm-titles', (c.titles || []).join('; ')); set('tm-headcount', c.headcount || '');
+  set('tm-leads', c.max_leads || 100); set('tm-daily', c.daily_limit || 30); set('tm-name', c.name || '');
+  const msg = document.getElementById('team-msg');
+  if (msg) msg.textContent = 'Editing “' + c.name + '”. It keeps running while you change it.';
+  const f = document.querySelector('.team-form'); if (f) f.scrollIntoView({behavior: 'smooth', block: 'start'});
+}
+
+function cancelTeamEdit() {
+  _teamEditing = null;
+  ['tm-industries', 'tm-regions', 'tm-titles', 'tm-name'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+  loadTeamPanel(true);
 }
 
 async function teamLimit(id, current) {

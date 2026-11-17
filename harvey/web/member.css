@@ -103,3 +103,6 @@ body.member{background:var(--bg);min-height:100dvh}
   padding:5px 12px;font:inherit;font-size:13px;cursor:pointer}
 .m-sug-chip:hover{border-style:solid;border-color:#F26B21}
 .m-sug-chip.on{background:#F26B21;border-color:#F26B21;border-style:solid;color:#fff}
+
+.m-form-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.m-form.editing{box-shadow:0 0 0 2px #F26B21,var(--shadow-border)}

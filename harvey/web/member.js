@@ -204,7 +204,7 @@ function renderPortal() {
       'writes to them as you and sends from your mailbox.</p></div>' +
     '<div class="m-grid">' +
     '<section class="m-card m-form">' +
-      '<h2>New campaign</h2>' +
+      '<div class="m-form-head"><h2 id="f-title">New campaign</h2><button type="button" class="btn btn-ghost btn-sm" id="f-cancel" hidden>Cancel editing</button></div>' +
       '<div class="m-step"><span>1</span>What you’re offering</div>' +
       '<label class="m-field"><span>Service</span><select id="f-service" class="team-input">' +
         '<option value="">Choose a service…</option>' +
@@ -241,6 +241,38 @@ function renderPortal() {
   ['f-ind', 'f-reg', 'f-titles'].forEach(wireChips);
   $('f-service').onchange = () => applyService($('f-service').value);
   $('f-go').onclick = startCampaign;
+  $('f-cancel').onclick = resetForm;
+}
+
+let editing = null, mineById = {};
+
+function resetForm() {
+  editing = null;
+  $('f-title').textContent = 'New campaign';
+  $('f-go').textContent = 'Start campaign';
+  $('f-cancel').hidden = true;
+  $('f-service').value = ''; applyService('');
+  ['f-ind', 'f-reg', 'f-titles'].forEach(id => chips[id].set([]));
+  $('f-head').value = ''; $('f-leads').value = 100; $('f-daily').value = 30; $('f-name').value = '';
+  if ($('f-account')) $('f-account').value = '';
+  $('f-msg').textContent = '';
+  document.querySelector('.m-form').classList.remove('editing');
+}
+
+function startEdit(c) {
+  editing = c.id;
+  $('f-title').textContent = 'Edit campaign';
+  $('f-go').textContent = 'Save changes';
+  $('f-cancel').hidden = false;
+  $('f-service').value = c.service || ''; applyService(c.service || '');
+  chips['f-ind'].set(c.industries || []); chips['f-reg'].set(c.regions || []); chips['f-titles'].set(c.titles || []);
+  $('f-head').value = c.headcount || ''; $('f-leads').value = c.max_leads || 100;
+  $('f-daily').value = c.daily_limit || 30; $('f-name').value = c.name || '';
+  if ($('f-account')) $('f-account').value = (c.accounts || [])[0] || '';
+  $('f-msg').textContent = 'Editing “' + c.name + '”. It keeps running while you change it.';
+  const form = document.querySelector('.m-form');
+  form.classList.add('editing');
+  form.scrollIntoView({behavior: 'smooth', block: 'start'});
 }
 
 function applyService(name) {
@@ -282,12 +314,19 @@ async function startCampaign() {
   if (!body.regions.length) { msg.textContent = 'Add at least one city or region.'; return; }
   if (!body.titles.length) { msg.textContent = 'Add who to email, e.g. CEO or Founder.'; return; }
   if (!body.accounts.length) { msg.textContent = 'Pick the mailbox to send from.'; return; }
-  btn.disabled = true; msg.textContent = 'Starting…';
-  const r = await call('/api/member/campaign', {method: 'POST', body: JSON.stringify(body)});
+  btn.disabled = true; msg.textContent = editing ? 'Saving…' : 'Starting…';
+  const r = editing
+    ? await call('/api/member/campaign/' + encodeURIComponent(editing) + '/edit', {method: 'POST', body: JSON.stringify(body)})
+    : await call('/api/member/campaign', {method: 'POST', body: JSON.stringify(body)});
   btn.disabled = false;
-  if (!r || r.success === false) { msg.textContent = (r && (r.error || r.message)) || 'Couldn’t start it. Try again.'; return; }
-  msg.textContent = 'Started. It’s finding companies now.';
-  chips['f-reg'].set([]); $('f-name').value = '';
+  if (!r || r.success === false) { msg.textContent = (r && (r.error || r.message)) || 'Couldn’t save it. Try again.'; return; }
+  if (editing) {
+    resetForm();
+    $('f-msg').textContent = r.retargeted ? 'Saved. It’s searching for your new targets now.' : 'Saved. Changes apply right away.';
+  } else {
+    msg.textContent = 'Started. It’s finding companies now.';
+    chips['f-reg'].set([]); $('f-name').value = '';
+  }
   loadCampaigns();
 }
 
@@ -318,6 +357,7 @@ async function loadCampaigns() {
   if (agent) agent.innerHTML = r.agent_running
     ? '<span class="live-pill live"><i></i>Agent running</span>'
     : '<span class="live-pill paused"><i></i>Agent stopped</span>';
+  mineById = {}; r.mine.forEach(c => { mineById[c.id] = c; });
   $('m-mine').innerHTML = r.mine.length ? r.mine.map(c => {
     const pct = Math.min(100, Math.round(100 * (c.written || 0) / Math.max(1, c.max_leads || 1)));
     return '<article class="m-camp">' +
@@ -343,6 +383,7 @@ async function loadCampaigns() {
         '<button class="btn btn-secondary btn-sm" data-a="find-more" data-id="' + c.id + '"' +
           (c.discovery === 'running' || c.discovery === 'queued' ? ' disabled' : '') + '>Find more</button>' +
         '<button class="btn btn-secondary btn-sm" data-a="limit" data-id="' + c.id + '" data-limit="' + (c.daily_limit || 30) + '">Emails/day</button>' +
+        '<button class="btn btn-secondary btn-sm" data-a="edit" data-id="' + c.id + '">Edit</button>' +
         '<button class="btn btn-secondary btn-sm" data-a="contacts" data-id="' + c.id + '">Contacts</button>' +
         '<button class="btn btn-ghost btn-sm" data-a="delete" data-id="' + c.id + '">Delete</button>' +
       '</div><div class="m-contacts" id="ct-' + c.id + '" hidden></div></article>';
@@ -358,6 +399,7 @@ async function loadCampaigns() {
 async function campaignAction(b) {
   const id = b.dataset.id, a = b.dataset.a;
   if (a === 'contacts') return toggleContacts(id);
+  if (a === 'edit') return mineById[id] && startEdit(mineById[id]);
   let body;
   if (a === 'delete' && !confirm('Delete this campaign? Emails already sent stay sent.')) return;
   if (a === 'limit') {

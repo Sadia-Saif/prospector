@@ -1613,6 +1613,8 @@ async def team_options():
         "headcounts": [h for h in team.HEADCOUNTS if h],
         "providers": providers,
         "default_provider": DEFAULT_PROVIDER,
+        "suggest": {"industries": team.INDUSTRY_SUGGESTIONS, "regions": team.REGION_SUGGESTIONS,
+                    "titles": team.TITLE_SUGGESTIONS},
     }
 
 
@@ -1653,7 +1655,7 @@ async def team_overview():
     for r in await team.load_requests(state):
         view = {k: r.get(k) for k in (
             "id", "owner", "name", "accounts", "industries", "regions", "headcount",
-            "provider", "max_leads", "daily_limit", "written", "status", "discovery",
+            "provider", "max_leads", "daily_limit", "titles", "written", "status", "discovery",
             "discovery_note", "created_at")}
         view["service"] = (r.get("service") or {}).get("name", "")
         view.update(await _team_stats(state, r))
@@ -1730,6 +1732,62 @@ async def _create_team_campaign(state, body: dict, member: dict | None = None):
             "existing_companies": len(existing)}
 
 
+async def _edit_team_campaign(state, request_id: str, body: dict):
+    """Change a live campaign. New targeting searches again; contacts already
+    emailed stay emailed and are never written to twice."""
+    from harvey import team
+    req = next((r for r in await team.load_requests(state) if r.get("id") == request_id), None)
+    if not req:
+        return JSONResponse({"success": False, "error": "No such campaign."}, status_code=404)
+    changes: dict = {}
+    try:
+        if "service" in body:
+            services = {s["name"]: s for s in await team.load_services(state)}
+            svc = services.get(str(body.get("service") or ""))
+            if not svc:
+                raise ValueError("Pick the service this campaign offers.")
+            changes["service"] = {k: v for k, v in svc.items() if k != "icp"}
+        for key, label in (("industries", "industry"), ("regions", "city or region"), ("titles", "person to email")):
+            if key in body:
+                vals = team.clean_list(body.get(key))
+                if not vals:
+                    raise ValueError(f"Add at least one {label}.")
+                changes[key] = vals
+        if "headcount" in body:
+            hc = str(body.get("headcount") or "")
+            changes["headcount"] = hc if hc in team.HEADCOUNTS else ""
+        if "accounts" in body:
+            acc = [str(a).strip() for a in (body.get("accounts") or []) if "@" in str(a)]
+            if not acc:
+                raise ValueError("Pick the Instantly mailbox to send from.")
+            changes["accounts"] = acc[:team.MAX_ACCOUNTS]
+        if "max_leads" in body:
+            changes["max_leads"] = max(1, min(int(body.get("max_leads") or team.DEFAULT_MAX_LEADS),
+                                              team.MAX_MAX_LEADS))
+        if "daily_limit" in body:
+            changes["daily_limit"] = team.clean_daily_limit(body.get("daily_limit"))
+        if body.get("name"):
+            changes["name"] = team.clean_name(body.get("name"))
+    except (ValueError, TypeError) as e:
+        return JSONResponse({"success": False, "error": str(e)}, status_code=400)
+    retarget = any(changes.get(k) is not None and changes.get(k) != req.get(k)
+                   for k in ("industries", "regions", "headcount"))
+    if retarget:
+        changes["company_ids"] = await team.matching_company_ids(
+            state, changes.get("industries", req.get("industries") or []),
+            team.expand_regions(changes.get("regions", req.get("regions") or [])))
+        changes.update(discovery="queued", discovery_note="Searching for your new targets…", rounds=0)
+    if req.get("status") == "complete" and int(changes.get("max_leads", 0)) > int(req.get("written") or 0):
+        changes["status"] = "active"
+    await team.update_request(state, request_id, **changes)
+    if "daily_limit" in changes or "accounts" in changes:
+        await _apply_mailbox_limits(changes.get("accounts", req.get("accounts") or []),
+                                    changes.get("daily_limit", team.clean_daily_limit(req.get("daily_limit"))))
+    if retarget:
+        _kick_team_discovery()
+    return {"success": True, "retargeted": retarget}
+
+
 async def _apply_mailbox_limits(accounts: list[str], limit: int, campaign_ids=()):
     """Set the daily cap on the mailboxes (and any live Instantly campaigns)
     in Instantly itself, so it holds whatever else uses those mailboxes."""
@@ -1755,6 +1813,8 @@ async def team_campaign_action(request_id: str, action: str, request: Request):
     from harvey import team
     state = _state()
     await state.init_db()
+    if action == "edit":
+        return await _edit_team_campaign(state, request_id, await _json_body(request))
     if action == "limit":
         try:
             body = await request.json()
