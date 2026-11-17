@@ -408,6 +408,58 @@ async def record_hunter_search(state) -> None:
         logger.debug(f"Hunter usage write failed: {e}")
 
 
+# Apollo: a small monthly credit budget shared by every campaign, paced evenly
+# across the month so early campaigns can't spend what later ones need.
+APOLLO_DEFAULT_MONTHLY_CREDITS = 50
+
+
+def _apollo_monthly_cap() -> int:
+    raw = os.getenv("APOLLO_MONTHLY_CREDITS", "").strip()
+    try:
+        return max(int(raw), 0) if raw else APOLLO_DEFAULT_MONTHLY_CREDITS
+    except ValueError:
+        return APOLLO_DEFAULT_MONTHLY_CREDITS
+
+
+def _apollo_month_key() -> str:
+    return f"apollo_credit_count:{datetime.now(timezone.utc):%Y-%m}"
+
+
+def _apollo_day_key() -> str:
+    return f"apollo_credit_count:{datetime.now(timezone.utc):%Y-%m-%d}"
+
+
+async def apollo_usage(state) -> dict:
+    """This month's Apollo credits: cap, used, and what today may still spend."""
+    import calendar
+    cap = _apollo_monthly_cap()
+    now = datetime.now(timezone.utc)
+    try:
+        month = int(await state.get_setting(_apollo_month_key(), "0") or "0")
+        today = int(await state.get_setting(_apollo_day_key(), "0") or "0")
+    except Exception:
+        return {"cap": cap, "used": cap, "today_left": 0}
+    days_left = calendar.monthrange(now.year, now.month)[1] - now.day + 1
+    left_at_start_of_today = max(cap - (month - today), 0)
+    per_day = -(-left_at_start_of_today // max(days_left, 1))  # ceil
+    return {"cap": cap, "used": month,
+            "today_left": max(min(per_day - today, cap - month), 0)}
+
+
+async def apollo_credit_available(state) -> bool:
+    if state is None:
+        return False
+    return (await apollo_usage(state))["today_left"] > 0
+
+
+async def record_apollo_credit(state) -> None:
+    try:
+        await state.increment_setting(_apollo_month_key())
+        await state.increment_setting(_apollo_day_key())
+    except Exception as e:
+        logger.debug(f"Apollo usage write failed: {e}")
+
+
 async def hunter_domain_people(
     domain: str, api_key: str, limit: int = 10
 ) -> Optional[list[dict]]:
@@ -919,7 +971,8 @@ async def find_email(
         # Our own guess didn't verify: ask Apollo, which knows many people's
         # real work addresses. Only its own verified answers are used.
         apollo_key = getattr(env, "apollo_api_key", "") if env else ""
-        if apollo_key:
+        if apollo_key and await apollo_credit_available(state):
+            await record_apollo_credit(state)
             found = await apollo_match(first_name, last_name, domain, apollo_key)
             if found and not _belongs_to_someone_else(found, pattern, (first_name, last_name), domain,
                                                       other_people, known_emails):

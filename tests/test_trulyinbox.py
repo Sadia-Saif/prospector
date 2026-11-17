@@ -175,7 +175,7 @@ def _health(**kw):
 
 def test_not_connected_recommends_trulyinbox_with_the_link():
     c = d.check_warmup_service(None, today=TODAY)
-    assert ti.AFFILIATE_URL in c.detail and "harvey trulyinbox connect" in c.detail
+    assert ti.AFFILIATE_URL in c.detail and "xorora-prospector trulyinbox connect" in c.detail
     assert c.status == d.INFO
 
 

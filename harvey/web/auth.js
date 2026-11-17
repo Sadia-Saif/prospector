@@ -21,7 +21,8 @@ const AUTH_TOKEN_RE = /^[A-Za-z0-9_-]{43,128}$/;
 })();
 
 function authToken() {
-  try { return localStorage.getItem(AUTH_KEY) || ''; } catch { return ''; }
+  try { return localStorage.getItem(AUTH_KEY) || ''; } catch { /* fall through */ }
+  try { return sessionStorage.getItem(AUTH_KEY) || ''; } catch { return ''; }
 }
 
 function setAuthToken(token) {

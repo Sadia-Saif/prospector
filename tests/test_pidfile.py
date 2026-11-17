@@ -273,7 +273,7 @@ def test_start_refuses_before_setup_is_done(status_client, monkeypatch, tmp_path
     monkeypatch.setattr(dash.subprocess, "Popen", _never)
     data = status_client.post("/api/harvey/start").json()
     assert data["success"] is False
-    assert "harvey setup" in data["message"]
+    assert "xorora-prospector setup" in data["message"]
 
 
 def test_harvey_run_without_a_terminal_does_not_start_the_wizard(monkeypatch, capsys):
@@ -288,7 +288,7 @@ def test_harvey_run_without_a_terminal_does_not_start_the_wizard(monkeypatch, ca
     with pytest.raises(SystemExit) as exc:
         main_mod.main()
     assert exc.value.code == 1
-    assert "harvey setup" in capsys.readouterr().out
+    assert "xorora-prospector setup" in capsys.readouterr().out
 
 
 def test_stop_that_could_not_end_the_loop_says_so(status_client, monkeypatch, tmp_path):

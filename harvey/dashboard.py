@@ -468,7 +468,7 @@ async def get_settings():
         "IMAP_HOST", "IMAP_PORT", "IMAP_USERNAME", "IMAP_PASSWORD",
         "M365_CLIENT_ID", "M365_TENANT_ID",
         "REOON_API_KEY", "ZEROBOUNCE_API_KEY", "HUNTER_API_KEY",
-        "PROSPEO_API_KEY", "APOLLO_API_KEY",
+        "PROSPEO_API_KEY", "APOLLO_API_KEY", "APOLLO_MONTHLY_CREDITS",
     ]
     for key in all_keys:
         if key not in env_vars:
@@ -510,7 +510,19 @@ async def get_settings():
         "hunter_api_key_set": is_set("HUNTER_API_KEY"),
         "prospeo_api_key_set": is_set("PROSPEO_API_KEY"),
         "apollo_api_key_set": is_set("APOLLO_API_KEY"),
+        "apollo_monthly_credits": env_vars.get("APOLLO_MONTHLY_CREDITS", "") or "50",
+        "apollo_used": await _apollo_used(),
     }
+
+
+async def _apollo_used() -> int:
+    try:
+        from harvey.integrations.email_finder import apollo_usage
+        state = _state()
+        await state.init_db()
+        return int((await apollo_usage(state))["used"])
+    except Exception:
+        return 0
 
 
 async def _admins_only(request: Request):
@@ -520,6 +532,9 @@ async def _admins_only(request: Request):
     await state.init_db()
     m = await members.member_for_token(state, request.headers.get("x-member-session", ""))
     if members.is_admin(m):
+        return None
+    # A single-user install with no team accounts: the token holder is the admin.
+    if not await members.load_members(state):
         return None
     return JSONResponse({"success": False, "message": "Only admins can change keys and accounts.",
                          "error": "Only admins can change keys and accounts."}, status_code=403)
@@ -545,7 +560,7 @@ async def save_env_settings(request: Request):
                      "IMAP_HOST", "IMAP_PORT", "IMAP_USERNAME", "IMAP_PASSWORD",
                      "M365_CLIENT_ID", "M365_TENANT_ID",
                      "REOON_API_KEY", "ZEROBOUNCE_API_KEY", "HUNTER_API_KEY",
-                     "PROSPEO_API_KEY", "APOLLO_API_KEY"]:
+                     "PROSPEO_API_KEY", "APOLLO_API_KEY", "APOLLO_MONTHLY_CREDITS"]:
             if key in data and data[key] is not None:
                 value = data[key]
                 if isinstance(value, bool) or not isinstance(value, (str, int, float)):
@@ -865,7 +880,7 @@ async def start_harvey():
     global _harvey_process, _harvey_started_at
     try:
         AUTOSTART_FILE.parent.mkdir(parents=True, exist_ok=True)
-        AUTOSTART_FILE.write_text("1\n")
+        AUTOSTART_FILE.write_text("1\n", encoding="utf-8")
     except OSError:
         pass
 

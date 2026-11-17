@@ -296,7 +296,7 @@ async def test_not_authorized_raises(graph):
     microsoft.TOKEN_FILE.unlink()
     p = provider(graph)
     assert not p.is_configured()
-    with pytest.raises(GraphError, match="harvey microsoft auth"):
+    with pytest.raises(GraphError, match="xorora-prospector microsoft auth"):
         await p.get_replies()
 
 

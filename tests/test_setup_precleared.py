@@ -1,4 +1,4 @@
-"""Tests for the optional Precleared step in `harvey setup`: off unless the
+"""Tests for the optional Precleared step in `xorora-prospector setup`: off unless the
 user says yes, saved answers are the defaults when setup is re-run, the key is
 read with hidden input and never printed, and other settings are kept. No
 network: the step only writes harvey.yaml and .env."""
@@ -63,7 +63,7 @@ def saved(path) -> dict:
 
 
 def finish(wizard):
-    """Write .env and harvey.yaml the way the end of `harvey setup` does."""
+    """Write .env and harvey.yaml the way the end of `xorora-prospector setup` does."""
     if not wizard.config:
         wizard.config = {"channels": {"email": {"max_daily_sends": 50}}}
     wizard._write_env()

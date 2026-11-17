@@ -75,7 +75,10 @@ def _protected_requests():
     for route in dash.app.routes:
         if not isinstance(route, Route):
             continue
-        if route.path in ("/", "/static/{path:path}"):
+        if route.path in ("/", "/static/{path:path}", "/member"):
+            continue
+        # Team member routes check their own session instead of the token.
+        if route.path.startswith("/api/member/"):
             continue
         path = re.sub(r"\{[^}]+\}", "x", route.path)
         for method in sorted(route.methods - {"HEAD"}):

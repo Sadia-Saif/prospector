@@ -1318,6 +1318,10 @@ async function loadSettings() {
   tag('hunter-status', data.hunter_api_key_set, 'set');
   tag('prospeo-status', data.prospeo_api_key_set, 'set');
   tag('apollo-status', data.apollo_api_key_set, 'set');
+  const ac = document.getElementById('apollo-credits');
+  if (ac) ac.value = data.apollo_monthly_credits || '50';
+  const au = document.getElementById('apollo-usage');
+  if (au) { au.className = 'email-tag'; au.textContent = (data.apollo_used || 0) + ' used this month'; }
   lockSettingsForMembers();
 }
 
@@ -1367,6 +1371,8 @@ function saveVerifiers() {
   const ak = document.getElementById('apollo-key').value;
   if (pk) payload.PROSPEO_API_KEY = pk;
   if (ak) payload.APOLLO_API_KEY = ak;
+  const acr = (document.getElementById('apollo-credits') || {}).value;
+  if (acr !== undefined && acr !== '') payload.APOLLO_MONTHLY_CREDITS = String(Math.max(0, parseInt(acr, 10) || 0));
   if (!Object.keys(payload).length) { showToast('Enter at least one key first.', 'error'); return; }
   saveEnv(payload, 'Verification keys saved.').then(loadSettings);
 }
@@ -2794,7 +2800,7 @@ function renderWhoAmI() {
 async function signOutMember() {
   let session = '';
   try { session = localStorage.getItem('xorora.member.session') || ''; } catch {}
-  if (session) await fetch('/api/member/logout', {method: 'POST', headers: {'X-Member-Session': session}}).catch(() => {});
+  if (session) await authFetch('/api/member/logout', {method: 'POST'}).catch(() => {});
   try {
     ['xorora.member.session', 'harvey-dashboard-token', 'xorora.teamName'].forEach(k => localStorage.removeItem(k));
   } catch {}
