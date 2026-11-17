@@ -2716,6 +2716,58 @@ let _teamAccounts = null, _teamOptions = null, _teamFilterValue = '', _teamEditS
 function _lsGet(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } }
 function _lsSet(k, v) { try { localStorage.setItem(k, v); } catch {} }
 function _teamFilter() { return _teamFilterValue; }
+function me() { return _lsGet(TEAM_NAME_KEY).trim(); }
+function _sameName(a, b) { return !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase(); }
+
+// Each person signs in with their name once (remembered on this browser).
+// Their campaigns are sent and signed as them; everyone sees everyone's
+// campaigns with the owner's name on each.
+function renderWhoAmI() {
+  const el = document.getElementById('whoami');
+  if (!el) return;
+  const n = me();
+  el.innerHTML = n
+    ? '<span class="whoami-avatar">' + escHtml(n.charAt(0).toUpperCase()) + '</span>' +
+      '<span class="whoami-name">' + escHtml(n) + '</span>' +
+      '<a href="#" onclick="askTeamName(true);return false">Switch</a>'
+    : '<a href="#" onclick="askTeamName(true);return false">Sign in with your name</a>';
+}
+
+async function askTeamName(force) {
+  if (!force && me()) { renderWhoAmI(); return; }
+  if (document.getElementById('name-gate')) return;
+  let owners = [];
+  try { const t = await api('/api/team'); owners = (t && t.owners) || []; } catch {}
+  const gate = document.createElement('div');
+  gate.id = 'name-gate';
+  gate.className = 'name-gate';
+  gate.innerHTML = '<div class="name-card"><h2>Who’s this?</h2>' +
+    '<p class="muted">Sign in with your name. Your campaigns and emails go out as you, and the team sees your name on them.</p>' +
+    (owners.length ? '<div class="name-pick">' + owners.map(n =>
+      '<button class="btn btn-secondary btn-sm" data-n="' + escHtml(n) + '">' + escHtml(n) + '</button>').join('') + '</div>' : '') +
+    '<input id="name-input" class="team-input" placeholder="Your name, e.g. Sadia" maxlength="80" value="' + escHtml(me()) + '">' +
+    '<div class="name-actions">' + (me() ? '<button class="btn btn-ghost" id="name-cancel">Cancel</button>' : '') +
+    '<button class="btn btn-primary" id="name-ok">Continue</button></div></div>';
+  document.body.appendChild(gate);
+  const input = gate.querySelector('#name-input');
+  const done = n => {
+    n = (n || '').split(/\s+/).join(' ').trim().slice(0, 80);
+    if (!n) { input.focus(); return; }
+    _lsSet(TEAM_NAME_KEY, n);
+    gate.remove(); renderWhoAmI(); _teamFilterValue = '';
+    if (document.getElementById('team-panel')) loadTeamPanel(true);
+  };
+  gate.querySelectorAll('[data-n]').forEach(b => b.onclick = () => done(b.dataset.n));
+  gate.querySelector('#name-ok').onclick = () => done(input.value);
+  const c = gate.querySelector('#name-cancel'); if (c) c.onclick = () => gate.remove();
+  input.onkeydown = e => { if (e.key === 'Enter') done(input.value); };
+  input.focus();
+}
+
+(function signInByName() {
+  const go = () => { if (typeof authToken === 'function' && !authToken()) return; askTeamName(false); };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else setTimeout(go, 0);
+})();
 function setTeamFilter(v) { _teamFilterValue = v; loadCampaigns(); }
 
 function _opt(value, label, selected) {
@@ -2734,7 +2786,8 @@ async function loadTeamPanel(force) {
   if (acc && acc.connected) _teamAccounts = acc;
   if (opts) _teamOptions = opts;
   const o = opts || {services: [], headcounts: [], providers: []};
-  const v = Object.assign({owner: _lsGet(TEAM_NAME_KEY), provider: o.default_provider || '',
+  if (keep) keep.owner = me();
+  const v = Object.assign({owner: me(), provider: o.default_provider || '',
     max_spend: '1', max_leads: '100'}, keep || {});
 
   let accHtml;
@@ -2760,7 +2813,8 @@ async function loadTeamPanel(force) {
       'finds the owner’s email, writes the emails as you and sends them from your mailbox.</p></div></div>' +
     '<div class="team-section">Who’s sending</div>' +
     '<div class="team-grid">' +
-      '<label><span>Your name</span><input id="tm-owner" class="team-input" placeholder="e.g. Sadia" value="' + escHtml(v.owner) + '"></label>' +
+      '<label><span>Sending as</span><input id="tm-owner" class="team-input" readonly value="' + escHtml(me()) + '">' +
+        '<span class="team-hint">Not you? <a href="#" onclick="askTeamName(true);return false">Switch name</a></span></label>' +
       '<label><span>Send from (Instantly)</span>' + accHtml + '</label>' +
     '</div>' +
     '<div class="team-section">What you’re offering <a href="#" onclick="toggleServiceEditor();return false">Edit services</a></div>' +
@@ -2789,7 +2843,9 @@ async function loadTeamPanel(force) {
   const camps = (team && team.campaigns) || [];
   const owners = (team && team.owners) || [];
   const who = _teamFilter();
-  const shown = who ? camps.filter(c => c.owner === who) : camps;
+  const mine = c => _sameName(c.owner, me());
+  const shown = (who ? camps.filter(c => _sameName(c.owner, who)) : camps).slice()
+    .sort((a, b) => (mine(b) - mine(a)));
   const statusLabel = c => {
     if (c.status === 'stopped') return ['Stopped', 't-waiting'];
     if (c.status === 'complete') return ["Done", "t-good"];
@@ -2802,8 +2858,8 @@ async function loadTeamPanel(force) {
   const list = shown.map(c => {
     const [label, tone] = statusLabel(c);
     const pct = Math.min(100, Math.round(100 * (c.written || 0) / Math.max(1, c.max_leads || 1)));
-    return '<div class="tc-card">' +
-      '<div class="tc-top"><div><span class="owner-chip">' + escHtml(c.owner) + '</span> ' +
+    return '<div class="tc-card' + (mine(c) ? ' tc-mine' : '') + '">' +
+      '<div class="tc-top"><div><span class="owner-chip">' + escHtml(mine(c) ? c.owner + ' (you)' : c.owner) + '</span> ' +
         '<strong>' + escHtml(c.name) + '</strong></div>' +
         '<span class="mini ' + tone + '">' + label + '</span></div>' +
       '<div class="tc-meta">' + escHtml(c.service) + ' &middot; ' + escHtml((c.industries || []).join(', ')) +
@@ -2818,6 +2874,7 @@ async function loadTeamPanel(force) {
       '</div>' +
       '<div class="tc-bar"><i style="width:' + pct + '%"></i></div>' +
       (c.discovery_note ? '<div class="team-hint">' + escHtml(c.discovery_note) + '</div>' : '') +
+      (!mine(c) ? '<div class="tc-actions"><span class="team-hint">Run by ' + escHtml(c.owner) + '. Only they can pause or delete it.</span></div></div>' :
       '<div class="tc-actions">' +
         (c.status === 'active'
           ? '<button class="btn btn-secondary btn-sm" onclick="teamAction(\'' + c.id + '\',\'stop\')">Pause</button>'
@@ -2825,12 +2882,13 @@ async function loadTeamPanel(force) {
         '<button class="btn btn-secondary btn-sm" onclick="teamAction(\'' + c.id + '\',\'find-more\')"' +
           (c.discovery === 'running' || c.discovery === 'queued' ? ' disabled' : '') + '>Find more companies</button>' +
         '<button class="btn btn-ghost btn-sm" onclick="if(confirm(\'Delete this campaign? Emails already sent stay sent.\'))teamAction(\'' + c.id + '\',\'delete\')">Delete</button>' +
-      '</div></div>';
+      '</div></div>');
   }).join('');
 
   const listHtml = '<div class="team-list-head"><h3>Team campaigns</h3>' +
       '<div class="team-filter"><button class="btn btn-sm ' + (!who ? 'btn-primary' : 'btn-secondary') + '" onclick="setTeamFilter(\'\')">Everyone</button>' +
-      owners.map(n => '<button class="btn btn-sm ' + (who === n ? 'btn-primary' : 'btn-secondary') +
+      (me() ? '<button class="btn btn-sm ' + (who === me() ? 'btn-primary' : 'btn-secondary') + '" onclick="setTeamFilter(' + escHtml(JSON.stringify(me())) + ')">Mine</button>' : '') +
+      owners.filter(n => !_sameName(n, me())).map(n => '<button class="btn btn-sm ' + (who === n ? 'btn-primary' : 'btn-secondary') +
         '" onclick="setTeamFilter(' + escHtml(JSON.stringify(n)) + ')">' + escHtml(n) + '</button>').join('') + '</div></div>' +
       (list || '<p class="muted" style="font-size:13px">No campaigns yet. Start yours on the left.</p>') +
       '<p class="team-hint" style="margin-top:12px">Xorora Prospector must be running (Controls → Start) for campaigns to move. The emails it writes show below.</p>';
@@ -2891,10 +2949,10 @@ async function startTeamCampaign(btn) {
   const msg = document.getElementById('team-msg');
   const v = _teamFormValues();
   const split = t => (t || '').split(/[;\n]|,(?!\s*[A-Z]{2}\b)/).map(x => x.trim()).filter(Boolean);
-  if (!v.owner.trim()) { msg.textContent = 'Enter your name.'; return; }
+  v.owner = me();
+  if (!v.owner) { askTeamName(true); return; }
   if (!v.account) { msg.textContent = 'Pick the mailbox to send from.'; return; }
   if (!v.service) { msg.textContent = 'Pick the service to offer.'; return; }
-  _lsSet(TEAM_NAME_KEY, v.owner.trim());
   btn.disabled = true; msg.textContent = 'Starting…';
   const res = await api('/api/team/campaign', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
