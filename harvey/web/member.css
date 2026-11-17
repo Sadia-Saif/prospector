@@ -106,3 +106,5 @@ body.member{background:var(--bg);min-height:100dvh}
 
 .m-form-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .m-form.editing{box-shadow:0 0 0 2px #F26B21,var(--shadow-border)}
+
+.m-reco[hidden]{display:none !important}

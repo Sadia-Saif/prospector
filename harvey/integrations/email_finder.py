@@ -626,6 +626,68 @@ async def detect_catch_all(domain: str) -> Optional[bool]:
     return None
 
 
+async def verify_prospeo(email: str, api_key: str) -> Optional[dict]:
+    """Prospeo email verifier (free monthly credits). Its verdicts are
+    VALID / INVALID / CATCH_ALL / UNKNOWN; anything else is inconclusive."""
+    try:
+        async with httpx.AsyncClient(timeout=API_TIMEOUT) as client:
+            resp = await client.post(
+                "https://api.prospeo.io/email-verifier",
+                headers={"X-KEY": api_key, "Content-Type": "application/json"},
+                json={"email": email},
+            )
+    except httpx.HTTPError as e:
+        logger.debug(f"Prospeo request failed for {email}: {e}")
+        return None
+    if resp.status_code != 200:
+        return None
+    try:
+        data = resp.json()
+    except ValueError:
+        return None
+    if not isinstance(data, dict) or data.get("error") is True:
+        return None
+    body = data.get("response") if isinstance(data.get("response"), dict) else data
+    raw = body.get("email_status") or body.get("status") or ""
+    if isinstance(body.get("email"), dict):
+        raw = raw or body["email"].get("status") or body["email"].get("email_status") or ""
+    raw = str(raw).lower().replace(" ", "_")
+    status = {"valid": "valid", "verified": "valid", "invalid": "invalid",
+              "catch_all": "catch_all", "accept_all": "catch_all"}.get(raw, "unknown")
+    return {"status": status, "catch_all": status == "catch_all"}
+
+
+async def apollo_match(first_name: str, last_name: str, domain: str,
+                       api_key: str) -> Optional[str]:
+    """Ask Apollo for this person's work email. Returned only when Apollo
+    itself marks it verified and it is on the company's own domain."""
+    try:
+        async with httpx.AsyncClient(timeout=API_TIMEOUT) as client:
+            resp = await client.post(
+                "https://api.apollo.io/api/v1/people/match",
+                headers={"x-api-key": api_key, "Content-Type": "application/json",
+                         "Cache-Control": "no-cache"},
+                json={"first_name": first_name, "last_name": last_name, "domain": domain,
+                      "reveal_personal_emails": False},
+            )
+    except httpx.HTTPError as e:
+        logger.debug(f"Apollo match failed for {first_name} {last_name}@{domain}: {e}")
+        return None
+    if resp.status_code != 200:
+        logger.debug(f"Apollo match HTTP {resp.status_code} for {domain}")
+        return None
+    try:
+        person = (resp.json() or {}).get("person") or {}
+    except ValueError:
+        return None
+    email = str(person.get("email") or "").strip().lower()
+    if not email or str(person.get("email_status") or "").lower() != "verified":
+        return None
+    if email.partition("@")[2] != domain.lower():
+        return None
+    return email
+
+
 def _status_from_verdict(verdict: dict) -> Optional[str]:
     """Map a provider verdict dict to our status, or None if inconclusive."""
     if verdict.get("catch_all"):
@@ -648,6 +710,7 @@ async def _verify_candidate(email: str, mx_type: str, env) -> tuple[Optional[str
     """
     reoon_key = getattr(env, "reoon_api_key", "") if env else ""
     zerobounce_key = getattr(env, "zerobounce_api_key", "") if env else ""
+    prospeo_key = getattr(env, "prospeo_api_key", "") if env else ""
     hunter_key = _hunter_api_key()
 
     catch_all_seen = False
@@ -660,6 +723,8 @@ async def _verify_candidate(email: str, mx_type: str, env) -> tuple[Optional[str
             channels.append(lambda: verify_zerobounce(email, zerobounce_key))
         if reoon_key:
             channels.append(lambda: verify_reoon(email, reoon_key))
+        if prospeo_key:
+            channels.append(lambda: verify_prospeo(email, prospeo_key))
         if hunter_key:
             channels.append(lambda: verify_hunter(email, hunter_key))
         for channel in channels:
@@ -676,6 +741,15 @@ async def _verify_candidate(email: str, mx_type: str, env) -> tuple[Optional[str
     # Small / self-hosted: Reoon → SMTP (still works here) → Hunter.
     if reoon_key:
         verdict = await verify_reoon(email, reoon_key)
+        if verdict:
+            if verdict.get("catch_all"):
+                catch_all_seen = True
+            status = _status_from_verdict(verdict)
+            if status is not None:
+                return status, catch_all_seen
+
+    if prospeo_key:
+        verdict = await verify_prospeo(email, prospeo_key)
         if verdict:
             if verdict.get("catch_all"):
                 catch_all_seen = True
@@ -813,6 +887,19 @@ async def find_email(
             await state.save_email_pattern(domain, mx_type=mx_type, is_catch_all=1)
         except Exception:
             pass
+
+    if status != "verified":
+        # Our own guess didn't verify: ask Apollo, which knows many people's
+        # real work addresses. Only its own verified answers are used.
+        apollo_key = getattr(env, "apollo_api_key", "") if env else ""
+        if apollo_key:
+            found = await apollo_match(first_name, last_name, domain, apollo_key)
+            if found and not _belongs_to_someone_else(found, pattern, (first_name, last_name), domain,
+                                                      other_people, known_emails):
+                logger.info(f"Email for {first_name} {last_name}@{domain}: {found} [verified by Apollo]")
+                return EmailResult(email=found, status="verified",
+                                   pattern=infer_pattern_from_email(found, first_name, last_name) or pattern,
+                                   mx_type=mx_type)
 
     if status is None:
         # Verification couldn't decide — an honest guess, never "verified".

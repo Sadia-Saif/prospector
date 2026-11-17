@@ -237,7 +237,8 @@ async def get_setup_status():
     })
 
     # 4. Email verification (needed for addresses to be sendable, not 'guess')
-    verifier_set = _has("REOON_API_KEY") or _has("ZEROBOUNCE_API_KEY") or _has("HUNTER_API_KEY")
+    verifier_set = (_has("REOON_API_KEY") or _has("ZEROBOUNCE_API_KEY") or _has("HUNTER_API_KEY")
+                    or _has("PROSPEO_API_KEY") or _has("APOLLO_API_KEY"))
     checks.append({
         "id": "verifier", "label": "Email verification key",
         "done": verifier_set,
@@ -351,6 +352,7 @@ async def get_settings():
         "IMAP_HOST", "IMAP_PORT", "IMAP_USERNAME", "IMAP_PASSWORD",
         "M365_CLIENT_ID", "M365_TENANT_ID",
         "REOON_API_KEY", "ZEROBOUNCE_API_KEY", "HUNTER_API_KEY",
+        "PROSPEO_API_KEY", "APOLLO_API_KEY",
     ]
     for key in all_keys:
         if key not in env_vars:
@@ -390,6 +392,8 @@ async def get_settings():
         "reoon_api_key_set": is_set("REOON_API_KEY"),
         "zerobounce_api_key_set": is_set("ZEROBOUNCE_API_KEY"),
         "hunter_api_key_set": is_set("HUNTER_API_KEY"),
+        "prospeo_api_key_set": is_set("PROSPEO_API_KEY"),
+        "apollo_api_key_set": is_set("APOLLO_API_KEY"),
     }
 
 
@@ -410,7 +414,8 @@ async def save_env_settings(request: Request):
                      "SMTP_HOST", "SMTP_PORT", "SMTP_USERNAME", "SMTP_PASSWORD",
                      "IMAP_HOST", "IMAP_PORT", "IMAP_USERNAME", "IMAP_PASSWORD",
                      "M365_CLIENT_ID", "M365_TENANT_ID",
-                     "REOON_API_KEY", "ZEROBOUNCE_API_KEY", "HUNTER_API_KEY"]:
+                     "REOON_API_KEY", "ZEROBOUNCE_API_KEY", "HUNTER_API_KEY",
+                     "PROSPEO_API_KEY", "APOLLO_API_KEY"]:
             if key in data and data[key] is not None:
                 value = data[key]
                 if isinstance(value, bool) or not isinstance(value, (str, int, float)):
@@ -2023,7 +2028,9 @@ async def member_campaigns(request: Request):
                 "service": (r.get("service") or {}).get("name", ""),
                 "status": r.get("status"), "discovery": r.get("discovery"),
                 "written": r.get("written") or 0, "max_leads": r.get("max_leads") or 0,
-                "companies": stats["companies"], "created_at": r.get("created_at")}
+                "companies": stats["companies"], "created_at": r.get("created_at"),
+                "industries": r.get("industries") or [], "regions": r.get("regions") or [],
+                "headcount": r.get("headcount") or ""}
         if _is_mine(r, m):
             base.update({k: r.get(k) for k in ("industries", "regions", "headcount", "accounts",
                                                 "titles", "daily_limit", "discovery_note")})

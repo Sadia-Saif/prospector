@@ -165,6 +165,8 @@ async function boot() {
   const r = await call('/api/member/me');
   if (!r || !r.success) return;
   me = r.member;
+  // Admins work in the full dashboard: take them straight there.
+  if (me.role === 'admin') { openAdmin(); return; }
   $('m-user').innerHTML = '<span class="m-avatar">' + esc(me.name.charAt(0).toUpperCase()) + '</span>' +
     '<span class="m-who"><b>' + esc(me.name) + (me.role === 'admin' ? ' <em class="m-role">Admin</em>' : '') +
       '</b><small>' + esc(me.email) + '</small></span>' +
@@ -391,8 +393,11 @@ async function loadCampaigns() {
   $('m-mine').querySelectorAll('[data-a]').forEach(b => b.onclick = () => campaignAction(b));
   $('m-team').innerHTML = r.team.length ? r.team.map(c =>
     '<div class="m-row"><div class="m-row-main"><span class="owner-chip">' + esc(personName(c.owner)) + '</span>' +
-      '<strong>' + esc(c.name) + '</strong><small>' + esc(c.service) + ' · ' + (c.companies || 0) + ' companies · ' +
-      (c.written || 0) + '/' + (c.max_leads || 0) + ' emailed</small></div>' + pill(c) + '</div>').join('')
+      '<strong>' + esc(c.name) + '</strong><small>' + esc(c.service) + '</small>' +
+      '<small>' + esc((c.industries || []).join(', ')) + ' · ' + esc((c.regions || []).join(', ')) +
+        (c.headcount ? ' · ' + esc(c.headcount) + ' employees' : '') + '</small>' +
+      '<small>' + (c.companies || 0) + ' companies · ' + (c.written || 0) + '/' + (c.max_leads || 0) + ' emailed</small></div>' +
+      pill(c) + '</div>').join('')
     : '<p class="m-empty">No one else has a campaign yet.</p>';
 }
 
@@ -435,6 +440,7 @@ async function openAdmin() {
   const r = await call('/api/member/admin-token');
   if (!r || !r.success) { alert((r && r.error) || 'Couldn’t open the admin dashboard.'); return; }
   store.set('harvey-dashboard-token', r.token);
+  store.set('xorora.teamName', me.name);
   location.href = '/';
 }
 
