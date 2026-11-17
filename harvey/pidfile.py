@@ -8,7 +8,7 @@ Windows asks the kernel instead (OpenProcess + GetExitCodeProcess).
 A PID file can outlive its loop (a crash, a reboot) and name whatever process
 later got that number, so the running loop also holds an OS lock on
 data/harvey.lock. The OS drops the lock when the loop dies, however it dies:
-a live PID with nobody holding the lock is not Prospector, and is never signalled.
+a live PID with nobody holding the lock is not Xorora Prospector, and is never signalled.
 """
 
 import logging
@@ -155,7 +155,7 @@ def release_loop_lock(handle) -> None:
 
 
 def loop_lock_held(path: Path | None = None) -> bool:
-    """True while some Prospector loop holds the lock. Probing never keeps it."""
+    """True while some Xorora Prospector loop holds the lock. Probing never keeps it."""
     path = path or LOCK_FILE
     if not path.exists():
         return False

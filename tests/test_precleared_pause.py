@@ -1,7 +1,7 @@
 """What a failed Precleared check holds back, and what still goes out.
 
 A check that fails because of Precleared itself (no connection, a busy
-server, the daily allowance, the rate limit, the key, an answer Prospector can't
+server, the daily allowance, the rate limit, the key, an answer Xorora Prospector can't
 read) pauses fresh checks for the rest of the cycle, but a stored verdict is
 still used, so email to people already checked carries on. A failure that
 may be about one address moves just that email back and the rest carry on;
@@ -924,12 +924,12 @@ async def test_a_rate_limit_is_recorded_as_its_own_hold(state):
 
     hold = await stored_hold(state)
     assert hold["kind"] == "rate_limited" and hold["waiting"] == 2
-    assert hold_message(hold)["title"] == "Precleared is limiting how fast Prospector can check"
+    assert hold_message(hold)["title"] == "Precleared is limiting how fast Xorora Prospector can check"
 
 
 def test_the_rate_limit_hold_says_what_happens_next():
     message = hold_message({"kind": "rate_limited", "waiting": 2})
-    assert message["title"] == "Precleared is limiting how fast Prospector can check"
+    assert message["title"] == "Precleared is limiting how fast Xorora Prospector can check"
     assert message["detail"].startswith("2 cold emails are waiting.")
     assert "next cycle" in message["detail"]
     assert "free key" not in message["detail"]

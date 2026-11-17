@@ -1,8 +1,8 @@
-"""How Prospector starts the Claude CLI: no tools, and none of the operator's own
+"""How Xorora Prospector starts the Claude CLI: no tools, and none of the operator's own
 Claude Code customisation.
 
-Prospector's prompts carry untrusted text and its output goes to third parties
-as email, so a brain call must see only what Prospector sends it. A plain
+Xorora Prospector's prompts carry untrusted text and its output goes to third parties
+as email, so a brain call must see only what Xorora Prospector sends it. A plain
 ``claude -p`` loads the operator's ``~/.claude/CLAUDE.md``, any ``CLAUDE.md``
 in the working directory or its ancestors, settings hooks, skills, plugins
 and MCP servers, and saves a transcript of the prompt under
@@ -25,7 +25,7 @@ and MCP servers, and saves a transcript of the prompt under
   variables are left exactly as they are.
 
 Before any prompt is sent the CLI's ``--help`` must list every one of those
-flags; if any is missing Prospector refuses to call it (there is no fallback to
+flags; if any is missing Xorora Prospector refuses to call it (there is no fallback to
 an unisolated call). That check proves the flags exist, not what the CLI
 does with them: the behaviour itself is verified offline against the
 installed CLI by ``tests/test_claude_cli_isolation.py``.
@@ -55,7 +55,7 @@ REQUIRED_FLAGS = (
 )
 
 # Inherited variables that add instruction sources or bind the call to an
-# enclosing Claude Code session (e.g. Prospector started from inside Claude Code).
+# enclosing Claude Code session (e.g. Xorora Prospector started from inside Claude Code).
 # CLAUDE_CODE_SIMPLE is --bare mode, which disables subscription login.
 STRIPPED_ENV = (
     "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD",
@@ -121,7 +121,7 @@ def _locate(env: dict | None) -> tuple[str | None, Path | None]:
 
 
 def find_claude(env: dict | None = None) -> str | None:
-    """Full path of the ``claude`` executable on the PATH Prospector will use.
+    """Full path of the ``claude`` executable on the PATH Xorora Prospector will use.
 
     On Windows an npm install puts a ``claude.cmd`` shim on PATH. Running it
     goes through cmd.exe, which re-parses every argument, and the isolation
@@ -142,7 +142,7 @@ def find_claude(env: dict | None = None) -> str | None:
                if size is not None else "isn't there")
     raise ClaudeRuntimeError(
         f"Found the claude.cmd shim ({found}), but the claude.exe it launches "
-        f"({native}) {problem}. Prospector never runs Claude through cmd.exe, which "
+        f"({native}) {problem}. Xorora Prospector never runs Claude through cmd.exe, which "
         f"re-parses the flags that keep each call isolated. {INSTALL_HINT}")
 
 
@@ -180,7 +180,7 @@ def build_command(executable: str, model: str = "", session_id: str | None = Non
         # Validated by BrainConfig; affects this call only.
         cmd += ["--model", model]
     if session_id:
-        # The CLI only accepts UUIDs; Prospector's friendly labels are dropped.
+        # The CLI only accepts UUIDs; Xorora Prospector's friendly labels are dropped.
         try:
             uuid.UUID(session_id)
             cmd += ["--session-id", session_id]
@@ -255,14 +255,14 @@ def check_cli(env: dict | None = None) -> str:
     except (OSError, subprocess.SubprocessError) as e:
         raise ClaudeRuntimeError(
             f"Could not run '{exe} --help' to check the Claude CLI ({type(e).__name__}). "
-            "Prospector sends no prompt until it can confirm the CLI isolates calls.") from e
+            "Xorora Prospector sends no prompt until it can confirm the CLI isolates calls.") from e
     missing = missing_flags(help_text)
     if missing:
         raise ClaudeRuntimeError(
-            f"This Claude CLI ({exe}) lacks {', '.join(missing)}, which Prospector needs "
+            f"This Claude CLI ({exe}) lacks {', '.join(missing)}, which Xorora Prospector needs "
             "to keep your CLAUDE.md, hooks, skills, plugins and settings out of its "
             "prompts. Update it ('claude update', or rebuild the Docker image) and "
-            "Prospector resumes on its own. No prompt was sent.")
+            "Xorora Prospector resumes on its own. No prompt was sent.")
     with _capable_lock:
         _capable[key] = True
     return exe

@@ -1,6 +1,6 @@
 """Usage accounting helpers.
 
-Prospector's usage ledger is built entirely from its OWN Claude calls: every
+Xorora Prospector's usage ledger is built entirely from its OWN Claude calls: every
 `claude -p` invocation goes through the Brain, which parses the call's
 result JSON and writes one usage_events row tagged with the agent and task
 (see harvey/brain.py). That path is the single source of truth — it never
@@ -8,8 +8,8 @@ sees, and never records, your other Claude Code sessions.
 
 (An earlier version also scanned every transcript in the Claude config
 directory to "backfill" usage. That pulled in unrelated projects' sessions
-and polluted Prospector's numbers, so it was removed: Prospector tracks only what
-Prospector does.)
+and polluted Xorora Prospector's numbers, so it was removed: Xorora Prospector tracks only what
+Xorora Prospector does.)
 
 This module now holds just the shared location helper the quota client
 needs.

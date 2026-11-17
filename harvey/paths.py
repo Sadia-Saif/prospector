@@ -1,10 +1,10 @@
-"""Canonical filesystem locations for the Prospector checkout.
+"""Canonical filesystem locations for the Xorora Prospector checkout.
 
-Prospector is repo-centric: config (harvey.yaml, .env), knowledge (prompts/,
+Xorora Prospector is repo-centric: config (harvey.yaml, .env), knowledge (prompts/,
 skills/), and state (data/) all live next to the package. ``resolve()``
 matters — when the package is reached through a symlink (some editable
 installs), a bare ``Path(__file__).parent`` would point into
-site-packages and Prospector would silently read/write the wrong files.
+site-packages and Xorora Prospector would silently read/write the wrong files.
 """
 
 from pathlib import Path

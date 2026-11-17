@@ -5,18 +5,18 @@ the SMTP+IMAP provider can't read an M365 inbox. This one uses OAuth:
 
 Setup (one-time):
 1. https://entra.microsoft.com → App registrations → New registration.
-   Name "Prospector", "Accounts in this organizational directory only".
+   Name "Xorora Prospector", "Accounts in this organizational directory only".
    Redirect URI: platform "Public client/native (mobile & desktop)",
    value http://localhost:8766
 2. Copy the Application (client) ID and Directory (tenant) ID into .env as
-   M365_CLIENT_ID / M365_TENANT_ID. No client secret: Prospector is a public
+   M365_CLIENT_ID / M365_TENANT_ID. No client secret: Xorora Prospector is a public
    client and signs in with PKCE.
 3. Run ``harvey microsoft auth`` — opens a browser, you sign in and accept
    Mail.ReadWrite + Mail.Send, and the refresh token is stored in
    data/m365_token.json (mode 600). Revoke it any time at
    https://myaccount.microsoft.com → Apps.
 
-Prospector never marks your mail read or moves it: it reads the last 7 days of
+Xorora Prospector never marks your mail read or moves it: it reads the last 7 days of
 the inbox and remembers what it has handled. Mail is sent as the signed-in
 mailbox, under its own display name.
 """
@@ -480,7 +480,7 @@ def run_auth_flow(client_id: str, tenant: str = "") -> bool:
             self.send_header("Content-Type", "text/html")
             self.end_headers()
             self.wfile.write(
-                b"<h2>Prospector is connected to Microsoft 365.</h2>You can close this tab.")
+                b"<h2>Xorora Prospector is connected to Microsoft 365.</h2>You can close this tab.")
             done.set()
 
         def log_message(self, *args):

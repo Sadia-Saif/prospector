@@ -1,4 +1,4 @@
-"""When Prospector holds sending because replies couldn't be read, you see it.
+"""When Xorora Prospector holds sending because replies couldn't be read, you see it.
 
 Sending waits for replies so an opt-out stops its follow-up (main.py). That
 used to show only as a log line, so sending could stall for days unnoticed:
@@ -70,7 +70,7 @@ async def test_a_hold_keeps_its_start_and_clears_when_sending_runs(state):
 async def test_a_hold_nobody_has_seen_for_half_a_day_is_not_shown(state):
     old = (datetime.now(timezone.utc) - timedelta(hours=13)).replace(tzinfo=None).isoformat()
     await state.set_setting(SENDS_HELD_KEY, json.dumps({"since": old, "last_seen": old, "reason": "x"}))
-    assert await state.current_sends_held() is None        # Prospector stopped: no stale card
+    assert await state.current_sends_held() is None        # Xorora Prospector stopped: no stale card
 
 
 @pytest.mark.asyncio

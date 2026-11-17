@@ -149,12 +149,19 @@ class InstantlyClient:
 
     # ── Campaigns ──
 
-    async def create_campaign(self, name: str) -> dict | None:
-        """Create a new campaign. Returns campaign data with id."""
+    async def create_campaign(self, name: str,
+                              email_list: list[str] | None = None) -> dict | None:
+        """Create a new campaign. Returns campaign data with id.
+
+        ``email_list`` limits sending to those Instantly accounts (a team
+        member's own mailbox domain); empty means Instantly's default.
+        """
         # stop_for_company: a reply from anyone at a company stops the
-        # sequence to everyone there, as on Prospector's own providers.
-        result = await self._request("POST", "/campaigns",
-                                     {"name": name, "stop_for_company": True})
+        # sequence to everyone there, as on Xorora Prospector's own providers.
+        payload = {"name": name, "stop_for_company": True}
+        if email_list:
+            payload["email_list"] = list(email_list)
+        result = await self._request("POST", "/campaigns", payload)
         if isinstance(result, dict):
             logger.info(f"Created campaign: {name} (id={result.get('id')})")
             return result

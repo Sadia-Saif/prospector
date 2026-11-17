@@ -17,7 +17,7 @@ import harvey.brain as brain_mod
 import harvey.dashboard as dash
 from harvey.brain import Brain
 from harvey.codex import CodexError, CodexResult
-from harvey.config import BrainConfig, ConfigError, HarveyConfig, load_brain_config
+from harvey.config import BrainConfig, ConfigError, ProspectorConfig, load_brain_config
 from harvey.state import StateManager
 
 BASE = {
@@ -48,7 +48,7 @@ async def state():
 
 
 def test_claude_is_the_default():
-    assert HarveyConfig(**BASE).brain.provider == "claude"
+    assert ProspectorConfig(**BASE).brain.provider == "claude"
     assert BrainConfig().model == ""
 
 
@@ -331,7 +331,7 @@ async def test_main_heartbeat_builds_brain_from_config(monkeypatch):
         seen["config"] = brain_config
         raise StopBrain
 
-    cfg = HarveyConfig(**BASE, brain={"provider": "codex", "model": "gpt-5.5"})
+    cfg = ProspectorConfig(**BASE, brain={"provider": "codex", "model": "gpt-5.5"})
     monkeypatch.setattr(main_mod, "load_config", lambda: cfg)
     monkeypatch.setattr(main_mod, "Brain", fake_brain)
     with pytest.raises(StopBrain):
@@ -355,7 +355,7 @@ async def test_existing_usage_rows_become_claude(tmp_path):
             await db.executescript(script)
         await db.execute("PRAGMA user_version = 10")
         await db.execute("INSERT INTO usage_events (id, model, output_tokens) VALUES ('a', 'm', 5)")
-        # Prospector keys usage_log by the LOCAL date (date.today()); SQLite's
+        # Xorora Prospector keys usage_log by the LOCAL date (date.today()); SQLite's
         # date('now') is UTC, which is already tomorrow on a US evening.
         await db.execute("INSERT INTO usage_log (id, date, claude_calls) VALUES ('u', ?, 7)",
                          (date.today().isoformat(),))
@@ -387,7 +387,7 @@ def test_trainer_uses_and_writes_back_the_selection(tmp_path, monkeypatch):
     built = trainer._build_config({"product_name": "W"}, {}, {}, "acme.com")
     assert built["brain"] == {"provider": "codex", "model": "gpt-5.5"}
     # The written config loads back with the same selection.
-    assert HarveyConfig(**built).brain == BrainConfig(provider="codex", model="gpt-5.5")
+    assert ProspectorConfig(**built).brain == BrainConfig(provider="codex", model="gpt-5.5")
 
     explicit = trainer_mod.Trainer(brain_config=BrainConfig())
     assert explicit.brain.provider == "claude"

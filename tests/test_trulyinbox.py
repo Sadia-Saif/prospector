@@ -1,6 +1,6 @@
-"""TrulyInbox: the warmup service Prospector recommends, and reads.
+"""TrulyInbox: the warmup service Xorora Prospector recommends, and reads.
 
-Prospector only reads from TrulyInbox (is the sending mailbox enrolled, is warmup
+Xorora Prospector only reads from TrulyInbox (is the sending mailbox enrolled, is warmup
 on, how much of its warmup mail lands in spam), so `harvey warmup` can say
 whether a mailbox is actually warmed instead of counting days from a date.
 """

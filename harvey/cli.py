@@ -1,4 +1,4 @@
-"""Prospector CLI — simple commands to install, setup, run, and manage Prospector."""
+"""Xorora Prospector CLI — simple commands to install, setup, run, and manage Xorora Prospector."""
 
 import argparse
 import asyncio
@@ -12,10 +12,10 @@ MIN_PYTHON = (3, 11)
 
 
 def _check_python_version():
-    """Refuse to install on a Python that cannot run Prospector.
+    """Refuse to install on a Python that cannot run Xorora Prospector.
 
     `python3 -m venv .venv` on macOS builds the venv from /usr/bin/python3,
-    which is 3.9 — old enough that Prospector's `X | Y` type syntax fails at
+    which is 3.9 — old enough that Xorora Prospector's `X | Y` type syntax fails at
     import. The install itself appears to succeed and the failure surfaces
     later as an unrelated-looking ImportError, so check up front and name the
     fix.
@@ -25,7 +25,7 @@ def _check_python_version():
 
     have = f"{sys.version_info.major}.{sys.version_info.minor}"
     want = f"{MIN_PYTHON[0]}.{MIN_PYTHON[1]}"
-    print(f"\n  Prospector needs Python {want} or newer. This is Python {have}.")
+    print(f"\n  Xorora Prospector needs Python {want} or newer. This is Python {have}.")
     print(f"  ({sys.executable})\n")
     print("  On macOS, `python3` is usually the system 3.9, so a venv built")
     print("  with it is 3.9 too. Build the venv from a newer Python instead:\n")
@@ -39,7 +39,7 @@ def _check_python_version():
 def cmd_install(args):
     """Install all dependencies including Playwright browsers."""
     _check_python_version()
-    print("\n  Installing Prospector dependencies...\n")
+    print("\n  Installing Xorora Prospector dependencies...\n")
 
     # Install Python packages
     print("  [1/2] Installing Python packages...")
@@ -76,7 +76,7 @@ def cmd_install(args):
         print("  ✓ Playwright browsers installed.\n")
 
     _ensure_importable(args._project_root)
-    print("  Prospector is installed. Run 'harvey setup' next.\n")
+    print("  Xorora Prospector is installed. Run 'harvey setup' next.\n")
 
 
 def _ensure_importable(project_root: str):
@@ -126,14 +126,14 @@ def cmd_setup(args):
 
 
 def cmd_run(args):
-    """Start Prospector's heartbeat loop."""
+    """Start Xorora Prospector's heartbeat loop."""
     from harvey.main import main
 
     main()
 
 
 def cmd_train(args):
-    """Train Prospector on a website."""
+    """Train Xorora Prospector on a website."""
     from harvey.trainer import Trainer
 
     url = args.url.strip()
@@ -200,7 +200,7 @@ def cmd_status(args):
         await state.init_db()
         summary = await state.get_state_summary()
 
-        print("\n  Prospector Pipeline Status")
+        print("\n  Xorora Prospector Pipeline Status")
         print("  " + "=" * 40)
         print(f"  Prospects:            {summary['prospects']}")
         print(f"  Ready to write for:   {summary.get('writable_prospects', 0)} "
@@ -447,7 +447,7 @@ def cmd_export(args):
         print(f"\n  Exported {count} prospect(s) to {args.out}  ({scope})")
         if count == 0 and not args.all:
             print("  Tip: no deliverable emails yet? Add a REOON_API_KEY to .env so")
-            print("  Prospector can verify addresses, or use --all for the raw list.\n")
+            print("  Xorora Prospector can verify addresses, or use --all for the raw list.\n")
         else:
             print("  The CSV imports directly into Instantly, Smartlead, or any sequencer.\n")
 
@@ -511,7 +511,7 @@ def cmd_outbox(args):
             print(f"\n  Approved {n} email(s). They'll send on schedule.")
             held = await state.count_held_for_review()
             if held:
-                print(f"  {held} email(s) Prospector held for review were left out: read each one,")
+                print(f"  {held} email(s) Xorora Prospector held for review were left out: read each one,")
                 print("  then approve it with --approve <id>.")
             print()
             return
@@ -706,7 +706,7 @@ def cmd_discover(args):
 
 
 def cmd_signals(args):
-    """Review the signal vocabulary — Prospector proposes, you confirm.
+    """Review the signal vocabulary — Xorora Prospector proposes, you confirm.
 
     Nothing is collected until a signal is confirmed, so a fresh install
     prospects against nothing until someone makes these decisions.
@@ -856,7 +856,7 @@ def cmd_warmup(args):
     print("      it shows Gmail's spam rate and domain reputation once you send volume.")
     print("    - Inbox placement: send one email to a seed test (mail-tester.com is free)")
     print("      and aim for 9/10+. TrulyInbox shows the warmup inbox rate, and with it")
-    print("      connected (harvey trulyinbox connect) Prospector reads it into this report.")
+    print("      connected (harvey trulyinbox connect) Xorora Prospector reads it into this report.")
     print("      Wait for ~95%+ inbox for a week before relying on cold sends.\n")
     if failed or unknown:
         raise SystemExit(1)
@@ -903,7 +903,7 @@ def cmd_trulyinbox(args):
         await state.init_db()
         if args.trulyinbox_action == "other":
             await ti.set_choice(state, "other")
-            print("\n  Noted: you use another warmup service. Prospector won't ask about "
+            print("\n  Noted: you use another warmup service. Xorora Prospector won't ask about "
                   "TrulyInbox again.\n")
             return 0
         if args.trulyinbox_action == "connect":
@@ -933,7 +933,7 @@ def cmd_trulyinbox(args):
             try:
                 _write_env_file(updates)
             except OSError as e:
-                print(f"\n  The key works, but Prospector couldn't save it to .env: {e}\n")
+                print(f"\n  The key works, but Xorora Prospector couldn't save it to .env: {e}\n")
                 return 1
             await ti.set_choice(state, "connected")
             print("\n  Connected. " + d.check_warmup_service(health, warmup).detail + "\n")
@@ -978,7 +978,7 @@ def main():
 
     parser = argparse.ArgumentParser(
         prog="harvey",
-        description="Prospector — Autonomous AI Sales Agent. Always Be Closing.",
+        description="Xorora Prospector — Autonomous AI Sales Agent.",
     )
     subparsers = parser.add_subparsers(dest="command")
 
@@ -991,11 +991,11 @@ def main():
     sub.set_defaults(func=cmd_setup)
 
     # harvey run
-    sub = subparsers.add_parser("run", help="Start Prospector's heartbeat loop")
+    sub = subparsers.add_parser("run", help="Start Xorora Prospector's heartbeat loop")
     sub.set_defaults(func=cmd_run)
 
     # harvey train <url>
-    sub = subparsers.add_parser("train", help="Train Prospector on a website")
+    sub = subparsers.add_parser("train", help="Train Xorora Prospector on a website")
     sub.add_argument("url", help="Website URL to crawl and learn from")
     sub.add_argument(
         "max_pages",
@@ -1113,7 +1113,7 @@ def main():
     sub.set_defaults(func=cmd_profile)
 
     sub = subparsers.add_parser(
-        "signals", help="Review/confirm which signals Prospector prospects against")
+        "signals", help="Review/confirm which signals Xorora Prospector prospects against")
     sub.add_argument("--confirm", metavar="CODES", default="",
                      help="Comma-separated codes to confirm ('all' or 'free' accepted)")
     sub.add_argument("--reject", metavar="CODES", default="",
@@ -1136,7 +1136,7 @@ def main():
     sub.set_defaults(func=cmd_warmup)
 
     sub = subparsers.add_parser(
-        "trulyinbox", help="Warmup service: connect TrulyInbox so Prospector can read the inbox rate")
+        "trulyinbox", help="Warmup service: connect TrulyInbox so Xorora Prospector can read the inbox rate")
     sub.add_argument("trulyinbox_action", nargs="?", default="status",
                      choices=["status", "connect", "other"],
                      help="connect a key, 'other' if you use another warmup service, "
@@ -1155,7 +1155,7 @@ def main():
         parser.print_help()
         print("\n  Quick start:")
         print("    harvey install   — Install dependencies")
-        print("    harvey setup     — Configure Prospector (first time)")
+        print("    harvey setup     — Configure Xorora Prospector (first time)")
         print("    harvey run       — Start closing deals")
         print("    harvey dashboard — Open the web dashboard")
         print()

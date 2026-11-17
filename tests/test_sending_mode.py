@@ -1,7 +1,7 @@
 """Approval or autopilot: which one you're in, what it means, and switching.
 
 Approval (the default): every email waits in the Outbox for you. Autopilot
-(channels.email.require_approval: false): Prospector sends on its own, except
+(channels.email.require_approval: false): Xorora Prospector sends on its own, except
 what gate.autopilot_review holds. The dashboard shows the mode and can
 switch it. Turning autopilot on takes a typed confirmation. Turning it off
 works at once: nothing autopilot approved goes out after that.
@@ -246,7 +246,7 @@ def test_the_outbox_says_which_mode_and_offers_the_way_out():
 
 def test_settings_explains_both_and_asks_for_the_word():
     card = _render("sendingModeCard", MODE)
-    assert "Sending mode: Approval" in card and "<b>Autopilot</b>: Prospector sends on its own" in card
+    assert "Sending mode: Approval" in card and "<b>Autopilot</b>: Xorora Prospector sends on its own" in card
     assert "acme.com, &lt;b&gt;x&lt;/b&gt;" in card and "harvey.local.yaml" in card
     assert "Turn on autopilot…" in card and 'id="autopilot-go"' not in card
     armed = _render("sendingModeCard", MODE, armed=True)

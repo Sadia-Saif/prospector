@@ -293,7 +293,7 @@ def test_cli_status_shows_the_hold(monkeypatch, tmp_path, capsys):
 
 @pytest.mark.asyncio
 async def test_since_restarts_after_a_stale_gap(state):
-    # A hold last seen days ago (Prospector stopped, or the check was off) is
+    # A hold last seen days ago (Xorora Prospector stopped, or the check was off) is
     # over: hitting the same kind again starts a new one, not "since" then.
     old = (datetime.now(timezone.utc) - timedelta(days=3)).replace(microsecond=0).isoformat()
     await state.set_setting(STATUS_KEY, json.dumps({

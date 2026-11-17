@@ -169,7 +169,7 @@ def test_installing_the_missing_executable_changes_the_fingerprint(tmp_path, mon
 
 
 def test_files_saved_in_the_old_windows_code_page_still_load(tmp_path, caplog):
-    # Before this fix, Prospector on Windows saved trained skills as cp1252.
+    # Before this fix, Xorora Prospector on Windows saved trained skills as cp1252.
     from harvey.textio import read_user_text
     old = tmp_path / "product_knowledge.md"
     old.write_bytes("We\u2019re a caf\u00e9 \u2014 fast.".encode("cp1252"))

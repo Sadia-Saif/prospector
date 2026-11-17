@@ -1,4 +1,4 @@
-"""Trainer — give Prospector a URL and it learns everything about the product.
+"""Trainer — give Xorora Prospector a URL and it learns everything about the product.
 
 Uses Cloudflare Browser Rendering /crawl API for deep site crawling.
 Falls back to manual scraping if no Cloudflare credentials are configured.
@@ -399,7 +399,7 @@ def write_trained_config(learned: dict, path: Path) -> dict:
     """Write a trained config to ``path`` without losing the operator's settings.
 
     The base is ``path`` itself when it exists. On a first training it is the
-    harvey.yaml next to it (the template Prospector ships, with the provider and
+    harvey.yaml next to it (the template Xorora Prospector ships, with the provider and
     compliance blocks), never a config found elsewhere on disk. A base that
     has content but can't be read as YAML is backed up before it is
     replaced. The new file is swapped in whole, so a failed write never
@@ -449,7 +449,7 @@ class Trainer:
         output_path: str = "harvey.local.yaml",
         max_pages: int = 100,
     ):
-        """Train Prospector on a product website.
+        """Train Xorora Prospector on a product website.
 
         1. Deep crawl the site (Cloudflare /crawl or fallback)
         2. Analyze all content with the configured brain
@@ -468,9 +468,9 @@ class Trainer:
             return None
         base_url = f"{parsed.scheme}://{domain}"
 
-        logger.info(f"Training Prospector on {base_url}...")
+        logger.info(f"Training Xorora Prospector on {base_url}...")
         print(f"\n{'='*60}")
-        print(f"  Prospector Training Mode")
+        print(f"  Xorora Prospector Training Mode")
         print(f"  Learning from: {base_url}")
         print(f"{'='*60}\n")
 
@@ -492,7 +492,7 @@ class Trainer:
 
         if not self.scraped_pages:
             if getattr(crawler, "blocked", False):
-                print(f"\nERROR: {base_url} points to a local or private address. Prospector only")
+                print(f"\nERROR: {base_url} points to a local or private address. Xorora Prospector only")
                 print("learns from public websites, so it never reaches into your own network.")
                 print("Train on the live public site instead.")
             else:
@@ -643,7 +643,7 @@ resolves to the wrong place on Earth instead of failing loudly.
 "titles" MUST be literal job titles exactly as they'd appear on a business
 card or LinkedIn profile ("Owner", "CEO", "President", "Plant Manager",
 "Practice Manager") — never a customer-segment or persona label ("Business
-Owner Segment", "Decision Maker", "Healthcare Professional"). Prospector matches
+Owner Segment", "Decision Maker", "Healthcare Professional"). Xorora Prospector matches
 a found contact's title against this list by substring, so a descriptive
 label instead of a real title means every real contact silently fails to
 match and gets discarded. If the buyer is an INDIVIDUAL bought into by
@@ -858,7 +858,7 @@ What prospects do instead of buying a solution like ours:
 
         return {
             "persona": {
-                "name": "Prospector",
+                "name": "Xorora Prospector",
                 "company": company,
                 "role": "Business Development",
                 "email": f"harvey@{email_domain}",
@@ -926,7 +926,7 @@ def main():
         print("  CLOUDFLARE_ACCOUNT_ID=your_account_id")
         print("  CLOUDFLARE_API_TOKEN=your_api_token")
         print("")
-        print("Without Cloudflare credentials, Prospector will use basic HTTP")
+        print("Without Cloudflare credentials, Xorora Prospector will use basic HTTP")
         print("scraping (no JavaScript rendering, limited page discovery).")
         sys.exit(1)
 

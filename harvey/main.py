@@ -1,4 +1,4 @@
-"""Prospector's main heartbeat loop. Always Be Closing."""
+"""Xorora Prospector's main heartbeat loop. Always Be Closing."""
 
 import asyncio
 import logging
@@ -11,7 +11,7 @@ import pytz
 from harvey.brain import Brain
 from harvey.sending_mode import sync_sending_mode
 from harvey.config import (
-    ConfigError, load_config, load_env, HarveyConfig, legacy_sending_held, sending_notice,
+    ConfigError, load_config, load_env, ProspectorConfig, legacy_sending_held, sending_notice,
     compliance_notice, send_window_of,
 )
 from harvey.integrations.mail_provider import NATIVE_PROVIDERS
@@ -20,6 +20,7 @@ from harvey.pidfile import (
 )
 from harvey.pipeline import run_profile_stage
 from harvey.state import StateManager
+from harvey import team
 
 logging.basicConfig(
     level=logging.INFO,
@@ -36,13 +37,13 @@ ERROR_BACKOFF_CAP = 900
 # gather() only isolates a task that raises — a task that hangs (a socket or
 # lock that never resolves) blocks gather() forever, taking the whole
 # heartbeat loop down silently with it. This is the only thing standing
-# between one stuck agent and Prospector freezing for hours with no agent
+# between one stuck agent and Xorora Prospector freezing for hours with no agent
 # knowing it's dead — found in production after exactly that happened.
 CYCLE_TIMEOUT_SECONDS = 600
 
 # Cap on a single quiet-hours sleep chunk. See the quiet-hours block in
 # heartbeat() for why this exists — a system sleep/wake cycle during one
-# multi-hour asyncio.wait_for left Prospector silently stalled well past when
+# multi-hour asyncio.wait_for left Xorora Prospector silently stalled well past when
 # quiet hours actually ended.
 QUIET_HOURS_POLL_SECONDS = 300
 
@@ -50,7 +51,7 @@ QUIET_HOURS_POLL_SECONDS = 300
 REPLY_READERS = ("handle_replies", "read_replies")
 
 
-def in_quiet_hours(config: HarveyConfig) -> bool:
+def in_quiet_hours(config: ProspectorConfig) -> bool:
     """Check if we're currently in quiet hours."""
     qh = config.usage.quiet_hours
     tz = pytz.timezone(qh.timezone)
@@ -65,8 +66,8 @@ def in_quiet_hours(config: HarveyConfig) -> bool:
         return now >= start or now <= end
 
 
-def sends_through_quiet_hours(config: HarveyConfig) -> bool:
-    """True when quiet hours pause Prospector's own work but not cold email
+def sends_through_quiet_hours(config: ProspectorConfig) -> bool:
+    """True when quiet hours pause Xorora Prospector's own work but not cold email
     that is due in its recipient's window.
 
     With a send window in each recipient's time zone, the operator's night
@@ -85,7 +86,7 @@ def sends_through_quiet_hours(config: HarveyConfig) -> bool:
                 and email.enabled and email.provider in NATIVE_PROVIDERS)
 
 
-def seconds_until_quiet_hours_end(config: HarveyConfig) -> int:
+def seconds_until_quiet_hours_end(config: ProspectorConfig) -> int:
     """Calculate seconds until quiet hours end."""
     qh = config.usage.quiet_hours
     tz = pytz.timezone(qh.timezone)
@@ -105,7 +106,7 @@ def seconds_until_quiet_hours_end(config: HarveyConfig) -> int:
 # this many unusable prospects (a guessed, invalid or missing email) were
 # found in the last 24 hours. Without a working verifier every address is a
 # guess, and prospecting every cycle would spend search and verifier credits
-# on people Prospector can never email. Nothing re-checks a guess, so the window
+# on people Xorora Prospector can never email. Nothing re-checks a guess, so the window
 # is a day, never all time: an all-time count would stop Scout for good.
 PROSPECT_BACKLOG = 20
 
@@ -120,13 +121,13 @@ def _new_counts(summary: dict) -> tuple[int, int]:
 
 
 def unusable_backlog_notice(summary: dict) -> str:
-    """Why Prospector paused prospecting for the day, or ""."""
+    """Why Xorora Prospector paused prospecting for the day, or ""."""
     _, writable = _new_counts(summary)
     recent = summary.get("recent_unusable_prospects", 0) or 0
     if writable or recent < PROSPECT_BACKLOG:
         return ""
     return (
-        f"Prospector found {recent} prospects in the last day, but none has a verified "
+        f"Xorora Prospector found {recent} prospects in the last day, but none has a verified "
         "or catch-all email, so it paused prospecting for about a day to save search "
         "and verifier credits. Add an email verifier key (REOON_API_KEY, "
         "ZEROBOUNCE_API_KEY or HUNTER_API_KEY in .env) or check it still has credits. "
@@ -137,10 +138,10 @@ def unusable_backlog_notice(summary: dict) -> str:
 async def decide_next_action(
     brain: Brain,
     state: StateManager,
-    config: HarveyConfig,
+    config: ProspectorConfig,
     summary: dict | None = None,
 ) -> str:
-    """Decide what Prospector should do next based on current state.
+    """Decide what Xorora Prospector should do next based on current state.
 
     Uses deterministic priority rules (send_campaign > write_campaign >
     prospect > idle) instead of burning a Claude call on a decision that is
@@ -158,6 +159,11 @@ async def decide_next_action(
     # Only prospects the Writer can draft for trigger writing: one with a
     # guessed email stays 'new' for good, and counting it starved Scout.
     new_prospects, writable = _new_counts(summary)
+    # Team mode: only campaigns someone started get written, so only their
+    # prospects count — otherwise unclaimed new prospects would choose
+    # write_campaign every cycle with nothing to write, starving the Scout.
+    if state is not None and await team.team_mode(state):
+        writable = await team.pending_writable(state)
     draft_campaigns = summary.get("draft_campaigns", 0) or 0
 
     # Drafts that can't deploy must not win the cycle: choosing send_campaign
@@ -256,12 +262,12 @@ async def record_send_phase(state, held_reason: str):
 
 
 async def heartbeat(stop_event: asyncio.Event | None = None):
-    """Prospector's main loop. Wakes up, decides, acts, sleeps. Repeat."""
+    """Xorora Prospector's main loop. Wakes up, decides, acts, sleeps. Repeat."""
     if stop_event is None:
         stop_event = asyncio.Event()
 
     logger.info("=" * 60)
-    logger.info("Prospector is online. Always Be Closing.")
+    logger.info("Xorora Prospector is online.")
     logger.info("=" * 60)
 
     try:
@@ -308,7 +314,7 @@ async def heartbeat(stop_event: asyncio.Event | None = None):
     while not stop_event.is_set():
         try:
             # 0. Approval or autopilot, as the config file says now: the
-            # dashboard can switch it while Prospector runs.
+            # dashboard can switch it while Xorora Prospector runs.
             await sync_sending_mode(config, state)
 
             # 1. Check quiet hours. With send windows in recipients' own time
@@ -355,7 +361,7 @@ async def heartbeat(stop_event: asyncio.Event | None = None):
             problem = await brain.preflight()
             if problem:
                 logger.error(
-                    f"Prospector is paused: {problem} Nothing was sent or changed. "
+                    f"Xorora Prospector is paused: {problem} Nothing was sent or changed. "
                     f"Re-checking in {config.usage.heartbeat_interval_minutes} minutes."
                 )
                 if await _interruptible_sleep(interval, stop_event):
@@ -363,7 +369,7 @@ async def heartbeat(stop_event: asyncio.Event | None = None):
                 continue
 
             # 3. Check usage budget (real subscription quota when readable,
-            # else Prospector's own call counter)
+            # else Xorora Prospector's own call counter)
             if not await brain.is_within_budget(
                 max_calls, max_percent=config.usage.max_daily_claude_percent
             ):
@@ -479,11 +485,11 @@ async def heartbeat(stop_event: asyncio.Event | None = None):
             if await _interruptible_sleep(backoff, stop_event):
                 break
 
-    logger.info("Prospector shutting down. Deals don't close themselves, but I need a break.")
+    logger.info("Xorora Prospector shutting down. Deals don't close themselves, but I need a break.")
 
 
 def _needs_setup() -> bool:
-    """Check if Prospector needs first-time setup."""
+    """Check if Xorora Prospector needs first-time setup."""
     from harvey.paths import PROJECT_ROOT
     from harvey.config import _find_config_file, ConfigFileNotFoundError
 
@@ -543,9 +549,9 @@ def main():
     if _needs_setup():
         if not sys.stdin.isatty():
             # Started by the dashboard or a service: nobody can answer the wizard.
-            print("Prospector isn't set up yet. Run `harvey setup` in a terminal first.")
+            print("Xorora Prospector isn't set up yet. Run `harvey setup` in a terminal first.")
             sys.exit(1)
-        print("\n  First time running Prospector? Let's get you set up.\n")
+        print("\n  First time running Xorora Prospector? Let's get you set up.\n")
         from harvey.setup import run_setup
         asyncio.run(run_setup())
         return
@@ -555,7 +561,7 @@ def main():
     lock = hold_loop_lock(LOCK_FILE)
     if lock is None:
         running = read_pid()
-        print(f"Prospector is already running{f' (pid {running})' if running else ''}. "
+        print(f"Xorora Prospector is already running{f' (pid {running})' if running else ''}. "
               "Stop it first, from the dashboard or with Ctrl+C in its terminal.")
         sys.exit(1)
     write_pid_file()

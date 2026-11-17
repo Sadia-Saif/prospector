@@ -148,12 +148,12 @@ def test_the_notice_asks_for_an_address_only_when_email_is_on():
 
 GMAIL_QUOTE = (
     "Sounds interesting, send me pricing.\n\n"
-    "On Tue, Oct 14, 2026 at 3:02 PM Prospector <harvey@x.co> wrote:\n"
+    "On Tue, Oct 14, 2026 at 3:02 PM Xorora Prospector <harvey@x.co> wrote:\n"
     "> A short, plain note. Question?\n>\n> " + ADDRESS + "\n> " + LINE
 )
 OUTLOOK_QUOTE = (
     "Sounds interesting, send me pricing.\n\n"
-    "From: Prospector <harvey@x.co>\nSent: Tuesday, October 14, 2026 3:02 PM\n"
+    "From: Xorora Prospector <harvey@x.co>\nSent: Tuesday, October 14, 2026 3:02 PM\n"
     "To: Jane\nSubject: hello there\n\n"
     "A short, plain note. Question?\n\n" + ADDRESS + "\n"
     # Outlook re-wraps lines and uses curly quotes.
@@ -168,11 +168,11 @@ def test_strip_keeps_only_what_they_wrote():
         "Thanks.\n\n-----Original Message-----\nFrom: x") == "Thanks."
     # Answers written between quoted lines are theirs too.
     assert strip_quoted_reply(
-        "Hi Prospector,\n\n> Would you be open to a call?\n\nNo. Remove me please."
-    ) == "Hi Prospector,\n\nNo. Remove me please."
+        "Hi Xorora Prospector,\n\n> Would you be open to a call?\n\nNo. Remove me please."
+    ) == "Hi Xorora Prospector,\n\nNo. Remove me please."
     # Everything under a quote header: keep their lines, never return nothing.
     assert "Remove me" in strip_quoted_reply(
-        "On Tue Prospector wrote:\n> Open to a call?\nRemove me")
+        "On Tue Xorora Prospector wrote:\n> Open to a call?\nRemove me")
     assert strip_quoted_reply("") == ""
 
 
@@ -202,10 +202,10 @@ async def _reply(state, body, intent="interested"):
 @pytest.mark.parametrize("body", [
     GMAIL_QUOTE, OUTLOOK_QUOTE,
     # An HTML-only reply converted to text keeps its entities.
-    "Sounds interesting.\n\nOn Tue Prospector wrote:\nNot interested? Reply &quot;no thanks&quot; "
+    "Sounds interesting.\n\nOn Tue Xorora Prospector wrote:\nNot interested? Reply &quot;no thanks&quot; "
     "and I won&#39;t email again.",
     # Gmail re-wraps long quoted lines.
-    "Sounds interesting.\n\nOn Tue Prospector wrote:\n> Not interested? Reply \"no\n> thanks\" "
+    "Sounds interesting.\n\nOn Tue Xorora Prospector wrote:\n> Not interested? Reply \"no\n> thanks\" "
     "and I won't email again.",
 ], ids=["gmail", "outlook", "html-entities", "gmail-wrapped"])
 async def test_our_own_quoted_footer_never_reads_as_an_opt_out(state, body):
@@ -218,11 +218,11 @@ async def test_our_own_quoted_footer_never_reads_as_an_opt_out(state, body):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("body", [
     "No thanks.",
-    "no thank you\n\nOn Tue Prospector wrote:\n> A short, plain note.",
+    "no thank you\n\nOn Tue Xorora Prospector wrote:\n> A short, plain note.",
     # Answered inline, below and between our quoted lines.
     "> Would you be open to a quick call?\nNo. Please remove me from your list.",
-    "Hi Prospector,\n\n> Would you be open to a quick call?\n\nNo. Remove me from your list.",
-    "On Tue Prospector wrote:\n> Open to a call?\nunsubscribe",
+    "Hi Xorora Prospector,\n\n> Would you be open to a quick call?\n\nNo. Remove me from your list.",
+    "On Tue Xorora Prospector wrote:\n> Open to a call?\nunsubscribe",
 ], ids=["no-thanks", "above-quote", "below-quote", "between-quotes", "under-header"])
 async def test_an_opt_out_is_honoured_wherever_they_wrote_it(state, body):
     status, _ = await _reply(state, body)
@@ -275,7 +275,7 @@ def test_an_unreadable_config_still_shows_the_outbox(client, monkeypatch):
 
 async def _reply_after_sending(state, body, sent_bodies=(), intent="interested",
                                line=LINE):
-    """A reply from someone Prospector already emailed `sent_bodies`."""
+    """A reply from someone Xorora Prospector already emailed `sent_bodies`."""
     pid = await seed_prospect(state, status="contacted")
     for n, sent in enumerate(sent_bodies, start=1):
         oid = await state.add_outbox_item(
@@ -317,7 +317,7 @@ async def test_quoting_an_old_opt_out_line_is_not_an_opt_out(state):
     old = 'Reply "unsubscribe" to stop hearing from me.'
     sent = "A short, plain note. Question?\n\n" + ADDRESS + "\n" + old
     status, _ = await _reply_after_sending(
-        state, "Yes, let's talk Tuesday.\n\nOn Tue Prospector wrote:\n> " + sent.replace("\n", "\n> "),
+        state, "Yes, let's talk Tuesday.\n\nOn Tue Xorora Prospector wrote:\n> " + sent.replace("\n", "\n> "),
         sent_bodies=[sent], line="Not for you? Reply no thanks.")
     assert status != "opted_out"
 
@@ -325,7 +325,7 @@ async def test_quoting_an_old_opt_out_line_is_not_an_opt_out(state):
 # Dutch Outlook: a header strip_quoted_reply doesn't know.
 DUTCH_OUTLOOK = (
     "Klinkt goed, stuur me de prijzen.\n\n"
-    "Van: Prospector <harvey@x.co>\nVerzonden: dinsdag 14 oktober 2026 15:02\n\n"
+    "Van: Xorora Prospector <harvey@x.co>\nVerzonden: dinsdag 14 oktober 2026 15:02\n\n"
     "A short, plain note. Question?\n\n" + ADDRESS + "\n" + LINE
 )
 
@@ -342,7 +342,7 @@ async def test_our_quoted_email_never_reaches_the_model_even_unrecognised(state)
 @pytest.mark.asyncio
 async def test_a_footer_cut_off_by_the_length_limit_is_not_an_opt_out(state):
     sent = "A short, plain note. Question?\n\n" + ADDRESS + "\n" + LINE
-    body = ("Interested, tell me more.\n\nOn Tue Prospector wrote:\n> A short, plain note. Question?\n> "
+    body = ("Interested, tell me more.\n\nOn Tue Xorora Prospector wrote:\n> A short, plain note. Question?\n> "
             + ADDRESS + '\n> Not interested? Reply "no thanks"')  # truncated here
     status, _ = await _reply_after_sending(state, body, sent_bodies=[sent])
     assert status != "opted_out"
@@ -352,13 +352,13 @@ async def test_a_footer_cut_off_by_the_length_limit_is_not_an_opt_out(state):
 async def test_escalation_words_in_our_own_quoted_email_dont_escalate(state):
     sent = "We help attorney offices fill their calendar. Worth a chat?"
     status, prompts = await _reply_after_sending(
-        state, "Yes please.\n\nOn Tue Prospector wrote:\n> " + sent, sent_bodies=[sent])
+        state, "Yes please.\n\nOn Tue Xorora Prospector wrote:\n> " + sent, sent_bodies=[sent])
     assert prompts  # classified by the model, not escalated by keyword
 
 
 def test_inline_answers_under_a_quote_header_are_kept():
     text = strip_quoted_reply(
-        "Answers inline below.\n\nOn Tue, Oct 14 Prospector wrote:\n"
+        "Answers inline below.\n\nOn Tue, Oct 14 Xorora Prospector wrote:\n"
         "> Would a call work?\nYes, Thursday 2pm.\n> CRM?\nHubSpot.")
     assert "Thursday 2pm" in text and "HubSpot" in text and "Would a call" not in text
 
@@ -429,7 +429,7 @@ SENT = "A short, plain note. Question?\n\n" + ADDRESS + "\n" + LINE
 @pytest.mark.asyncio
 async def test_an_html_only_reply_quoting_our_footer_is_not_an_opt_out(state):
     # Tags become spaces: their words and our quote end up on one line.
-    body = ("Yes, interested. Tuesday works.   On Tue, Oct 14, 2026 Prospector wrote:   "
+    body = ("Yes, interested. Tuesday works.   On Tue, Oct 14, 2026 Xorora Prospector wrote:   "
             "A short, plain note. Question?   " + ADDRESS + "   "
             "Not interested? Reply &quot;no thanks&quot; and I won&#39;t email again.")
     status, prompts = await _reply_after_sending(state, body, sent_bodies=[SENT])
@@ -439,7 +439,7 @@ async def test_an_html_only_reply_quoting_our_footer_is_not_an_opt_out(state):
 
 @pytest.mark.asyncio
 async def test_short_wrapped_fragments_of_our_quote_are_ours(state):
-    body = ("Sure, call me.\n\nOn Tue Prospector wrote:\n> A short, plain note. Question?\n"
+    body = ("Sure, call me.\n\nOn Tue Xorora Prospector wrote:\n> A short, plain note. Question?\n"
             "> Not interested? Reply\n> \"no thanks\"\n> and I won't email again.")
     status, _ = await _reply_after_sending(state, body, sent_bodies=[SENT])
     assert status != "opted_out"
@@ -449,7 +449,7 @@ async def test_short_wrapped_fragments_of_our_quote_are_ours(state):
 async def test_outlook_mailto_annotations_dont_hide_our_line(state):
     line = "To opt out, reply STOP to this email."
     sent = "A short, plain note. Question?\n\n" + ADDRESS + "\n" + line
-    body = ("Yes please, send pricing.\n\nFrom: Prospector <harvey@x.co<mailto:harvey@x.co>>\n"
+    body = ("Yes please, send pricing.\n\nFrom: Xorora Prospector <harvey@x.co<mailto:harvey@x.co>>\n"
             "Sent: Tuesday\n\nA short, plain note. Question?\n" + ADDRESS + "\n"
             "To opt out, reply STOP to this email<https://x.co/a>.")
     status, _ = await _reply_after_sending(state, body, sent_bodies=[sent], line=line)
@@ -473,7 +473,7 @@ async def test_campaign_text_counts_as_ours_without_an_outbox_row(state):
     provider = FakeProvider()
     provider.inbound = [InboundMessage(
         provider_id="in1", from_email="jane@acme.com", subject="Re: hi",
-        body="Yes let's talk.\n\nOn Tue Prospector wrote:\n> Hi Jane, we help attorney offices grow.\n> " + old)]
+        body="Yes let's talk.\n\nOn Tue Xorora Prospector wrote:\n> Hi Jane, we help attorney offices grow.\n> " + old)]
     handler = make_handler(state, provider, intent="interested")
     handler.config.compliance = ComplianceConfig(opt_out_line="Reply no thanks to stop.")
     handler.brain = RecordingBrain("interested")
@@ -521,7 +521,7 @@ def test_opt_out_line_must_ask_for_a_reply_harvey_catches():
 
 @pytest.mark.asyncio
 async def test_every_footer_harvey_used_stays_ours_after_the_line_changes(state):
-    # Instantly keeps the footer in its own copy; Prospector remembers what it used.
+    # Instantly keeps the footer in its own copy; Xorora Prospector remembers what it used.
     old = 'Reply "unsubscribe" to stop hearing from me.'
     config = SimpleNamespace(
         channels=SimpleNamespace(email=SimpleNamespace(
@@ -535,7 +535,7 @@ async def test_every_footer_harvey_used_stays_ours_after_the_line_changes(state)
         id="c", name="Draft", instantly_campaign_id="existing",
         sequence=[EmailStep(step=1, subject="a note", body="Would this help?")]))
     # The line is changed afterwards; a reply quotes the old one.
-    status, _ = await _reply(state, "Yes let's talk.\n\nOn Tue Prospector wrote:\n> Would this help?\n> " + old)
+    status, _ = await _reply(state, "Yes let's talk.\n\nOn Tue Xorora Prospector wrote:\n> Would this help?\n> " + old)
     assert status != "opted_out"
 
 
@@ -554,7 +554,7 @@ async def test_template_lines_with_merge_tags_are_recognised_when_quoted(state):
     provider = FakeProvider()
     provider.inbound = [InboundMessage(
         provider_id="in1", from_email="jane@acme.com", subject="Re: hi",
-        body="Yes please.\n\nOn Tue Prospector wrote:\n> We help Acme attorney offices grow.")]
+        body="Yes please.\n\nOn Tue Xorora Prospector wrote:\n> We help Acme attorney offices grow.")]
     handler = make_handler(state, provider, intent="interested")
     handler.brain = RecordingBrain("interested")
     await handler._run_native()
@@ -626,7 +626,7 @@ async def test_ordinary_hebrew_is_not_an_opt_out(state, body):
 async def test_quoting_our_hebrew_footer_is_not_an_opt_out(state):
     sent = "הודעה קצרה ופשוטה. שאלה?\n\n" + ADDRESS + "\n" + HEBREW_LINE
     status, prompts = await _reply_after_sending(
-        state, "כן, בואו נדבר ביום שלישי.\n\nב-יום ג׳ Prospector כתב:\n> " + sent.replace("\n", "\n> "),
+        state, "כן, בואו נדבר ביום שלישי.\n\nב-יום ג׳ Xorora Prospector כתב:\n> " + sent.replace("\n", "\n> "),
         sent_bodies=[sent], line=HEBREW_LINE)
     assert status != "opted_out" and prompts
 
@@ -646,7 +646,7 @@ def test_opt_out_line_can_ask_in_hebrew():
                  'בלי לחץ: השיבו "הסר" ולא אפנה שוב.'):
         assert ComplianceConfig(opt_out_line=good).opt_out_line == good
     for bad in (
-        "ואם זה לא בשבילכם, תגידו לי ולא אכתוב שוב.",   # names no reply Prospector catches
+        "ואם זה לא בשבילכם, תגידו לי ולא אכתוב שוב.",   # names no reply Xorora Prospector catches
         'השיבו "הסרתי"',
         "תודה שקראתם!",
         "להסרה לחצו כאן",
@@ -855,7 +855,7 @@ async def test_ordinary_hebrew_does_not_escalate(state, body):
 async def test_a_hebrew_pitch_mentioning_lawyers_doesnt_escalate_when_quoted(state):
     sent = "אנחנו עוזרים למשרדי עורכי דין למלא את היומן. נדבר?"
     status, prompts = await _reply_after_sending(
-        state, "כן, בואו נדבר.\n\nב-יום ג׳ Prospector כתב:\n> " + sent, sent_bodies=[sent])
+        state, "כן, בואו נדבר.\n\nב-יום ג׳ Xorora Prospector כתב:\n> " + sent, sent_bodies=[sent])
     assert status != "opted_out" and prompts  # not escalated over our own "עורכי דין"
 
 

@@ -1,7 +1,7 @@
 """Open roles from the public job-board feeds a company's ATS publishes.
 
 Greenhouse, Lever, Ashby and Workable each publish a company's open roles as
-an unauthenticated JSON feed. Prospector finds which one a company uses from the
+an unauthenticated JSON feed. Xorora Prospector finds which one a company uses from the
 links on its OWN site (never by guessing tokens), reads that one feed, and
 records the roles that match ``icp.hiring_signals`` (or ``icp.titles``).
 """

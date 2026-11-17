@@ -262,7 +262,7 @@ def test_saving_the_key_keeps_other_env_lines_and_stays_private(files, monkeypat
     assert FAKE_KEY not in caplog.text
 
 
-# ── setup saves to the file Prospector reads, and says when it couldn't ──
+# ── setup saves to the file Xorora Prospector reads, and says when it couldn't ──
 
 @pytest.fixture
 def trained(files):

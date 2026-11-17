@@ -1,4 +1,4 @@
-"""Prospector's built-in skill for YC startups: find them, tag them, write to them.
+"""Xorora Prospector's built-in skill for YC startups: find them, tag them, write to them.
 
 Without touching ycombinator.com, whose terms forbid scraping and
 harvesting contact details. A company says it's YC-backed on its own site

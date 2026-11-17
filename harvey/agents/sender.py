@@ -19,7 +19,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from harvey.brain import Brain
 from harvey.config import (
-    HarveyConfig, EnvConfig, cold_daily_cap, compliance_footer_lines, compliance_notice,
+    ProspectorConfig, EnvConfig, cold_daily_cap, compliance_footer_lines, compliance_notice,
     compliance_of, live_do_not_contact, operator_timezone, send_window_of,
 )
 from harvey.gate import autopilot_review, do_not_contact_match, pre_send_check
@@ -85,7 +85,7 @@ class Sender:
         self,
         brain: Brain,
         state: StateManager,
-        config: HarveyConfig,
+        config: ProspectorConfig,
         env: EnvConfig,
     ):
         self.brain = brain
@@ -120,7 +120,7 @@ class Sender:
         """The time zone this recipient's send window is in: their own when
         it can be told (with recipient_timezone on), otherwise the zone in
         usage.quiet_hours, as before. ``country`` is the recipient's country
-        from Precleared, ``given`` the one Prospector gave the check (see
+        from Precleared, ``given`` the one Xorora Prospector gave the check (see
         _recipient_country) and ``names`` the company and person names it
         gave (see _recipient_names), which a cached verdict is keyed on."""
         window = send_window_of(self.config)
@@ -150,7 +150,7 @@ class Sender:
             return operator_timezone(self.config)
 
     async def _recipient_country(self, prospect) -> str:
-        """The recipient's country when Prospector is sure of it, for the
+        """The recipient's country when Xorora Prospector is sure of it, for the
         compliance check (see send_window.recipient_country). A failure to
         work it out means none for this one email, which Precleared then
         works out itself, instead of stopping the drain."""
@@ -366,7 +366,12 @@ class Sender:
                 f"{campaign_id}. Resuming deploy instead of recreating."
             )
         else:
-            instantly_campaign = await self.instantly.create_campaign(campaign.name)
+            if campaign.sending_accounts:
+                # A team campaign sends only from its owner's own mailbox(es).
+                instantly_campaign = await self.instantly.create_campaign(
+                    campaign.name, email_list=campaign.sending_accounts)
+            else:
+                instantly_campaign = await self.instantly.create_campaign(campaign.name)
             if not instantly_campaign or not isinstance(instantly_campaign, dict):
                 logger.error(f"Sender: Failed to create Instantly campaign: {campaign.name}")
                 return
@@ -763,7 +768,7 @@ class Sender:
             # Stop-on-reply / opt-out: never continue a sequence after contact.
             if prospect.status in STOP_STATUSES:
                 return "cancelled", f"prospect status '{prospect.status}'"
-            # The user already emailed them by hand: whatever Prospector staged
+            # The user already emailed them by hand: whatever Xorora Prospector staged
             # (before, during or after that) would be a second email.
             if await self.state.get_setting(MANUAL_SEND_KEY + prospect.id):
                 return "cancelled", HAND_SENT_REASON
@@ -913,7 +918,7 @@ class Sender:
             if order:
                 await self.state.update_outbox_item(item["id"], status=order[0], error=order[1])
                 continue
-            # The recipient's country when Prospector is sure of it, and the
+            # The recipient's country when Xorora Prospector is sure of it, and the
             # company's and person's names: they go with the compliance
             # check, and a cached verdict is keyed on them.
             country = await self._recipient_country(prospect) if needs_check else ""

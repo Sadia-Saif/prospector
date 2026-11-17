@@ -1,4 +1,4 @@
-"""Allow running Prospector with `python -m harvey`."""
+"""Allow running Xorora Prospector with `python -m harvey`."""
 
 from harvey.cli import main
 

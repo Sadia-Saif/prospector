@@ -1,4 +1,4 @@
-"""writer.email_rules: the operator's own shape for the emails Prospector drafts.
+"""writer.email_rules: the operator's own shape for the emails Xorora Prospector drafts.
 
 The Writer's prompts end with a built-in shape (email 1 under 75 words, an
 observation and a question, no pitch). An operator whose first email has to
@@ -188,7 +188,7 @@ async def test_with_an_opt_out_line_set_the_draft_gets_no_second_one(state):
     compliance = ComplianceConfig(opt_out_line='Reply "no thanks" and I won\'t write again.')
     for prompt in (await personal_prompt(state, RULES, compliance=compliance),
                    await sequence_prompt(state, RULES, compliance=compliance)):
-        assert 'Prospector adds this opt-out line under the email when it sends: "Reply "no thanks"' in prompt
+        assert 'Xorora Prospector adds this opt-out line under the email when it sends: "Reply "no thanks"' in prompt
         assert "Don't write another way to opt out, even if the operator's rules give one." in prompt
         assert BUILT_IN_FOOTER not in prompt
 
@@ -197,7 +197,7 @@ async def test_with_an_opt_out_line_set_the_draft_gets_no_second_one(state):
 async def test_with_no_opt_out_line_the_operators_own_sentence_is_written(state):
     compliance = ComplianceConfig(opt_out_line="")
     prompt = await personal_prompt(state, RULES, compliance=compliance)
-    assert "Prospector adds no opt-out line." in prompt
+    assert "Xorora Prospector adds no opt-out line." in prompt
     assert "write it into the body as they say" in prompt
     assert "opt-out line under the email" not in prompt
 
@@ -208,7 +208,7 @@ async def test_the_postal_address_is_only_mentioned_when_harvey_adds_one(state):
     with_address = await personal_prompt(
         state, RULES, compliance=ComplianceConfig(postal_address="1 Example St, Springfield"))
     assert "postal address" not in without.lower()
-    assert "No postal address: Prospector adds it under the email when it sends." in with_address
+    assert "No postal address: Xorora Prospector adds it under the email when it sends." in with_address
 
 
 # ── A run ──

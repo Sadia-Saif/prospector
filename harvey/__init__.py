@@ -1,4 +1,4 @@
-"""Prospector — an autonomous sales agent that runs on your Claude subscription."""
+"""Xorora Prospector — an autonomous sales agent that runs on your Claude subscription."""
 
 import sys
 
@@ -7,7 +7,7 @@ import sys
 # the single most likely first-run problem.
 if sys.version_info < (3, 11):  # pragma: no cover - version guard
     raise RuntimeError(
-        f"Prospector needs Python 3.11+, but this is "
+        f"Xorora Prospector needs Python 3.11+, but this is "
         f"{sys.version_info.major}.{sys.version_info.minor} "
         f"({sys.executable}). On macOS `python3` is the system 3.9 — rebuild "
         f"the venv from a newer Python:\n"
@@ -16,4 +16,4 @@ if sys.version_info < (3, 11):  # pragma: no cover - version guard
         f"    source .venv/bin/activate && pip install -e ."
     )
 
-"""Prospector — Autonomous Sales Agent. Always Be Closing."""
+"""Xorora Prospector — Autonomous Sales Agent."""

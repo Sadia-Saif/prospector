@@ -27,7 +27,7 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setattr(dash, "PID_FILE", tmp_path / "data" / "harvey.pid")
     monkeypatch.setattr(dash, "LOG_FILE", tmp_path / "data" / "harvey.log")
     dash.token_store.configure(tmp_path / "data" / "dashboard-token")
-    # No mailbox connected: the user sends by hand. Tests that need Prospector
+    # No mailbox connected: the user sends by hand. Tests that need Xorora Prospector
     # to be able to send set this back.
     monkeypatch.setattr(dash, "_harvey_can_send", lambda: False)
     asyncio.run(StateManager(db_path=str(db)).init_db())
@@ -167,7 +167,7 @@ def test_unticking_someone_sent_through_instantly_is_refused(client, env):
 
 def test_recipients_say_who_can_be_sent_by_hand(client, env):
     _prospect(env, "p1", "a@acme.test", status="queued")
-    _prospect(env, "p2", "b@acme.test", status="queued")              # Prospector approved mail
+    _prospect(env, "p2", "b@acme.test", status="queued")              # Xorora Prospector approved mail
     _prospect(env, "p3", "c@acme.test", status="opted_out")           # asked to be removed
     _prospect(env, "p4", "d@acme.test", email_status="guess")         # undeliverable
     _prospect(env, "p5", "e@acme.test", email_status="invalid")
@@ -180,7 +180,7 @@ def test_recipients_say_who_can_be_sent_by_hand(client, env):
 
 def test_no_gmail_button_while_harvey_can_send_but_a_hand_send_can_still_be_recorded(
         client, env, monkeypatch):
-    # Recording "I already emailed them" can only stop Prospector sending, so it
+    # Recording "I already emailed them" can only stop Xorora Prospector sending, so it
     # is never refused just because a mailbox is connected now.
     monkeypatch.setattr(dash, "_harvey_can_send", lambda: True)
     _prospect(env, "p1", "a@acme.test", status="queued")
@@ -277,7 +277,7 @@ def test_a_hand_sent_prospect_is_marked_for_the_sender(client, env):
 def test_ticking_someone_harvey_emailed_changes_nothing(client, env):
     _prospect(env, "p1", "a@acme.test", status="contacted")
     _outbox(env, "o1", "p1", "sent", step=1)
-    _outbox(env, "o2", "p1", "approved", step=2)   # Prospector's follow-up
+    _outbox(env, "o2", "p1", "approved", step=2)   # Xorora Prospector's follow-up
     client.post("/api/prospects/p1/sent", json={"sent": True})
     assert _status(env, "outbox", "o2") == "approved"
 
@@ -326,7 +326,7 @@ class _Provider:
 @pytest.mark.parametrize("cfg, env, provider_ok, expected", [
     (_Cfg(enabled=False), _Env(), True, False),                 # email off: hand sends only
     (_Cfg(provider="smtp"), _Env(), False, False),              # mailbox not connected
-    (_Cfg(provider="gmail"), _Env(), True, True),               # connected: Prospector sends
+    (_Cfg(provider="gmail"), _Env(), True, True),               # connected: Xorora Prospector sends
     (_Cfg(provider="instantly"), _Env(instantly="k"), True, True),
     (_Cfg(provider="instantly"), _Env(), True, False),
     (_Cfg(provider="instantly", approval=True), _Env(instantly="k"), True, False),  # held

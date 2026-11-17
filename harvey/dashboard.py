@@ -1,4 +1,4 @@
-"""Prospector Dashboard — local web UI to set up, control, and monitor Prospector."""
+"""Xorora Prospector Dashboard — local web UI to set up, control, and monitor Xorora Prospector."""
 
 import asyncio
 import ipaddress
@@ -50,11 +50,11 @@ def _resolve_config_file() -> Path:
 
 # No /docs, /redoc or /openapi.json: the API is for this UI only, and every
 # route except the static shell needs the token (see dashboard_auth).
-app = FastAPI(title="Prospector Dashboard", docs_url=None, redoc_url=None, openapi_url=None)
+app = FastAPI(title="Xorora Prospector Dashboard", docs_url=None, redoc_url=None, openapi_url=None)
 token_store = auth.TokenStore(TOKEN_FILE)
 app.add_middleware(auth.DashboardGuard, store=token_store)
 
-# Prospector process tracking
+# Xorora Prospector process tracking
 _harvey_process: subprocess.Popen | None = None
 _harvey_started_at: datetime | None = None
 _env_lock = asyncio.Lock()
@@ -159,7 +159,7 @@ def _write_env_file(updates: dict[str, str]):
 
 
 def _check_harvey_pid() -> int | None:
-    """Check if there's a running Prospector process from a PID file."""
+    """Check if there's a running Xorora Prospector process from a PID file."""
     global _harvey_process, _harvey_started_at
     if _harvey_process and _harvey_process.poll() is None:
         return _harvey_process.pid
@@ -258,10 +258,10 @@ async def get_setup_status():
         except Exception:
             pass
     checks.append({
-        "id": "config", "label": f"Prospector configured ({config_path.name})",
+        "id": "config", "label": f"Xorora Prospector configured ({config_path.name})",
         "done": config_valid,
         "required": True,
-        "help": "Train Prospector on your product. Use the trainer or set up manually through Claude.",
+        "help": "Train Xorora Prospector on your product. Use the trainer or set up manually through Claude.",
     })
 
     # 6. Product trained
@@ -312,7 +312,7 @@ async def get_setup_status():
         "required": provider != "instantly",
         "help": ("A new mailbox needs 2-4 weeks of warmup before cold email, and warmup "
                  "keeps it out of spam after that. We recommend TrulyInbox: connect it and "
-                 "Prospector shows whether your mailbox is warmed."),
+                 "Xorora Prospector shows whether your mailbox is warmed."),
         "link": ti.AFFILIATE_URL,
     })
 
@@ -382,7 +382,7 @@ async def get_settings():
         "imap_port": env_vars.get("IMAP_PORT", ""),
         "imap_username": env_vars.get("IMAP_USERNAME", ""),
         "imap_password_set": is_set("IMAP_PASSWORD"),
-        # Microsoft 365: ids aren't secret (no client secret: Prospector signs
+        # Microsoft 365: ids aren't secret (no client secret: Xorora Prospector signs
         # in as a public client with PKCE); the token file means signed in.
         "m365_client_id": env_vars.get("M365_CLIENT_ID", ""),
         "m365_tenant_id": env_vars.get("M365_TENANT_ID", ""),
@@ -417,7 +417,7 @@ async def save_env_settings(request: Request):
                     return JSONResponse({"success": False, "message": f"{key} must be text."},
                                         status_code=400)
                 value = str(value)
-                # A port Prospector can't parse would stop it starting at all.
+                # A port Xorora Prospector can't parse would stop it starting at all.
                 if key.endswith("_PORT") and value.strip() and not value.strip().isdigit():
                     return JSONResponse({"success": False, "message": f"{key} must be a number."},
                                         status_code=400)
@@ -566,7 +566,7 @@ async def export_companies():
 @app.get("/api/companies/{company_id}/profile")
 async def get_company_profile(company_id: str):
     """One company's facts for its detail card: the register row plus what
-    Prospector observed on its site (latest value per signal, with the page)."""
+    Xorora Prospector observed on its site (latest value per signal, with the page)."""
     rows = await query_db("SELECT * FROM companies WHERE id = ?", (company_id,))
     if not rows:
         return JSONResponse({"error": "not found"}, status_code=404)
@@ -649,12 +649,12 @@ async def get_feedback(entity_type: str, entity_id: str):
     return rows
 
 
-# ── Prospector Controls ──
+# ── Xorora Prospector Controls ──
 
 
 @app.get("/api/harvey/status")
 async def get_harvey_status():
-    """Check if Prospector is currently running."""
+    """Check if Xorora Prospector is currently running."""
     pid = _check_harvey_pid()
     started = _harvey_started_at.isoformat() if _harvey_started_at else None
     return {"running": pid is not None, "pid": pid, "started_at": started}
@@ -662,15 +662,15 @@ async def get_harvey_status():
 
 @app.post("/api/harvey/start")
 async def start_harvey():
-    """Start Prospector's heartbeat loop as a subprocess."""
+    """Start Xorora Prospector's heartbeat loop as a subprocess."""
     global _harvey_process, _harvey_started_at
 
     if _check_harvey_pid():
-        return {"success": False, "message": "Prospector is already running."}
+        return {"success": False, "message": "Xorora Prospector is already running."}
     from harvey.main import _needs_setup
     if _needs_setup():
         return {"success": False,
-                "message": "Prospector isn't set up yet. Run `harvey setup` in a terminal first."}
+                "message": "Xorora Prospector isn't set up yet. Run `harvey setup` in a terminal first."}
 
     # Ensure data dir exists
     (PROJECT_ROOT / "data").mkdir(parents=True, exist_ok=True)
@@ -698,8 +698,8 @@ async def start_harvey():
             # Child holds its own copies of the fds; don't leak ours.
             log_handle.close()
     except Exception as e:
-        logger.warning("Failed to start Prospector: %s", e)
-        return {"success": False, "message": f"Failed to start Prospector: {e}"}
+        logger.warning("Failed to start Xorora Prospector: %s", e)
+        return {"success": False, "message": f"Failed to start Xorora Prospector: {e}"}
     _harvey_started_at = datetime.now()
     # The loop writes its own PID file once it holds the loop lock. Writing
     # the child's PID here would overwrite a running loop's record if this
@@ -709,12 +709,12 @@ async def start_harvey():
 
 @app.post("/api/harvey/stop")
 async def stop_harvey():
-    """Stop the Prospector subprocess."""
+    """Stop the Xorora Prospector subprocess."""
     global _harvey_process, _harvey_started_at
 
     pid = _check_harvey_pid()
     if not pid:
-        return {"success": False, "message": "Prospector is not running."}
+        return {"success": False, "message": "Xorora Prospector is not running."}
 
     own = _harvey_process if _harvey_process and _harvey_process.pid == pid else None
 
@@ -741,12 +741,12 @@ async def stop_harvey():
                 pass
             await asyncio.sleep(0.5)
     except OSError as e:
-        logger.warning("Couldn't signal Prospector (pid %s): %s", pid, e)
+        logger.warning("Couldn't signal Xorora Prospector (pid %s): %s", pid, e)
 
     if alive():
         # Started by another user, or from an elevated terminal on Windows.
         return {"success": False,
-                "message": f"Couldn't stop Prospector (pid {pid}). Stop it where it was started."}
+                "message": f"Couldn't stop Xorora Prospector (pid {pid}). Stop it where it was started."}
 
     _harvey_process = None
     _harvey_started_at = None
@@ -1072,7 +1072,7 @@ async def get_outbox_api():
     try:
         state = _state()
         await state.init_db()
-        # A send cut off mid-way shows up under Didn't send even when Prospector
+        # A send cut off mid-way shows up under Didn't send even when Xorora Prospector
         # isn't running.
         await state.fail_stale_sending_outbox()
         return {
@@ -1130,7 +1130,7 @@ async def set_sending_mode(request: Request):
     if mode not in ("approval", "autopilot"):
         return _refuse('expected {"mode": "approval"} or {"mode": "autopilot", "confirm": "autopilot"}', 400)
     if mode == "autopilot" and body.get("confirm") != "autopilot":
-        return _refuse('Type "autopilot" to confirm: Prospector will send email without asking you.', 400)
+        return _refuse('Type "autopilot" to confirm: Xorora Prospector will send email without asking you.', 400)
     path = _resolve_config_file()
     try:
         set_require_approval(mode == "approval", path)
@@ -1226,14 +1226,14 @@ async def outbox_edit(item_id: str, request: Request):
         return JSONResponse({"success": False, "message": str(e)}, status_code=500)
 
 
-# A hand send is only offered to someone Prospector could still email: never to
+# A hand send is only offered to someone Xorora Prospector could still email: never to
 # someone who replied, opted out, bounced or was already contacted.
 HAND_SENDABLE_STATUSES = ("new", "queued")
 HAND_SENDABLE_EMAIL = ("verified", "risky")
 
 
 def _harvey_can_send() -> bool:
-    """Can Prospector send email itself (a connected mailbox, or Instantly)?
+    """Can Xorora Prospector send email itself (a connected mailbox, or Instantly)?
 
     Sending by hand from the dashboard is only offered when it can't: with
     two senders, any timing gap between them emails someone twice. If the
@@ -1256,7 +1256,7 @@ def _harvey_can_send() -> bool:
 
 
 def _send_as() -> str:
-    """The address Prospector sends as, so Gmail opens the right account."""
+    """The address Xorora Prospector sends as, so Gmail opens the right account."""
     try:
         from harvey.config import load_config
         return load_config().persona.email or ""
@@ -1277,7 +1277,7 @@ def _compliance_view() -> dict:
 
 
 async def _harvey_committed_ids() -> set[str]:
-    """Everyone Prospector has approved or sent mail for (Outbox or Instantly).
+    """Everyone Xorora Prospector has approved or sent mail for (Outbox or Instantly).
 
     Approved mail can be going out at this moment, so these people are past
     the point where a hand send can be recorded safely. So is anyone whose
@@ -1307,7 +1307,7 @@ async def _hand_sent_ids() -> set[str]:
 
 
 async def _harvey_sent_to(prospect_id: str) -> bool:
-    """Did Prospector itself email this person (native send, or an Instantly campaign)?
+    """Did Xorora Prospector itself email this person (native send, or an Instantly campaign)?
 
     A send in flight, or cut off mid-way, counts: it may have reached them.
     """
@@ -1359,10 +1359,10 @@ async def mark_prospect_sent(prospect_id: str, request: Request):
                 return {"success": True, "sent": True, "already": True}
             if current not in HAND_SENDABLE_STATUSES:
                 # A reply, opt-out or close is never touched; neither is
-                # someone Prospector already emailed.
+                # someone Xorora Prospector already emailed.
                 return {"success": True, "sent": True, "status": current}
-            # Allowed even when Prospector can send: recording "I already emailed
-            # them" can only ever stop Prospector sending. Not once Prospector has
+            # Allowed even when Xorora Prospector can send: recording "I already emailed
+            # them" can only ever stop Xorora Prospector sending. Not once Xorora Prospector has
             # approved or sent mail to them, though: that may be going out now.
             # The marker goes down FIRST: a drain that checks after this sees
             # it and cancels; one that checked before only holds an approved
@@ -1370,10 +1370,10 @@ async def mark_prospect_sent(prospect_id: str, request: Request):
             await state.set_setting(key, current)
             if prospect_id in await _harvey_committed_ids():
                 await state.delete_setting(key)
-                return _refuse("Prospector has already approved or sent an email to this person. "
+                return _refuse("Xorora Prospector has already approved or sent an email to this person. "
                                "Check the Outbox.")
             await state.update_prospect_status(prospect_id, "contacted")
-            # Anything Prospector had queued for them must not go out as well.
+            # Anything Xorora Prospector had queued for them must not go out as well.
             changed = await state.cancel_pending_outbox_for_prospect(
                 prospect_id, reason=HAND_SENT_REASON)
         else:
@@ -1381,7 +1381,7 @@ async def mark_prospect_sent(prospect_id: str, request: Request):
                 if current in HAND_SENDABLE_STATUSES:
                     return {"success": True, "sent": False}
                 if current == "contacted":
-                    # Setting them back would make Prospector write and send again.
+                    # Setting them back would make Xorora Prospector write and send again.
                     return _refuse("This wasn't marked as sent by hand here, so it stays sent.")
                 return {"success": True, "sent": True, "status": current}
             if current != "contacted":
@@ -1395,7 +1395,7 @@ async def mark_prospect_sent(prospect_id: str, request: Request):
             changed = await state.restore_hand_cancelled_outbox(
                 prospect_id, reason=HAND_SENT_REASON)
         if sent:
-            # Open in Gmail adds today's footer; remember it as Prospector's text.
+            # Open in Gmail adds today's footer; remember it as Xorora Prospector's text.
             footer = _compliance_view()["footer"]
             await state.remember_footer_lines(footer.split("\n"))
         await state.log_action(
@@ -1477,6 +1477,11 @@ async def get_campaigns():
             row["prospect_ids"] = json.loads(row.get("prospect_ids_json", "[]"))
         except (json.JSONDecodeError, TypeError):
             row["prospect_ids"] = []
+        try:
+            row["sending_accounts"] = json.loads(row.get("sending_accounts_json") or "[]")
+        except (json.JSONDecodeError, TypeError):
+            row["sending_accounts"] = []
+        row["owner"] = row.get("owner") or ""
         # Who each draft goes to, so the UI can open it in the user's own mail client.
         ids = row["prospect_ids"]
         row["recipients"] = await query_db(
@@ -1486,21 +1491,268 @@ async def get_campaigns():
             tuple(ids),
         ) if ids else []
         row["send_as"] = send_as
-        # A cold email sent by hand needs the same footer Prospector adds.
+        # A cold email sent by hand needs the same footer Xorora Prospector adds.
         row["footer"] = footer
         for r in row["recipients"]:
             r["sent_by_hand"] = r["id"] in hand_sent
-            # "I already emailed them": always recordable before Prospector commits.
+            # "I already emailed them": always recordable before Xorora Prospector commits.
             r["can_mark_sent"] = (
                 r["id"] not in hand_sent and r["id"] not in committed
                 and (r.get("status") or "new") in HAND_SENDABLE_STATUSES
             )
-            # The Gmail button: only when Prospector can't send itself.
+            # The Gmail button: only when Xorora Prospector can't send itself.
             r["can_send_by_hand"] = (
                 r["can_mark_sent"] and not harvey_sends
                 and (r.get("email_status") or "guess") in HAND_SENDABLE_EMAIL
             )
     return rows
+
+
+# ── Team campaigns: one shared Xorora Prospector, a campaign per person ──
+
+
+def _instantly_key() -> str:
+    key = (_read_env_file().get("INSTANTLY_API_KEY", "")
+           or os.getenv("INSTANTLY_API_KEY", "")).strip()
+    return "" if key == "your_instantly_api_key_here" else key
+
+
+@app.get("/api/team/accounts")
+async def team_accounts():
+    """The Instantly sending accounts a person can pick for their campaign."""
+    key = _instantly_key()
+    if not key:
+        return {"connected": False, "accounts": [],
+                "message": "Add your Instantly API key in Settings first."}
+    from harvey.integrations.instantly import InstantlyClient
+    items = await InstantlyClient(key).list_accounts()
+    accounts = []
+    for a in items:
+        email = str(a.get("email") or "").strip()
+        if not email:
+            continue
+        accounts.append({
+            "email": email,
+            "domain": email.split("@")[-1].lower(),
+            "status": a.get("status"),
+            "warmup_status": a.get("warmup_status"),
+        })
+    accounts.sort(key=lambda a: (a["domain"], a["email"]))
+    return {"connected": True, "accounts": accounts}
+
+
+@app.get("/api/team/options")
+async def team_options():
+    """Everything the campaign builder's dropdowns need."""
+    from harvey import team
+    from harvey.collectors.discover import DEFAULT_PROVIDER, provider_menu
+    from harvey.config import load_env
+    state = _state()
+    await state.init_db()
+    try:
+        providers = [
+            {"key": p["key"], "label": p["label"], "cost_note": p["cost_note"],
+             "configured": p["configured"]}
+            for p in provider_menu(load_env().model_dump())
+        ]
+    except Exception:
+        providers = []
+    return {
+        "services": await team.load_services(state),
+        "headcounts": [h for h in team.HEADCOUNTS if h],
+        "providers": providers,
+        "default_provider": DEFAULT_PROVIDER,
+    }
+
+
+@app.post("/api/team/services")
+async def team_save_services(request: Request):
+    from harvey import team
+    try:
+        body = await request.json()
+        services = body.get("services") if isinstance(body, dict) else None
+        if not isinstance(services, list):
+            raise ValueError("services must be a list")
+    except (ValueError, TypeError) as e:
+        return JSONResponse({"success": False, "error": str(e)}, status_code=400)
+    state = _state()
+    await state.init_db()
+    return {"success": True, "services": await team.save_services(state, services)}
+
+
+async def _team_stats(state, req: dict) -> dict:
+    """Where a campaign stands: companies, contacts, and who's been written to."""
+    from harvey import team
+    company_ids = list(req.get("company_ids") or [])
+    stats = {"companies": len(company_ids), "contacts": 0, "ready": 0}
+    if company_ids:
+        ids = await state.prospect_ids_for_companies(company_ids)
+        stats["contacts"] = len(ids)
+        stats["ready"] = len(await team.candidate_prospect_ids(state, req))
+    return stats
+
+
+@app.get("/api/team")
+async def team_overview():
+    """Every team campaign with its progress, and who has campaigns."""
+    from harvey import team
+    state = _state()
+    await state.init_db()
+    out = []
+    for r in await team.load_requests(state):
+        view = {k: r.get(k) for k in (
+            "id", "owner", "name", "accounts", "industries", "regions", "headcount",
+            "provider", "max_leads", "written", "status", "discovery",
+            "discovery_note", "created_at")}
+        view["service"] = (r.get("service") or {}).get("name", "")
+        view.update(await _team_stats(state, r))
+        out.append(view)
+    owners = sorted({r["owner"] for r in out if r.get("owner")})
+    _kick_team_discovery()
+    return {"team_mode": await team.team_mode(state), "owners": owners,
+            "campaigns": out}
+
+
+@app.post("/api/team/campaign")
+async def team_start_campaign(request: Request):
+    """Start a personal campaign: who, what service, which companies, which mailbox."""
+    from harvey import team
+    from harvey.collectors.discover import PROVIDERS
+    state = _state()
+    await state.init_db()
+    try:
+        body = await request.json()
+        if not isinstance(body, dict):
+            raise ValueError("request body must be an object")
+        owner = team.clean_name(body.get("owner"), 60)
+        if not owner:
+            raise ValueError("Enter your name.")
+        accounts = body.get("accounts") or []
+        if isinstance(accounts, str):
+            accounts = [accounts]
+        accounts = [str(a).strip() for a in accounts if "@" in str(a)]
+        if not accounts:
+            raise ValueError("Pick the Instantly mailbox to send from.")
+        industries = team.clean_list(body.get("industries"))
+        if not industries:
+            raise ValueError("Add at least one industry.")
+        regions = team.clean_list(body.get("regions"))
+        if not regions:
+            raise ValueError("Add at least one region or city.")
+        services = {s["name"]: s for s in await team.load_services(state)}
+        service = services.get(str(body.get("service") or ""))
+        if not service:
+            raise ValueError("Pick the service this campaign offers.")
+        headcount = str(body.get("headcount") or "")
+        # Always the free source: no keys, no spend, nothing to choose.
+        provider = "osm" if "osm" in PROVIDERS else next(iter(PROVIDERS))
+        max_spend = 0.0
+        max_leads = int(body.get("max_leads") or team.DEFAULT_MAX_LEADS)
+        name = team.clean_name(body.get("name")) or (
+            f"{service['name'].split(' (')[0]} · {industries[0]} · {regions[0]}")
+    except (ValueError, TypeError) as e:
+        return JSONResponse({"success": False, "error": str(e)}, status_code=400)
+
+    existing = await team.matching_company_ids(state, industries, regions)
+    req = await team.add_request(
+        state, owner=owner, accounts=accounts, name=name, service=service,
+        industries=industries, regions=regions, headcount=headcount,
+        provider=provider, max_spend=max_spend, max_leads=max_leads,
+        company_ids=existing,
+    )
+    _kick_team_discovery()
+    return {"success": True, "id": req["id"], "campaign": team.campaign_name(owner, name),
+            "existing_companies": len(existing)}
+
+
+@app.post("/api/team/campaign/{request_id}/{action}")
+async def team_campaign_action(request_id: str, action: str):
+    from harvey import team
+    state = _state()
+    await state.init_db()
+    if action == "stop":
+        await team.update_request(state, request_id, status="stopped")
+    elif action == "resume":
+        await team.update_request(state, request_id, status="active")
+    elif action == "delete":
+        await team.remove_request(state, request_id)
+    elif action == "find-more":
+        await team.update_request(state, request_id, discovery="queued", discovery_note="")
+        _kick_team_discovery()
+    else:
+        return JSONResponse({"success": False, "error": "unknown action"}, status_code=400)
+    return {"success": True}
+
+
+_team_worker: "asyncio.Task | None" = None
+
+
+def _kick_team_discovery():
+    """Run queued campaign discoveries one at a time, in the background."""
+    global _team_worker
+    if _team_worker and not _team_worker.done():
+        return
+    try:
+        _team_worker = asyncio.get_running_loop().create_task(_team_discovery_loop())
+    except RuntimeError:
+        pass
+
+
+async def _team_discovery_loop():
+    global _discovery_task, _discovery_report, _discovery_kind
+    from harvey import team
+    from harvey.collectors.discover import build_queries
+    from harvey.config import load_config
+    from harvey.pipeline import run_prospecting
+    state = _state()
+    await state.init_db()
+    while True:
+        queued = [r for r in await team.load_requests(state)
+                  if r.get("discovery") == "queued" and r.get("status") == "active"]
+        if not queued:
+            return
+        if _discovery_task and not _discovery_task.done():
+            await asyncio.sleep(10)  # a manual run is going; wait our turn
+            continue
+        req = queued[0]
+        await team.update_request(state, req["id"], discovery="running",
+                                  discovery_note="Finding companies…")
+        try:
+            config = load_config().model_copy(deep=True)
+            config.icp.industries = list(req.get("industries") or [])
+            config.icp.geography = list(req.get("regions") or [])
+            if req.get("headcount"):
+                config.icp.company_size = req["headcount"] + " employees"
+            queries = build_queries(config, cities=list(req.get("regions") or []),
+                                    depth=30, limit=100)
+            async with state._connect() as db:
+                async with db.execute("SELECT id FROM companies") as cursor:
+                    before = {r[0] for r in await cursor.fetchall()}
+            _discovery_kind = "discover"
+
+            async def _run():
+                return await run_prospecting(state, config, req.get("provider") or None,
+                                             queries, max_spend=0.0)
+            _discovery_task = asyncio.create_task(_run())
+            result = await _discovery_task
+            _discovery_report = {**(result.discover or {}),
+                                 "profiled_companies": result.profiled_companies,
+                                 "errors": result.errors}
+            async with state._connect() as db:
+                async with db.execute("SELECT id FROM companies") as cursor:
+                    after = [r[0] for r in await cursor.fetchall()]
+            found = [c for c in after if c not in before]
+            found += await team.matching_company_ids(state, req.get("industries") or [],
+                                                     req.get("regions") or [])
+            await team.add_company_ids(state, req["id"], found)
+            note = f"Found {len(set(found))} companies."
+            if result.errors:
+                note += " Some searches failed: " + "; ".join(map(str, result.errors[:2]))[:300]
+            await team.update_request(state, req["id"], discovery="done", discovery_note=note)
+        except Exception as exc:
+            logger.exception("team discovery failed")
+            await team.update_request(state, req["id"], discovery="failed",
+                                      discovery_note=str(exc)[:300])
 
 
 @app.get("/api/prospects/{prospect_id}/opt-out")
@@ -1524,7 +1776,7 @@ async def get_opt_out(prospect_id: str):
                     ("rule", "matched", "why", "message", "conversation_id")})
         out["at"] = last["at"]
     elif status == "opted_out" or history:
-        # Opted out before Prospector kept reasons (and maybe undone since):
+        # Opted out before Xorora Prospector kept reasons (and maybe undone since):
         # show the last thing they wrote.
         for c in await query_db(
                 "SELECT id, thread_json, updated_at FROM conversations "
@@ -1573,7 +1825,7 @@ async def get_conversations(awaiting: bool = False):
         LEFT JOIN prospects p ON c.prospect_id = p.id
         ORDER BY c.updated_at DESC LIMIT 100
     """)
-    # The stored thread holds replies and Prospector's answers; the cold emails
+    # The stored thread holds replies and Xorora Prospector's answers; the cold emails
     # a reply answers live in the Outbox. Attach those (sent ones only) and
     # any answer still waiting for approval, so the page shows the exchange.
     pids = sorted({r["prospect_id"] for r in rows if r.get("prospect_id")})
@@ -1606,7 +1858,7 @@ async def get_conversations(awaiting: bool = False):
 
 
 async def _awaiting_reply() -> list[dict]:
-    """Prospects Prospector emailed who haven't replied yet, shaped like a
+    """Prospects Xorora Prospector emailed who haven't replied yet, shaped like a
     conversation so the tab can show every sent email, not only the ones
     that got an answer. Read-only: no conversation row is created, and the
     card moves to the real conversation the moment a reply arrives."""
@@ -1644,10 +1896,10 @@ async def _awaiting_reply() -> list[dict]:
 
 @app.post("/api/conversations/{convo_id}/status")
 async def set_conversation_status(convo_id: str, request: Request):
-    """Close a conversation, or hand one Prospector escalated back to it.
+    """Close a conversation, or hand one Xorora Prospector escalated back to it.
 
-    Prospector answers new replies only on open conversations, so "open" means
-    "Prospector, carry on" and "closed" means it's done."""
+    Xorora Prospector answers new replies only on open conversations, so "open" means
+    "Xorora Prospector, carry on" and "closed" means it's done."""
     try:
         data = await request.json()
     except Exception:
@@ -1987,8 +2239,8 @@ async def get_live_status():
         if isinstance(ids, list):
             drafted.update(i for i in ids if isinstance(i, str))
     sent = {p["id"] for p in prospects if p.get("status") in SENT_STATUSES}
-    # Who is left for the user to send by hand: only when Prospector can't send
-    # itself, and never someone Prospector has queued, sent to, or can't reach.
+    # Who is left for the user to send by hand: only when Xorora Prospector can't send
+    # itself, and never someone Xorora Prospector has queued, sent to, or can't reach.
     harvey_sends = _harvey_can_send()
     awaiting_review = await _scalar("SELECT COUNT(*) FROM outbox WHERE status = 'pending_review'")
     by_hand: set[str] = set()
@@ -2072,7 +2324,7 @@ async def get_live_status():
 
     next_tab = ""   # where the next step is done, when it's done in the dashboard
     if reading or finding:
-        next_up = "Wait — Prospector is working. This page updates by itself."
+        next_up = "Wait — Xorora Prospector is working. This page updates by itself."
     elif finding_emails:
         next_up = "Wait — emails are being found."
     elif stopped:
@@ -2159,15 +2411,15 @@ async def get_today():
             "unprofiled": unprofiled_count,
         }
 
-        # Ordered by how much it blocks Prospector from doing anything at all.
+        # Ordered by how much it blocks Xorora Prospector from doing anything at all.
         brain = await _brain_status()
         if brain.get("status") == "paused":
-            who = "Codex" if brain.get("provider") == "codex" else "Prospector's model"
+            who = "Codex" if brain.get("provider") == "codex" else "Xorora Prospector's model"
             items.append({
                 "key": "brain-paused", "tone": "bad",
-                "title": f"{who} is paused, so Prospector is waiting",
+                "title": f"{who} is paused, so Xorora Prospector is waiting",
                 "detail": (str(brain.get("reason") or "It can't be used right now.")[:300] +
-                           " Replies and queued emails are untouched; Prospector resumes "
+                           " Replies and queued emails are untouched; Xorora Prospector resumes "
                            "once it's fixed. harvey status --check says what's wrong."),
                 "action": "Open the log", "tab": "controls",
             })
@@ -2177,9 +2429,9 @@ async def get_today():
         if rules_problem:
             items.append({
                 "key": "email-rules", "tone": "bad",
-                "title": "Prospector isn't writing emails: your email rules can't be used",
+                "title": "Xorora Prospector isn't writing emails: your email rules can't be used",
                 "detail": (f"{rules_problem}. Fix the file, or clear writer.email_rules "
-                           "to use Prospector's built-in rules."),
+                           "to use Xorora Prospector's built-in rules."),
                 "action": "Open the log", "tab": "controls",
             })
 
@@ -2224,7 +2476,7 @@ async def get_today():
                        if c.get("required") and not c.get("done")]
             items.append({
                 "key": "setup", "tone": "warn",
-                "title": "Finish setting Prospector up",
+                "title": "Finish setting Xorora Prospector up",
                 "detail": ", ".join(missing[:3]) or "Some required steps are incomplete.",
                 "action": "Open setup", "tab": "settings",
             })
@@ -2235,7 +2487,7 @@ async def get_today():
                 "title": (f"{len(proposed)} signal waiting for your confirmation"
                           if len(proposed) == 1
                           else f"{len(proposed)} signals waiting for your confirmation"),
-                "detail": ("Prospector won't collect anything you haven't approved. "
+                "detail": ("Xorora Prospector won't collect anything you haven't approved. "
                            "Confirm which signals define a good prospect for you."),
                 "action": "Review signals", "tab": "signals",
             })
@@ -2272,7 +2524,7 @@ async def get_today():
                 "key": "needs-human", "tone": "bad",
                 "title": (f"{needs_human} conversation needs you" if needs_human == 1
                           else f"{needs_human} conversations need you"),
-                "detail": ("Prospector stopped and handed these over: an escalation, or a "
+                "detail": ("Xorora Prospector stopped and handed these over: an escalation, or a "
                            "reply it had no safe answer for. Reply yourself, then close "
                            "it or hand it back."),
                 "action": "Read them", "tab": "conversations",
@@ -2295,7 +2547,7 @@ async def get_today():
                 "key": "replies", "tone": "good",
                 "title": (f"{open_convos} live conversation" if open_convos == 1
                           else f"{open_convos} live conversations"),
-                "detail": "People replied. Check how Prospector is handling them.",
+                "detail": "People replied. Check how Xorora Prospector is handling them.",
                 "action": "Read conversations", "tab": "conversations",
             })
 
@@ -2305,7 +2557,7 @@ async def get_today():
         return {"items": [], "stats": stats, "error": str(e)}
 
 
-# ── Signals: Prospector proposes, the user confirms ──
+# ── Signals: Xorora Prospector proposes, the user confirms ──
 #
 # Nothing is collected until a human has said yes to it. This is the gate the
 # whole prospecting pipeline hangs off: collectors ask `state.confirmed_signal_codes()`
@@ -2314,7 +2566,7 @@ async def get_today():
 CATEGORY_META = {
     "discovery": {
         "label": "Discovery — who exists",
-        "blurb": "How Prospector finds businesses at all, and how visible they are. "
+        "blurb": "How Xorora Prospector finds businesses at all, and how visible they are. "
                  "This is the only stage that costs money.",
     },
     "profile": {
@@ -2682,7 +2934,7 @@ def start_dashboard(host: str = "127.0.0.1", port: int = 5555):
     except (DashboardSetupError, auth.TokenError) as e:
         raise DashboardSetupError(str(e)) from e
 
-    print(f"\n  Prospector Dashboard running. Open this link to unlock it:\n\n    {url}\n")
+    print(f"\n  Xorora Prospector Dashboard running. Open this link to unlock it:\n\n    {url}\n")
     print(f"  The token is stored in {token_store.path} (owner-only). Keep the link")
     print("  private; anyone with it can use the dashboard. Press Ctrl+C to stop.\n")
     if os.name == "nt":

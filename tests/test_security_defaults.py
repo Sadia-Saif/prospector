@@ -29,7 +29,7 @@ def legacy_config(require_approval=True):
         channels=SimpleNamespace(email=SimpleNamespace(
             enabled=True, provider="instantly", require_approval=require_approval,
             max_daily_sends=50, send_to_risky=False)),
-        persona=SimpleNamespace(name="Prospector", role="BDR", company="Acme", tone="direct"),
+        persona=SimpleNamespace(name="Xorora Prospector", role="BDR", company="Acme", tone="direct"),
         product=SimpleNamespace(name="Widget", description="A widget", objection_responses={}),
     )
 
@@ -173,11 +173,11 @@ def test_status_still_works_when_the_config_is_invalid(tmp_path, monkeypatch, ca
     import harvey.config
     import harvey.state
     from harvey.cli import cmd_status
-    from harvey.config import HarveyConfig
+    from harvey.config import ProspectorConfig
     from pydantic import ValidationError
 
     def invalid():
-        HarveyConfig(channels={"email": {"max_daily_sends": "lots"}})
+        ProspectorConfig(channels={"email": {"max_daily_sends": "lots"}})
 
     try:
         invalid()

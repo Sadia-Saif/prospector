@@ -40,7 +40,7 @@ from harvey.brain import Brain
 from harvey.collectors import people as people_mod
 from harvey.collectors.discover import site_name_from_html
 from harvey.collectors.profile import _reads_like_title, looks_like_challenge
-from harvey.config import HarveyConfig, EnvConfig
+from harvey.config import ProspectorConfig, EnvConfig
 from harvey.integrations.email_finder import (
     DEFAULT_PATTERN, SMALL_BUSINESS_PATTERN, find_email, site_email_evidence,
     verify_published_address,
@@ -92,7 +92,7 @@ LOCAL_BUSINESS_SOURCES = ("discover:osm", "discover:dataforseo_listings")
 # Company-inbox fallback: pages that publish a general address, and the
 # only mailboxes it will use, most likely read by the owner first. An
 # allowlist, not a blocklist: a personal address (jane.doe@) on a contact
-# page is a person Prospector chose not to target, never "the team".
+# page is a person Xorora Prospector chose not to target, never "the team".
 INBOX_PAGES = ("/contact", "/contact-us")
 INBOX_PREFERRED = ("owner", "office", "info", "contact", "contactus", "hello",
                    "team", "service", "sales", "estimates", "quotes",
@@ -133,7 +133,7 @@ class Scout:
         self,
         brain: Brain,
         state: StateManager,
-        config: HarveyConfig,
+        config: ProspectorConfig,
         env: EnvConfig,
     ):
         self.brain = brain
@@ -184,7 +184,7 @@ class Scout:
         # strategy self-skips when python-jobspy isn't installed.
         strategies.append(("hiring_boards", self._prospect_via_hiring_boards))
         # Web search for LinkedIn profiles yields names without a company or
-        # email, which Prospector can't verify; it rides the same switch as the
+        # email, which Xorora Prospector can't verify; it rides the same switch as the
         # LinkedIn channel (and its login) so it is off unless LinkedIn
         # prospecting is wanted, and doesn't spend the cycle's query budget.
         if self.config.channels.linkedin.enabled and self.env.linkedin_email:
@@ -259,7 +259,7 @@ class Scout:
     def _looks_blocked(text: str, status: int = 200) -> bool:
         """A challenge or block page — not a real page that happens to load
         reCAPTCHA for its contact form (which used to read as "blocked" and
-        cost Prospector the whole site)."""
+        cost Xorora Prospector the whole site)."""
         return looks_like_challenge(text, status)
 
     @staticmethod
@@ -1658,7 +1658,7 @@ Respond ONLY with the JSON array."""
             if owner:
                 await self._observe_likely_owner(company_id, member)
 
-        # The inbox is the fallback for a company Prospector can't otherwise
+        # The inbox is the fallback for a company Xorora Prospector can't otherwise
         # reach: nobody named on its site, or a named owner whose address is
         # only a guess (never sent). A named person found here who is
         # already a prospect (a revisit), or anyone already on file from

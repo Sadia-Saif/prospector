@@ -7,13 +7,13 @@ Precleared check off. These tests pin down what training owns.
 
 import yaml
 
-from harvey.config import HarveyConfig
+from harvey.config import ProspectorConfig
 from harvey.paths import PROJECT_ROOT
 from harvey.trainer import write_trained_config
 
 LEARNED = {
     "persona": {
-        "name": "Prospector", "company": "Acme Roofing", "role": "Business Development",
+        "name": "Xorora Prospector", "company": "Acme Roofing", "role": "Business Development",
         "email": "harvey@acme.com", "linkedin": "linkedin.com/in/harvey-acme-com",
         "tone": "warm, direct",
     },
@@ -104,7 +104,7 @@ def test_retraining_keeps_every_setting_training_does_not_learn(tmp_path):
         assert out["product"][key] == LEARNED["product"][key]
     for key in ("industries", "company_size", "titles", "geography"):
         assert out["icp"][key] == LEARNED["icp"][key]
-    HarveyConfig(**out)  # still a valid config
+    ProspectorConfig(**out)  # still a valid config
 
 
 def test_brain_selection_comes_from_the_trainer(tmp_path):
@@ -130,7 +130,7 @@ def test_first_training_keeps_the_template_settings(tmp_path):
     assert out["persona"] == LEARNED["persona"]
     assert out["product"]["offer"]["goal"] == "book_call"
     assert template.read_text() == shipped  # the template itself is untouched
-    HarveyConfig(**out)
+    ProspectorConfig(**out)
 
 
 def test_no_existing_config_writes_what_training_built(tmp_path):
@@ -168,7 +168,7 @@ def test_an_empty_config_needs_no_backup(tmp_path):
 
 def test_first_training_ignores_configs_outside_harveys_folder(tmp_path, monkeypatch):
     # Running `harvey train` from another project's folder must not copy that
-    # project's provider or sender identity into Prospector.
+    # project's provider or sender identity into Xorora Prospector.
     elsewhere = tmp_path / "other-project"
     elsewhere.mkdir()
     write(elsewhere / "harvey.local.yaml", TUNED)

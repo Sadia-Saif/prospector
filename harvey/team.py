@@ -1,0 +1,304 @@
+"""Team campaigns: one shared Xorora Prospector, a campaign per person.
+
+Anyone on the team builds a campaign from the dashboard: their name, the
+Xorora service to offer, the industries, regions and headcount to target,
+where to find companies, and the Instantly mailbox it sends from.
+
+A campaign is standing work, not a one-off batch:
+
+1. Finding companies: a discovery run for that campaign's industries and
+   regions. Companies it finds are tagged to the campaign.
+2. Finding contacts: the heartbeat's Scout finds the owner at each company
+   and verifies an email, as for any company.
+3. Writing: each heartbeat, the Writer drafts for the campaign's new,
+   deliverable contacts, signed by its owner and pitching its service.
+4. Sending: the Sender deploys each draft to Instantly on the owner's mailbox.
+
+It keeps going until it has written to ``max_leads`` contacts or its owner
+stops it. Once anyone starts a team campaign, Xorora Prospector is in team mode: the
+Writer writes nothing that isn't someone's campaign.
+"""
+
+import json
+import re
+import uuid
+from datetime import datetime, timezone
+
+TEAM_MODE_KEY = "team_mode"
+REQUESTS_KEY = "team_campaign_requests"
+SERVICES_KEY = "team_services"
+MAX_NAME = 80
+MAX_ACCOUNTS = 10
+MAX_LIST = 20
+DEFAULT_MAX_LEADS = 100
+MAX_MAX_LEADS = 2000
+BATCH_SIZE = 25
+
+HEADCOUNTS = {
+    "": (None, None),
+    "1-10": (1, 10),
+    "11-50": (11, 50),
+    "51-200": (51, 200),
+    "201-500": (201, 500),
+    "501-1000": (501, 1000),
+    "1000+": (1000, None),
+}
+
+DEFAULT_SERVICES = [
+    {
+        "name": "AI Automation & AI Agents",
+        "pitch": ("Xorora builds AI agents and workflow automation that take repetitive "
+                  "work off a team: lead handling, follow-ups, reporting, data entry and "
+                  "support triage, connected to the tools the business already uses."),
+        "benefits": ["Hours of manual work removed every week",
+                     "Faster response to leads and customers",
+                     "Built around the tools you already use"],
+    },
+    {
+        "name": "Custom Software Development",
+        "pitch": ("Xorora designs and builds custom web apps, portals and internal tools, "
+                  "from first prototype to the system the business runs on."),
+        "benefits": ["Software shaped to how you actually work",
+                     "One partner from prototype to production",
+                     "Senior engineers, clear weekly progress"],
+    },
+    {
+        "name": "Shopify Store Development",
+        "pitch": ("Xorora's in-house Shopify team handles stores A to Z: setup, custom "
+                  "themes, apps, migrations and speed and conversion fixes."),
+        "benefits": ["Faster, higher-converting store",
+                     "Custom features without app bloat",
+                     "One team for build, fixes and growth"],
+    },
+    {
+        "name": "Digital Marketing (Meta, Google & LinkedIn Ads)",
+        "pitch": ("Xorora runs paid acquisition on Meta, Google and LinkedIn: campaign "
+                  "setup, creative testing, tracking and weekly optimisation toward leads "
+                  "and sales, not clicks."),
+        "benefits": ["Lower cost per lead",
+                     "Proper tracking so spend is accountable",
+                     "Weekly testing and reporting"],
+    },
+    {
+        "name": "Staff Augmentation (Dedicated Developers)",
+        "pitch": ("Xorora places dedicated, vetted developers and engineers into a team "
+                  "on a monthly basis, so it can ship faster without hiring overhead."),
+        "benefits": ["Vetted engineers in days, not months",
+                     "Scale up or down monthly",
+                     "Works in your process and time zone overlap"],
+    },
+    {
+        "name": "CRM Implementation (Salesforce, HubSpot, Dynamics 365)",
+        "pitch": ("Xorora sets up, migrates and customises CRMs (Salesforce, HubSpot, "
+                  "SugarCRM, Dynamics 365) so sales and service teams actually use them."),
+        "benefits": ["Clean data and pipelines that match how you sell",
+                     "Automations that save reps time",
+                     "Migration without losing history"],
+    },
+]
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
+
+
+def clean_name(raw, limit: int = MAX_NAME) -> str:
+    return " ".join(str(raw or "").split())[:limit]
+
+
+def clean_list(raw) -> list[str]:
+    if isinstance(raw, str):
+        raw = re.split(r"[,\n;]", raw)
+    if not isinstance(raw, list):
+        return []
+    out = [clean_name(x, 80) for x in raw]
+    return list(dict.fromkeys(x for x in out if x))[:MAX_LIST]
+
+
+def headcount_range(label: str) -> tuple[int | None, int | None]:
+    return HEADCOUNTS.get(label or "", (None, None))
+
+
+def size_fits(company_size: str, label: str) -> bool:
+    """Unknown size always fits: most small businesses don't publish one."""
+    lo, hi = headcount_range(label)
+    if lo is None and hi is None:
+        return True
+    nums = [int(n) for n in re.findall(r"\d+", (company_size or "").replace(",", ""))]
+    if not nums:
+        return True
+    c_lo, c_hi = min(nums), max(nums)
+    if "+" in (company_size or ""):
+        c_hi = 10 ** 9
+    return not ((hi is not None and c_lo > hi) or (lo is not None and c_hi < lo))
+
+
+async def team_mode(state) -> bool:
+    return bool(await state.get_setting(TEAM_MODE_KEY))
+
+
+async def load_services(state) -> list[dict]:
+    raw = await state.get_setting(SERVICES_KEY)
+    try:
+        data = json.loads(raw) if raw else None
+    except (json.JSONDecodeError, TypeError):
+        data = None
+    if not isinstance(data, list) or not data:
+        return [dict(s) for s in DEFAULT_SERVICES]
+    return [s for s in data if isinstance(s, dict) and s.get("name")]
+
+
+async def save_services(state, services: list[dict]):
+    clean = []
+    for s in services[:30]:
+        name = clean_name(s.get("name"))
+        if not name:
+            continue
+        clean.append({
+            "name": name,
+            "pitch": " ".join(str(s.get("pitch") or "").split())[:800],
+            "benefits": clean_list(s.get("benefits"))[:6],
+        })
+    await state.set_setting(SERVICES_KEY, json.dumps(clean))
+    return clean
+
+
+async def load_requests(state) -> list[dict]:
+    raw = await state.get_setting(REQUESTS_KEY)
+    try:
+        data = json.loads(raw) if raw else []
+    except (json.JSONDecodeError, TypeError):
+        return []
+    return [r for r in data if isinstance(r, dict) and r.get("id")]
+
+
+async def save_requests(state, requests: list[dict]):
+    await state.set_setting(REQUESTS_KEY, json.dumps(requests))
+
+
+async def update_request(state, request_id: str, **fields) -> dict | None:
+    requests = await load_requests(state)
+    found = None
+    for r in requests:
+        if r.get("id") == request_id:
+            r.update(fields)
+            found = r
+    await save_requests(state, requests)
+    return found
+
+
+async def add_company_ids(state, request_id: str, company_ids: list[str]):
+    requests = await load_requests(state)
+    for r in requests:
+        if r.get("id") == request_id:
+            have = list(r.get("company_ids") or [])
+            r["company_ids"] = list(dict.fromkeys(have + [c for c in company_ids if c]))
+    await save_requests(state, requests)
+
+
+async def add_request(state, *, owner: str, accounts: list[str], name: str,
+                      service: dict, industries: list[str], regions: list[str],
+                      headcount: str, provider: str, max_spend: float,
+                      max_leads: int, company_ids: list[str]) -> dict:
+    request = {
+        "id": uuid.uuid4().hex[:12],
+        "owner": owner,
+        "accounts": accounts[:MAX_ACCOUNTS],
+        "name": name,
+        "service": service,
+        "industries": industries,
+        "regions": regions,
+        "headcount": headcount if headcount in HEADCOUNTS else "",
+        "provider": provider,
+        "max_spend": max_spend,
+        "max_leads": max(1, min(int(max_leads or DEFAULT_MAX_LEADS), MAX_MAX_LEADS)),
+        "company_ids": list(dict.fromkeys(company_ids)),
+        "written": 0,
+        "status": "active",          # active / stopped / complete
+        "discovery": "queued",       # queued / running / done / failed / skipped
+        "discovery_note": "",
+        "created_at": _now(),
+    }
+    requests = await load_requests(state)
+    requests.append(request)
+    await save_requests(state, requests)
+    await state.set_setting(TEAM_MODE_KEY, "1")
+    return request
+
+
+async def remove_request(state, request_id: str):
+    requests = [r for r in await load_requests(state) if r.get("id") != request_id]
+    await save_requests(state, requests)
+
+
+def campaign_name(owner: str, name: str) -> str:
+    """Owner first, so everyone's campaigns sort and filter by person, here
+    and in Instantly."""
+    return f"{owner} · {clean_name(name) or 'Campaign'}"
+
+
+async def matching_company_ids(state, industries: list[str], regions: list[str]) -> list[str]:
+    """Companies already known that fit: in one of the regions, and in one of
+    the industries (by industry, name or description)."""
+    if not industries and not regions:
+        return []
+    where, params = [], []
+    if regions:
+        where.append("(" + " OR ".join("lower(location) LIKE ?" for _ in regions) + ")")
+        params += [f"%{_place_key(r)}%" for r in regions]
+    if industries:
+        ors = []
+        for term in industries:
+            for col in ("industry", "name", "description"):
+                ors.append(f"lower(COALESCE({col}, '')) LIKE ?")
+                params.append(f"%{term.lower()}%")
+        where.append("(" + " OR ".join(ors) + ")")
+    sql = "SELECT id FROM companies WHERE " + " AND ".join(where) + " LIMIT 5000"
+    async with state._connect() as db:
+        async with db.execute(sql, tuple(params)) as cursor:
+            return [r[0] for r in await cursor.fetchall()]
+
+
+def _place_key(region: str) -> str:
+    """'Miami, FL' matches stored 'Miami, FL' and 'Miami'; compare on the city."""
+    return region.split(",")[0].strip().lower()
+
+
+async def candidate_prospect_ids(state, request: dict) -> list[str]:
+    """New, deliverable contacts at this campaign's companies that fit its
+    headcount, best first, not already claimed by an earlier campaign."""
+    company_ids = list(request.get("company_ids") or [])
+    if not company_ids:
+        return []
+    label = request.get("headcount") or ""
+    fitting = company_ids
+    if label:
+        fitting = []
+        async with state._connect() as db:
+            for start in range(0, len(company_ids), 500):
+                chunk = company_ids[start:start + 500]
+                async with db.execute(
+                    f"SELECT id, COALESCE(company_size, '') FROM companies "
+                    f"WHERE id IN ({','.join('?' * len(chunk))})", tuple(chunk),
+                ) as cursor:
+                    fitting += [r[0] for r in await cursor.fetchall() if size_fits(r[1], label)]
+    ids = await state.prospect_ids_for_companies(fitting)
+    return await state.writable_prospect_ids(ids)
+
+
+async def remaining(request: dict) -> int:
+    return max(0, int(request.get("max_leads") or DEFAULT_MAX_LEADS) - int(request.get("written") or 0))
+
+
+async def pending_writable(state) -> int:
+    """How many contacts the Writer could draft for right now, across active
+    campaigns: what the heartbeat counts as writable in team mode."""
+    total, seen = 0, set()
+    for r in await load_requests(state):
+        if r.get("status") != "active":
+            continue
+        ids = [i for i in await candidate_prospect_ids(state, r) if i not in seen]
+        ids = ids[:await remaining(r)]
+        seen.update(ids)
+        total += len(ids)
+    return total

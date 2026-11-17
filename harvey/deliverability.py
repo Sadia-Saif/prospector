@@ -1,7 +1,7 @@
 """Deliverability readiness - is this sending domain safe to cold email from?
 
 Everything here is free and read-only: public DNS, RDAP, DNS blocklists, and
-Prospector's own send history. None of it can measure inbox reputation directly
+Xorora Prospector's own send history. None of it can measure inbox reputation directly
 (only mailbox providers know that), so the report also points at the two
 things that can: Google Postmaster Tools and an inbox-placement test.
 """
@@ -219,7 +219,7 @@ def check_ip_blocklists(smtp_host: str) -> list[Check]:
 def check_warmup(warmup, ceiling: int, today: date | None = None,
                  provider: str = "") -> Check:
     if provider == "instantly":
-        return Check("Warmup", INFO, "Prospector's ramp doesn't apply to Instantly: use Instantly's "
+        return Check("Warmup", INFO, "Xorora Prospector's ramp doesn't apply to Instantly: use Instantly's "
                      "own warmup and per-account daily limit.")
     days = warmup.days_in(today)
     if days is None:
@@ -242,7 +242,7 @@ def check_warmup(warmup, ceiling: int, today: date | None = None,
         full_on = warmup.min_days + -(-(ceiling - warmup.start_sends) // warmup.daily_increase)
         ramp = f"reaches {ceiling}/day on day {full_on}"
     return Check("Warmup", OK, f"Day {days}: today's cap is {cap}/day ({ramp}). "
-                 "Keep the warmup service running alongside Prospector.")
+                 "Keep the warmup service running alongside Xorora Prospector.")
 
 
 # Warmup spam at or above this, over enough mail to judge, means the mailbox
@@ -261,9 +261,9 @@ def check_warmup_service(health, warmup=None, *, error: str = "", other_service:
         if other_service:
             return Check("Warmup service", INFO, "Using another warmup service: check its "
                          "dashboard for the inbox rate before cold email.")
-        return Check("Warmup service", INFO, "Not connected, so Prospector can't see whether this "
+        return Check("Warmup service", INFO, "Not connected, so Xorora Prospector can't see whether this "
                      "mailbox is warmed. We recommend TrulyInbox: it warms the mailbox, keeps "
-                     f"it healthy, and Prospector reads its inbox rate here. {AFFILIATE_URL} "
+                     f"it healthy, and Xorora Prospector reads its inbox rate here. {AFFILIATE_URL} "
                      f"{AFFILIATE_TAG} Then run: harvey trulyinbox connect")
     if not health.found:
         return Check("Warmup service", FAIL, f"{health.address} isn't in your TrulyInbox "
@@ -280,7 +280,7 @@ def check_warmup_service(health, warmup=None, *, error: str = "", other_service:
     hint = ""
     if health.started_on and warmup is not None and not warmup.start_date:
         hint = (f" Set channels.email.warmup.start_date: {health.started_on.isoformat()} "
-                "so Prospector ramps cold email from it.")
+                "so Xorora Prospector ramps cold email from it.")
     rate = health.spam_rate
     if rate is not None and health.sent >= MIN_WARMUP_SAMPLE and rate >= MAX_WARMUP_SPAM:
         return Check("Warmup service", FAIL, f"{round(rate * 100)}% spam in warmup over the "
@@ -296,7 +296,7 @@ def check_warmup_service(health, warmup=None, *, error: str = "", other_service:
         return Check("Warmup service", FAIL, f"TrulyInbox: {shown}{inbox}. Keep warming "
                      "before cold email." + hint)
     return Check("Warmup service", OK, f"TrulyInbox: warmed, day {days}{inbox}. "
-                 "Keep it running alongside Prospector." + hint)
+                 "Keep it running alongside Xorora Prospector." + hint)
 
 
 def check_send_history(total_sent: int, bounces: int) -> Check:

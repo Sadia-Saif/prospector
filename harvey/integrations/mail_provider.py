@@ -1,6 +1,6 @@
-"""Mail provider abstraction — Prospector owns its sending, Instantly optional.
+"""Mail provider abstraction — Xorora Prospector owns its sending, Instantly optional.
 
-A MailProvider gives Prospector full inbox control: send, read replies,
+A MailProvider gives Xorora Prospector full inbox control: send, read replies,
 thread. Two native providers ship:
 
 - ``gmail``  — a Google Workspace / Gmail mailbox via the Gmail REST API
@@ -87,7 +87,7 @@ def strip_quoted_reply(body: str) -> str:
     below it is ">"-marked (inline answers); when it isn't, everything from
     it on is the quote. An Outlook From:/Sent: block cuts the rest. Never
     returns nothing for a non-empty reply. The Handler also drops any line
-    that repeats what Prospector sent, which catches quotes no header marks.
+    that repeats what Xorora Prospector sent, which catches quotes no header marks.
     """
     text = (body or "").replace("\r\n", "\n")
     cut = len(text)
@@ -114,7 +114,7 @@ def looks_like_bounce(from_email: str, subject: str) -> bool:
 
 
 class MailProvider(ABC):
-    """A mailbox Prospector can send from and read replies out of."""
+    """A mailbox Xorora Prospector can send from and read replies out of."""
 
     name: str = "base"
 

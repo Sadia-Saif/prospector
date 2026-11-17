@@ -1,4 +1,4 @@
-"""What Prospector knows about a prospect's company as a startup.
+"""What Xorora Prospector knows about a prospect's company as a startup.
 
 Three profile signals mark one, each read off the company's own site:
 YC_BACKED, ACCELERATOR, and a FUNDING_ROUND dated within the last 18

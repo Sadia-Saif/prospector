@@ -67,7 +67,7 @@ function safeHref(u) {
 
 // ── One status vocabulary ──
 //
-// Prospector's tables each carry their own words for state: a prospect is `new`,
+// Xorora Prospector's tables each carry their own words for state: a prospect is `new`,
 // a campaign is `draft`, an email is `pending_review`, a signal is `proposed`.
 // Five of those mean "waiting on you" and the old dashboard styled every one
 // differently. Everything now resolves through this map, so a status reads the
@@ -269,7 +269,7 @@ function actionText(a) {
     case 'outbox_edited': return 'You edited a draft';
     case 'conversation_status':
       return d.to === 'closed' ? 'You closed a conversation'
-        : d.from === 'needs_human' ? 'You handed a conversation back to Prospector' : 'You reopened a conversation';
+        : d.from === 'needs_human' ? 'You handed a conversation back to Xorora Prospector' : 'You reopened a conversation';
   }
   const text = escHtml(String(a.action_type || '').replace(/_/g, ' '));
   return a.agent === 'main' ? 'Heartbeat: ' + text : text;
@@ -354,7 +354,7 @@ function unlockWithToken(event) {
   }
   hideLock();
   loadCurrentTab();
-  loadHarveyStatus();
+  loadProspectorStatus();
 }
 
 // Downloads go through the same authorised fetch and are handed to the
@@ -418,7 +418,7 @@ function loadCurrentTab() {
     case 'activity': loadActivity(); break;
     case 'usage': loadUsage(); break;
     case 'settings': loadSettings(); loadSendingModeCard(); break;
-    case 'controls': loadHarveyStatus(); loadLogs(); break;
+    case 'controls': loadProspectorStatus(); loadLogs(); break;
   }
 }
 
@@ -431,7 +431,7 @@ async function loadToday() {
   if (data.error) {
     // A failed check must never read as "Nothing needs you".
     el.innerHTML = emptyState(icon('alert'), 'Couldn\'t check what needs you',
-      'The dashboard hit an error reading Prospector\'s data: ' + escHtml(data.error));
+      'The dashboard hit an error reading Xorora Prospector\'s data: ' + escHtml(data.error));
     return;
   }
 
@@ -447,7 +447,7 @@ async function loadToday() {
     el.innerHTML = '<div class="queue-clear">' +
       '<div class="queue-icon">' + icon('check') + '</div><div>' +
       '<div class="qtitle">Nothing needs you</div>' +
-      '<div class="qdetail">Prospector has everything it needs. Anything that requires a ' +
+      '<div class="qdetail">Xorora Prospector has everything it needs. Anything that requires a ' +
       'decision — an email to approve, a signal to confirm — shows up here.</div>' +
       '</div></div>';
     return;
@@ -477,8 +477,8 @@ async function loadLiveStatus() {
   if (!d || !Array.isArray(d.steps)) {
     // Keep the last good numbers on screen, but never let them pass for live.
     const flag = el.querySelector('.live-flag');
-    if (flag) flag.textContent = "Can't reach Prospector right now — numbers below may be old.";
-    else el.innerHTML = '<p class="muted live-flag">Can\'t reach Prospector right now. ' +
+    if (flag) flag.textContent = "Can't reach Xorora Prospector right now — numbers below may be old.";
+    else el.innerHTML = '<p class="muted live-flag">Can\'t reach Xorora Prospector right now. ' +
       'Is the dashboard window still open?</p>';
     return;
   }
@@ -607,7 +607,7 @@ async function loadTodayActivity() {
   const shown = data.filter(a => a.agent !== 'main').slice(0, 8);
   if (!shown.length) {
     el.innerHTML = '<p class="muted" style="font-size:13px">' +
-      'Nothing yet. Every action Prospector takes shows up here.</p>';
+      'Nothing yet. Every action Xorora Prospector takes shows up here.</p>';
     return;
   }
   el.innerHTML = '<div class="timeline">' + shown.map(a =>
@@ -684,8 +684,8 @@ async function loadSetupStatus() {
 
   el.innerHTML =
     '<div class="card setup-card">' +
-      '<div class="setup-head"><div><h3>Finish setting up Prospector</h3>' +
-        '<p class="muted">Prospector starts finding prospects and sending once these are done.</p></div>' +
+      '<div class="setup-head"><div><h3>Finish setting up Xorora Prospector</h3>' +
+        '<p class="muted">Xorora Prospector starts finding prospects and sending once these are done.</p></div>' +
         '<span class="setup-pct">' + done + ' of ' + required.length + ' done</span></div>' +
       '<div class="bar thick" style="margin-bottom:8px"><span style="width:' + pct + '%;background:var(--accent)"></span></div>' +
       required.map(c => renderCheck(c, false)).join('') +
@@ -735,7 +735,7 @@ async function useOtherWarmup() {
   if (data && data.success) loadSetupStatus();
 }
 
-// ── Signals: Prospector proposes, you confirm ──
+// ── Signals: Xorora Prospector proposes, you confirm ──
 
 async function loadSignals() {
   const data = await api('/api/signals');
@@ -826,7 +826,7 @@ async function setSignals(codes, status) {
     showToast(
       status === 'confirmed'
         ? 'Confirmed ' + data.changed + ' signal' + (data.changed === 1 ? '' : 's') +
-          ' — Prospector will collect ' + (data.changed === 1 ? 'it' : 'them') + ' from now on.'
+          ' — Xorora Prospector will collect ' + (data.changed === 1 ? 'it' : 'them') + ' from now on.'
         : data.changed + ' signal' + (data.changed === 1 ? '' : 's') + ' turned off.',
       'success');
   } else {
@@ -973,7 +973,7 @@ function renderProfileCard(pending, running) {
   if (!pending) { el.innerHTML = ''; return; }
   el.innerHTML = '<div class="subhead">Read websites</div><div class="card"><div class="queue-item good" style="padding:0;border:0;box-shadow:none">' +
     '<div class="qtext"><div class="qtitle">' + pending + ' compan' + (pending === 1 ? 'y' : 'ies') +
-    ' not looked at yet</div><div class="qdetail">Free, no account needed. Prospector reads each site for ' +
+    ' not looked at yet</div><div class="qdetail">Free, no account needed. Xorora Prospector reads each site for ' +
     'who their agency is, what they are missing, and whether they run ads. Up to 200 per run.</div></div>' +
     '<button class="btn btn-primary btn-sm" onclick="runProfile(this)"' + (running ? ' disabled' : '') + '>' +
     (running ? 'Busy…' : 'Read their sites') + '</button></div></div>';
@@ -996,7 +996,7 @@ function renderDiscoverResult(report, running) {
   const el = document.getElementById('discover-result');
   if (running) {
     el.innerHTML = '<div class="card"><h2>Running…</h2>' +
-      '<p class="muted" style="font-size:13px">Prospector is working through the ' +
+      '<p class="muted" style="font-size:13px">Xorora Prospector is working through the ' +
       'queries. Results land in Companies, and the run log is on Today.</p></div>';
     return;
   }
@@ -1375,7 +1375,7 @@ async function testInstantly() {
 
 // ── Controls ──
 
-async function loadHarveyStatus() {
+async function loadProspectorStatus() {
   const data = await api('/api/harvey/status');
   const headerDot = document.getElementById('header-dot');
   const headerText = document.getElementById('header-status-text');
@@ -1389,7 +1389,7 @@ async function loadHarveyStatus() {
   const running = !!data.running;
 
   headerDot.className = 'status-dot ' + (running ? 'running' : 'stopped');
-  headerText.textContent = running ? 'Prospector is running' : 'Prospector is stopped';
+  headerText.textContent = running ? 'Xorora Prospector is running' : 'Xorora Prospector is stopped';
   document.getElementById('control-dot').className = 'dot ' + (running ? 'running' : 'stopped');
   const label = document.getElementById('control-label');
   label.className = 'label ' + (running ? 'running' : 'stopped');
@@ -1401,31 +1401,31 @@ async function loadHarveyStatus() {
     if (data.started_at) info += ' &middot; started ' + formatDate(data.started_at);
     meta.innerHTML = info;
   } else {
-    meta.innerHTML = 'Prospector wakes every few minutes, does what needs doing, and sleeps.';
+    meta.innerHTML = 'Xorora Prospector wakes every few minutes, does what needs doing, and sleeps.';
   }
 
   document.getElementById('btn-start').style.display = running ? 'none' : '';
   document.getElementById('btn-stop').style.display = running ? '' : 'none';
 }
 
-async function startHarvey() {
+async function startProspector() {
   const btn = document.getElementById('btn-start');
   btn.disabled = true;
   const data = await api('/api/harvey/start', {method: 'POST'});
-  if (data && data.success) showToast('Prospector started.', 'success');
+  if (data && data.success) showToast('Xorora Prospector started.', 'success');
   else showToast((data && data.message) || 'Failed to start.', 'error');
   btn.disabled = false;
-  loadHarveyStatus();
+  loadProspectorStatus();
 }
 
-async function stopHarvey() {
+async function stopProspector() {
   const btn = document.getElementById('btn-stop');
   btn.disabled = true;
   const data = await api('/api/harvey/stop', {method: 'POST'});
-  if (data && data.success) showToast('Prospector stopped.', 'success');
+  if (data && data.success) showToast('Xorora Prospector stopped.', 'success');
   else showToast((data && data.message) || 'Failed to stop.', 'error');
   btn.disabled = false;
-  loadHarveyStatus();
+  loadProspectorStatus();
 }
 
 async function loadLogs() {
@@ -1436,7 +1436,7 @@ async function loadLogs() {
     el.textContent = data.lines.join('\n');
     if (stick) el.scrollTop = el.scrollHeight;
   } else {
-    el.textContent = 'No logs yet. Start Prospector to see activity.';
+    el.textContent = 'No logs yet. Start Xorora Prospector to see activity.';
   }
 }
 
@@ -1488,9 +1488,9 @@ function quotaCardHtml(data) {
   let html = '<h2>' + escHtml(title) + '</h2>';
   if (!data.quota || !Object.keys(data.quota).length) {
     const why = provider === 'codex'
-      ? "Quota unavailable: Prospector couldn't read your ChatGPT plan's limits (check codex login, the Codex CLI version, and network)."
-      : "Quota unavailable: Prospector couldn't read your Claude subscription's limits (check claude login and network).";
-    return html + '<p class="muted">' + escHtml(why) + ' Until it can, budgets count Prospector\'s own calls.</p>';
+      ? "Quota unavailable: Xorora Prospector couldn't read your ChatGPT plan's limits (check codex login, the Codex CLI version, and network)."
+      : "Quota unavailable: Xorora Prospector couldn't read your Claude subscription's limits (check claude login and network).";
+    return html + '<p class="muted">' + escHtml(why) + ' Until it can, budgets count Xorora Prospector\'s own calls.</p>';
   }
   const labels = {five_hour: '5-hour window', seven_day: 'Weekly', primary: 'Primary window',
                   secondary: 'Secondary window', limit_reached: 'Usage limit reached'};
@@ -1575,7 +1575,7 @@ async function loadUsage() {
   const anyRows = (data.by_agent || []).length || (data.by_task || []).length;
   if (!anyRows) {
     tablesEl.innerHTML = emptyState(icon('usage'), 'No usage recorded yet',
-      'Once Prospector starts making model calls (Claude or Codex), every one is logged here with exact calls and tokens by provider, agent and task.');
+      'Once Xorora Prospector starts making model calls (Claude or Codex), every one is logged here with exact calls and tokens by provider, agent and task.');
   } else {
     const providers = data.by_provider || [];
     const showProviders = providers.length > 1 || (providers.length === 1 && providers[0].provider !== 'claude');
@@ -1626,7 +1626,7 @@ async function loadOutbox() {
     (pending.length && !data.paused
       ? (pending.length > pending.filter(p => heldReason(p)).length
         ? '<button class="btn btn-primary btn-sm" onclick="outboxApproveAll()" ' +
-          'title="Emails Prospector held are left for you to approve one by one">Approve all ' +
+          'title="Emails Xorora Prospector held are left for you to approve one by one">Approve all ' +
           (pending.length - pending.filter(p => heldReason(p)).length) + '</button>' : '') : '') +
     (data.paused
       ? '<button class="btn btn-secondary btn-sm" onclick="sendingToggle(\'resume\')">' +
@@ -1651,8 +1651,8 @@ async function loadOutbox() {
   desk.innerHTML = pending.length ? renderDesk(pending, _desk.i) :
     '<div class="card">' + emptyState(icon('check'), 'Nothing to review',
       _sendingMode && _sendingMode.mode === 'autopilot'
-        ? 'Autopilot is on, so Prospector sends on its own. Anything it holds for you shows up here.'
-        : 'Every draft Prospector writes lands here first. Approve one and it sends on schedule.') +
+        ? 'Autopilot is on, so Xorora Prospector sends on its own. Anything it holds for you shows up here.'
+        : 'Every draft Xorora Prospector writes lands here first. Approve one and it sends on schedule.') +
     '</div>';
 
   const table = (title, rows, cols) => {
@@ -1723,7 +1723,7 @@ function renderDeskContext(ctx) {
 
 // ── Approval or autopilot ──
 // Approval (the default): every email waits in the Outbox for you.
-// Autopilot (channels.email.require_approval: false): Prospector sends on its
+// Autopilot (channels.email.require_approval: false): Xorora Prospector sends on its
 // own, and still holds what gate.autopilot_review flags. Turning autopilot
 // on takes typing the word; turning it off is one click and works at once.
 let _sendingMode = null, _autopilotArmed = false, _modeBusy = false;
@@ -1732,7 +1732,7 @@ function sendingModeBanner(m) {
   if (!m) return '';
   if (m.mode === 'autopilot') {
     return '<div class="banner wait mode-banner">' + icon('alert') + '<div><b>Autopilot is on</b>' +
-      '<p>Prospector sends email on its own. It holds anything that links to a site that isn’t yours or ' +
+      '<p>Xorora Prospector sends email on its own. It holds anything that links to a site that isn’t yours or ' +
       'quotes its own instructions; those wait here' + (m.held ? ' (' + m.held + ' now)' : '') + '.</p></div>' +
       '<button class="btn btn-secondary btn-sm" onclick="setSendingMode(\'approval\')"' +
         (_modeBusy ? ' disabled' : '') + '>Turn off autopilot</button></div>';
@@ -1741,7 +1741,7 @@ function sendingModeBanner(m) {
   return '<div class="banner mode-banner">' + icon('check') + '<div><b>Approval mode</b>' +
     '<p>' + (instantly
       ? 'Instantly can’t hold single emails, so campaigns aren’t sent to Instantly until you turn on autopilot.'
-      : 'Every email Prospector writes waits here until you approve it.') +
+      : 'Every email Xorora Prospector writes waits here until you approve it.') +
     ' <a href="#" onclick="goTab(\'settings\');return false">About autopilot</a></p></div></div>';
 }
 
@@ -1751,12 +1751,12 @@ function sendingModeCard(m) {
   const instantly = m.provider === 'instantly';
   const domains = (m.your_domains || []).map(escHtml).join(', ') || 'none yet';
   let html = '<div class="card mode-card"><h3>Sending mode: ' + (auto ? 'Autopilot' : 'Approval') + '</h3>' +
-    '<p><b>Approval</b> (the default): every email Prospector writes, first emails, follow-ups and replies, ' +
+    '<p><b>Approval</b> (the default): every email Xorora Prospector writes, first emails, follow-ups and replies, ' +
       'waits in the Outbox until you approve it.' +
       (instantly ? ' On Instantly, which can’t hold single emails, that means campaigns aren’t deployed.' : '') + '</p>' +
-    '<p><b>Autopilot</b>: Prospector sends on its own, on schedule, within your daily limit and quiet hours. ' +
+    '<p><b>Autopilot</b>: Xorora Prospector sends on its own, on schedule, within your daily limit and quiet hours. ' +
       'Opt-outs, bounces and Pause all sending work the same. It still holds an email for you when it links ' +
-      'to, or gives an address at, a site that isn’t yours, or quotes Prospector’s own instructions: text from ' +
+      'to, or gives an address at, a site that isn’t yours, or quotes Xorora Prospector’s own instructions: text from ' +
       'websites and replies can try to steer what it writes. The first reply after you undo an opt-out waits too.</p>' +
     '<p class="muted">Counted as yours: ' + domains + (m.booking_page ? '; your booking page ' + escHtml(m.booking_page) : '') +
       '. Add others under <code>channels.email.link_domains</code> in <code>' + escHtml(m.file) + '</code>.</p>';
@@ -1768,7 +1768,7 @@ function sendingModeCard(m) {
         (_modeBusy ? ' disabled' : '') + '>Turn off autopilot</button></div>';
   } else if (_autopilotArmed) {
     html += '<div class="convo-actions mode-confirm"><span class="muted">Approve a batch or two by hand first ' +
-      'and read what Prospector writes. Type <b>autopilot</b> to turn it on. It starts from Prospector’s next cycle.</span>' +
+      'and read what Xorora Prospector writes. Type <b>autopilot</b> to turn it on. It starts from Xorora Prospector’s next cycle.</span>' +
       '<input class="form-input" id="autopilot-confirm" autocomplete="off" aria-label="Type autopilot to confirm" ' +
         'oninput="document.getElementById(\'autopilot-go\').disabled = this.value.trim().toLowerCase() !== \'autopilot\'" ' +
         'onkeydown="if (event.key === \'Enter\' && this.value.trim().toLowerCase() === \'autopilot\') setSendingMode(\'autopilot\')">' +
@@ -1810,7 +1810,7 @@ async function setSendingMode(mode) {
     if (res && res.success) {
       _autopilotArmed = false;
       showToast(mode === 'autopilot'
-        ? 'Autopilot is on from Prospector’s next cycle. Held emails still wait for you.'
+        ? 'Autopilot is on from Xorora Prospector’s next cycle. Held emails still wait for you.'
         : 'Autopilot is off. Every email waits for you' +
           (res.requeued ? '; ' + res.requeued + ' queued by autopilot came back to the Outbox.' : '.') +
           (_sendingMode && _sendingMode.provider === 'instantly'
@@ -1841,7 +1841,7 @@ function renderDesk(items, i) {
     return '<div class="desk-item ' + (n === i ? 'active' : '') + '" onclick="deskGo(' + n + ')">' +
       '<span class="avatar">' + initials(parts[0], parts[1]) + '</span>' +
       '<div class="di-text"><div class="to">' + escHtml(who) +
-        (heldReason(it) ? ' <span class="tag t-bad" title="Prospector held this instead of sending it">Held</span>' : '') +
+        (heldReason(it) ? ' <span class="tag t-bad" title="Xorora Prospector held this instead of sending it">Held</span>' : '') +
         '</div>' +
       '<div class="sub">' + escHtml(it.subject || '(no subject)') + '</div></div>' +
     '</div>';
@@ -1884,9 +1884,9 @@ function renderDesk(items, i) {
         '<span class="muted">sends ' + formatDate(cur.send_at) + '</span></div>' +
       renderDeskContext(cur.context) +
       (heldReason(cur)
-        ? '<div class="banner wait desk-held">' + icon('alert') + '<div><b>Prospector held this instead of sending it</b>' +
+        ? '<div class="banner wait desk-held">' + icon('alert') + '<div><b>Xorora Prospector held this instead of sending it</b>' +
           '<div>' + escHtml(heldReason(cur)) + '. Read it before approving: text from a website or an ' +
-          'email can try to steer what Prospector writes.</div></div></div>'
+          'email can try to steer what Xorora Prospector writes.</div></div></div>'
         : '') +
       draft + footer +
       '<div class="desk-actions">' + actions +
@@ -1982,7 +1982,7 @@ async function outboxApproveAll() {
   if (deskBusy()) return;
   const data = await api('/api/outbox/approve-all', {method: 'POST'});
   if (data && data.success) showToast('Approved ' + data.approved + ' email(s).' + (data.held
-    ? ' ' + data.held + ' Prospector held ' + (data.held === 1 ? 'is' : 'are') + ' left for you to read and approve one by one.'
+    ? ' ' + data.held + ' Xorora Prospector held ' + (data.held === 1 ? 'is' : 'are') + ' left for you to read and approve one by one.'
     : ''), 'success');
   else showToast(failMsg(data, 'Approve-all failed.'), 'error');
   loadOutbox();
@@ -2054,7 +2054,7 @@ function renderCompaniesPage(page) {
 }
 
 // Basic facts about one company, above its contacts: where it came from,
-// why it fits, what's been done, and what Prospector saw on its own site.
+// why it fits, what's been done, and what Xorora Prospector saw on its own site.
 function companyInfoCard(company, profile) {
   const c = (profile && profile.company) || company;
   const reg = (profile && profile.register) || {};
@@ -2139,19 +2139,19 @@ async function submitFeedback(entityType, entityId, promptText) {
     body: JSON.stringify({entity_type: entityType, entity_id: entityId, comment: comment})
   });
   if (data && data.success) showToast(entityType === 'campaign'
-    ? 'Saved. Prospector follows it in the emails it writes from now on.'
-    : 'Saved. Prospector uses it if it writes this person\'s first email (Gmail, SMTP or Microsoft 365).', 'success');
+    ? 'Saved. Xorora Prospector follows it in the emails it writes from now on.'
+    : 'Saved. Xorora Prospector uses it if it writes this person\'s first email (Gmail, SMTP or Microsoft 365).', 'success');
   else showToast((data && data.message) || 'Could not save feedback.', 'error');
 }
 
 function fbProspect(i) {
   const p = _prospects[i];
-  if (p) submitFeedback('contact', p.id, 'Anything Prospector should know before writing to this person?');
+  if (p) submitFeedback('contact', p.id, 'Anything Xorora Prospector should know before writing to this person?');
 }
 
 function fbCampaign(i) {
   const c = _campaigns[i];
-  if (c) submitFeedback('campaign', c.id, 'What should Prospector do differently in the emails it writes next? (e.g. "shorter; don\'t mention reviews")');
+  if (c) submitFeedback('campaign', c.id, 'What should Xorora Prospector do differently in the emails it writes next? (e.g. "shorter; don\'t mention reviews")');
 }
 
 // Search and status filter live outside the table, so the 15-second refresh
@@ -2172,7 +2172,7 @@ async function loadProspects() {
   _prospects = data;
   if (!data.length) {
     el.innerHTML = emptyState(icon('contacts'), 'No contacts yet',
-      'Prospector hasn\'t found any prospects. Once it\'s running, the Scout agent searches the web for people matching your ideal customer profile in <b>harvey.yaml</b>.');
+      'Xorora Prospector hasn\'t found any prospects. Once it\'s running, the Scout agent searches the web for people matching your ideal customer profile in <b>harvey.yaml</b>.');
     return;
   }
   if (!document.getElementById('contact-rows')) {
@@ -2233,7 +2233,7 @@ function renderContacts() {
       '<td class="muted" style="white-space:nowrap">' + relTime(p.created_at) + '</td>' +
       '<td><div class="cell-row">' + (p.status === 'opted_out' || p.opt_out_undone || _optOut.id === p.id
         ? '<button class="btn btn-ghost btn-sm" onclick="toggleOptOut(' + i + ')" ' +
-          'aria-expanded="' + (_optOut.id === p.id) + '" title="What made Prospector stop emailing them">' +
+          'aria-expanded="' + (_optOut.id === p.id) + '" title="What made Xorora Prospector stop emailing them">' +
           (p.status === 'opted_out' ? 'Why?' : 'Opt-out history') + '</button>' : '') +
         '<button class="btn btn-ghost btn-sm row-action" onclick="fbProspect(' + i + ')" ' +
         'title="Leave feedback on this contact">Feedback</button></div></td></tr>';
@@ -2243,7 +2243,7 @@ function renderContacts() {
     '<div class="table-foot">' + rows.length + ' of ' + _prospects.length + ' contacts</div>';
 }
 
-// Why someone is opted out, and undoing it. Prospector never moves anyone off
+// Why someone is opted out, and undoing it. Xorora Prospector never moves anyone off
 // "opted out" on its own, so a mistaken one (a bare "stop" that meant
 // something else) needs you: see what triggered it, then undo it here.
 let _optOut = {id: null, data: null, armed: false, busy: false};
@@ -2271,13 +2271,13 @@ function optOutPanel(p) {
   const name = escHtml([p.first_name, p.last_name].filter(Boolean).join(' ') || p.email);
   if (!d) return '<div class="optout-panel muted">Loading…</div>';
   if (d.error) return '<div class="optout-panel muted">Couldn’t load the opt-out record. Try again.</div>';
-  let html = '<div class="optout-panel"><h4>' + (d.opted_out ? 'Why Prospector stopped emailing ' : 'Opt-out history for ') +
+  let html = '<div class="optout-panel"><h4>' + (d.opted_out ? 'Why Xorora Prospector stopped emailing ' : 'Opt-out history for ') +
     name + '</h4>';
   if (d.recorded) {
     html += '<p>' + escHtml(d.why) + '</p><div class="optout-meta">' +
       escHtml(own(OPT_OUT_RULES, d.rule) || d.rule || '') + (d.at ? ' · ' + relTime(d.at) : '') + '</div>';
   } else if (d.opted_out || (d.history || []).length) {
-    html += '<p>They opted out before Prospector kept a record of why.' +
+    html += '<p>They opted out before Xorora Prospector kept a record of why.' +
       (d.message ? ' The last thing they wrote:' : ' There’s no reply from them on file.') + '</p>';
   }
   if (d.message) {
@@ -2292,8 +2292,8 @@ function optOutPanel(p) {
     html += '<div class="convo-actions"><span class="muted">Not opted out now (' +
       escHtml(statusMeta(d.status).label) + ').</span></div>';
   } else if (_optOut.armed) {
-    html += '<div class="convo-actions"><span class="muted">Prospector will treat them as having replied. Nothing is ' +
-      'sent automatically, emails the opt-out cancelled stay cancelled, and Prospector’s answer to their next ' +
+    html += '<div class="convo-actions"><span class="muted">Xorora Prospector will treat them as having replied. Nothing is ' +
+      'sent automatically, emails the opt-out cancelled stay cancelled, and Xorora Prospector’s answer to their next ' +
       'reply waits for your approval, even on autopilot. Only undo it if they didn’t mean to opt out.</span>' +
       '<button class="btn btn-primary btn-sm" onclick="undoOptOut()"' + (_optOut.busy ? ' disabled' : '') +
         '>Confirm undo</button>' +
@@ -2314,7 +2314,7 @@ async function undoOptOut() {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({confirm: true}),
   });
-  if (res && res.success) showToast('Opt-out undone. They’re marked as replied; Prospector sends nothing on its own.', 'success');
+  if (res && res.success) showToast('Opt-out undone. They’re marked as replied; Xorora Prospector sends nothing on its own.', 'success');
   else showToast(failMsg(res, 'Could not undo the opt-out. Try again.'), 'error');
   if (_optOut.id !== id) return;
   _optOut.armed = false;
@@ -2361,7 +2361,7 @@ async function openInGmail(ci, si, ri) {
   // Cold email carries the postal address and opt-out line, sent by hand too.
   const filled = fillMergeVars(step.body, r).trimEnd();
   const body = filled + (c.footer && !filled.endsWith(c.footer) ? '\n\n' + c.footer : '');
-  // authuser picks the Google account Prospector sends as, not just whichever
+  // authuser picks the Google account Xorora Prospector sends as, not just whichever
   // one the browser happens to be signed into.
   const url = 'https://mail.google.com/mail/?view=cm&fs=1' +
     (c.send_as ? '&authuser=' + encodeURIComponent(c.send_as) : '') +
@@ -2379,7 +2379,7 @@ async function openInGmail(ci, si, ri) {
     return;
   }
   w.opener = null;
-  // Record the send BEFORE the user can press Send in Gmail, so Prospector can
+  // Record the send BEFORE the user can press Send in Gmail, so Xorora Prospector can
   // never email them as well — not even if they forget to tick the box.
   _gmailBusy = true;
   let claimed = r.sent_by_hand;
@@ -2433,35 +2433,39 @@ function campaignProgress(c) {
 
 async function loadCampaigns() {
   const el = document.getElementById('campaigns-list');
-  const data = await api('/api/campaigns');
+  let data = await api('/api/campaigns');
   if (!data) { el.innerHTML = offlineState(); return; }
+  loadTeamPanel();
   _campaigns = data;
+  const who = _teamFilter();
+  if (who) data = data.filter(c => (c.owner || '') === who);
   if (!data.length) {
     el.innerHTML = emptyState(icon('campaigns'), 'No campaigns yet',
-      'The Writer agent hasn\'t drafted any sequences. It kicks in automatically once Prospector has scored prospects to write for.');
+      'The Writer agent hasn\'t drafted any sequences. It kicks in automatically once Xorora Prospector has scored prospects to write for.');
     return;
   }
   let html = '';
-  data.forEach((c, i) => {
+  data.forEach((c) => {
+    const i = _campaigns.indexOf(c);
     let stepsHtml = '';
     (c.sequence || []).forEach((step, s) => {
       const sendBtns = (c.recipients || []).map((r, ri) => {
-        // Only offered when Prospector can't send itself and this person can
+        // Only offered when Xorora Prospector can't send itself and this person can
         // still be emailed (the server decides: can_send_by_hand).
         if (r.sent_by_hand) {
           const tick = '<label style="display:inline-flex;align-items:center;gap:4px;font-size:13px;cursor:pointer">' +
             '<input type="checkbox" checked onchange="markSent(' + i + ',' + ri + ',this.checked)"> ' +
             '&#10003; Sent by you</label>';
           if (s === 0) return '<span class="rcpt-who">' + escHtml(r.email) + '</span>' + tick;
-          // Follow-ups are the user's too: Prospector never emails someone they emailed.
+          // Follow-ups are the user's too: Xorora Prospector never emails someone they emailed.
           return '<span class="rcpt-who">' + escHtml(r.email) + '</span>' +
             '<button class="btn btn-secondary btn-sm" onclick="openInGmail(' + i + ',' + s + ',' + ri + ')">' +
             'Open in Gmail</button>' +
-            '<span class="muted" style="font-size:12px">Prospector won\'t send follow-ups to people you emailed yourself.</span>';
+            '<span class="muted" style="font-size:12px">Xorora Prospector won\'t send follow-ups to people you emailed yourself.</span>';
         }
         if (s !== 0) return '';
         if (!r.can_send_by_hand) {
-          // Prospector sends here; this only records an email the user already sent.
+          // Xorora Prospector sends here; this only records an email the user already sent.
           return r.can_mark_sent
             ? '<label class="muted" style="display:inline-flex;align-items:center;gap:4px;font-size:12px;cursor:pointer">' +
               '<input type="checkbox" onchange="markSent(' + i + ',' + ri + ',this.checked)"> ' +
@@ -2487,7 +2491,10 @@ async function loadCampaigns() {
     html += '<div class="campaign-card"><div class="campaign-top">' +
       '<div class="campaign-title"><h3>' + escHtml(c.name || 'Untitled Campaign') + '</h3>' +
         '<button class="btn btn-ghost btn-sm" onclick="fbCampaign(' + i + ')">Feedback</button></div>' +
-      '<div class="meta">' + badge(c.status) + '<span>' + pc + ' prospect' + (pc !== 1 ? 's' : '') + '</span>' +
+      '<div class="meta">' + badge(c.status) +
+        (c.owner ? '<span class="owner-chip">' + escHtml(c.owner) + '</span>' : '') +
+        ((c.sending_accounts || []).length ? '<span>From ' + escHtml(c.sending_accounts.join(', ')) + '</span>' : '') +
+        '<span>' + pc + ' prospect' + (pc !== 1 ? 's' : '') + '</span>' +
         '<span>' + (c.sequence || []).length + ' emails</span><span>Created ' + relTime(c.created_at) + '</span></div>' +
       campaignProgress(c) + '</div>' +
       '<div class="sequence">' +
@@ -2496,8 +2503,8 @@ async function loadCampaigns() {
   el.innerHTML = html;
 }
 
-// The whole exchange in order: Prospector's cold emails (from the Outbox), the
-// replies, Prospector's answers, and any answer still waiting for approval.
+// The whole exchange in order: Xorora Prospector's cold emails (from the Outbox), the
+// replies, Xorora Prospector's answers, and any answer still waiting for approval.
 let _convos = [], _convoFilter = 'needs';
 const STAGE_LABELS = {
   initial_outreach: 'Outreach', engaged: 'Engaged', qualifying: 'Qualifying', presenting: 'Presenting',
@@ -2564,11 +2571,11 @@ function convoCard(c) {
     }
     const m = it.msg, sent = m.sender === 'harvey';
     return '<div class="thread-msg ' + (sent ? 'sent' : 'received') + '"><div class="sender">' +
-      (sent ? 'Prospector' : escHtml(first)) + ' &middot; ' + relTime(m.timestamp) + '</div>' +
+      (sent ? 'Xorora Prospector' : escHtml(first)) + ' &middot; ' + relTime(m.timestamp) + '</div>' +
       escHtml(m.content) + '</div>';
   }).join('');
   const draft = c.draft
-    ? '<div class="thread-draft"><div class="sender">' + icon('pen') + 'Prospector drafted a reply · waiting for you</div>' +
+    ? '<div class="thread-draft"><div class="sender">' + icon('pen') + 'Xorora Prospector drafted a reply · waiting for you</div>' +
       '<div class="td-body">' + escHtml(c.draft.body) + '</div>' +
       '<button class="btn btn-primary btn-sm" onclick="goTab(\'outbox\')">Review in Outbox' + icon('arrow') + '</button></div>'
     : '';
@@ -2585,22 +2592,22 @@ function convoCard(c) {
     draft + '</div>' + convoActions(c) + '</div>';
 }
 
-// Prospector answers new replies only on open conversations: an escalated one
+// Xorora Prospector answers new replies only on open conversations: an escalated one
 // waits for you to reply yourself, then close it or hand it back.
 function convoActions(c) {
   if (c.status === 'needs_human' && c.prospect_status === 'opted_out') {
     // A complaint or legal threat from someone who opted out: handing it
-    // back wouldn't help, Prospector never answers them.
+    // back wouldn't help, Xorora Prospector never answers them.
     return '<div class="convo-actions"><span class="muted">' + icon('alert') +
-      'Opted out, and Prospector handed this to you. Reply from your inbox if you need to, then:</span>' +
+      'Opted out, and Xorora Prospector handed this to you. Reply from your inbox if you need to, then:</span>' +
       '<button class="btn btn-secondary btn-sm" onclick="setConvoStatus(' + jsq(c.id) + ',\'closed\')">Close</button>' +
       '<button class="btn btn-secondary btn-sm" onclick="showOptOut(' + jsq(c.prospect_id) + ',' + jsq(c.prospect_email) +
       ')">Why opted out?</button></div>';
   }
   if (c.status === 'needs_human') {
     return '<div class="convo-actions"><span class="muted">' + icon('alert') +
-      'Prospector handed this to you. Reply from your inbox, then:</span>' +
-      '<button class="btn btn-secondary btn-sm" onclick="setConvoStatus(' + jsq(c.id) + ',\'open\')">Hand back to Prospector</button>' +
+      'Xorora Prospector handed this to you. Reply from your inbox, then:</span>' +
+      '<button class="btn btn-secondary btn-sm" onclick="setConvoStatus(' + jsq(c.id) + ',\'open\')">Hand back to Xorora Prospector</button>' +
       '<button class="btn btn-secondary btn-sm" onclick="setConvoStatus(' + jsq(c.id) + ',\'closed\')">Close</button></div>';
   }
   if (c.status === 'open') {
@@ -2608,8 +2615,8 @@ function convoActions(c) {
       jsq(c.id) + ',\'closed\')">Close conversation</button></div>';
   }
   if (c.status === 'closed' && c.prospect_status === 'opted_out') {
-    // Reopening wouldn't help: Prospector never answers someone who opted out.
-    return '<div class="convo-actions"><span class="muted">' + icon('alert') + 'Opted out. Prospector won’t write to them.</span>' +
+    // Reopening wouldn't help: Xorora Prospector never answers someone who opted out.
+    return '<div class="convo-actions"><span class="muted">' + icon('alert') + 'Opted out. Xorora Prospector won’t write to them.</span>' +
       '<button class="btn btn-secondary btn-sm" onclick="showOptOut(' + jsq(c.prospect_id) + ',' + jsq(c.prospect_email) +
       ')">Why opted out?</button></div>';
   }
@@ -2625,7 +2632,7 @@ async function setConvoStatus(id, status) {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({status: status}),
   });
-  if (data && data.success) showToast(status === 'open' ? 'Open again. Prospector will answer the next reply.' : 'Closed. A new reply starts a new conversation.', 'success');
+  if (data && data.success) showToast(status === 'open' ? 'Open again. Xorora Prospector will answer the next reply.' : 'Closed. A new reply starts a new conversation.', 'success');
   else showToast(failMsg(data, 'Could not update that conversation.'), 'error');
   loadConversations();
   loadToday();
@@ -2637,7 +2644,7 @@ async function loadActivity() {
   if (!data) { el.innerHTML = offlineState(); return; }
   if (!data.length) {
     el.innerHTML = emptyState(icon('activity'), 'No activity yet',
-      'Prospector hasn\'t taken any actions. Every prospect found, email written, and reply handled will appear here the moment it happens.');
+      'Xorora Prospector hasn\'t taken any actions. Every prospect found, email written, and reply handled will appear here the moment it happens.');
     return;
   }
   let html = '<div class="card"><div class="timeline">';
@@ -2661,12 +2668,12 @@ loadFunnel();
 loadSetupStatus();
 loadRuns();
 loadTodayActivity();
-loadHarveyStatus();
+loadProspectorStatus();
 
 loadLiveStatus();
 
 // Agent status: quick poll (not while locked: it would only be refused)
-setInterval(() => { if (!_locked) loadHarveyStatus(); }, 8000);
+setInterval(() => { if (!_locked) loadProspectorStatus(); }, 8000);
 
 // Live status panel: refreshed while the Today tab is open and visible.
 setInterval(() => {
@@ -2699,3 +2706,213 @@ setInterval(() => {
     case 'controls': loadLogs(); break;
   }
 }, 15000);
+
+
+// ── Team campaigns: each person builds and runs their own ──
+
+const TEAM_NAME_KEY = 'xorora.teamName';
+let _teamAccounts = null, _teamOptions = null, _teamFilterValue = '', _teamEditServices = false;
+
+function _lsGet(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } }
+function _lsSet(k, v) { try { localStorage.setItem(k, v); } catch {} }
+function _teamFilter() { return _teamFilterValue; }
+function setTeamFilter(v) { _teamFilterValue = v; loadCampaigns(); }
+
+function _opt(value, label, selected) {
+  return '<option value="' + escHtml(value) + '"' + (selected ? ' selected' : '') + '>' + escHtml(label) + '</option>';
+}
+
+async function loadTeamPanel(force) {
+  const el = document.getElementById('team-panel');
+  if (!el) return;
+  const keep = _teamFormValues();
+  const [team, acc, opts] = await Promise.all([
+    api('/api/team'),
+    _teamAccounts ? Promise.resolve(_teamAccounts) : api('/api/team/accounts'),
+    _teamOptions ? Promise.resolve(_teamOptions) : api('/api/team/options'),
+  ]);
+  if (acc && acc.connected) _teamAccounts = acc;
+  if (opts) _teamOptions = opts;
+  const o = opts || {services: [], headcounts: [], providers: []};
+  const v = Object.assign({owner: _lsGet(TEAM_NAME_KEY), provider: o.default_provider || '',
+    max_spend: '1', max_leads: '100'}, keep || {});
+
+  let accHtml;
+  if (!acc || !acc.connected) {
+    accHtml = '<div class="team-hint">' + escHtml((acc && acc.message) ||
+      'Instantly isn’t connected yet. Add the Instantly API key in Settings.') + '</div>';
+  } else if (!acc.accounts.length) {
+    accHtml = '<div class="team-hint">No mailboxes in Instantly yet.</div>';
+  } else {
+    const byDomain = {};
+    acc.accounts.forEach(a => (byDomain[a.domain] = byDomain[a.domain] || []).push(a));
+    accHtml = '<select id="tm-account" class="team-input"><option value="">Choose your mailbox…</option>' +
+      Object.entries(byDomain).map(([d, list]) => '<optgroup label="' + escHtml(d) + '">' +
+        list.map(a => _opt(a.email, a.email, v.account === a.email)).join('') + '</optgroup>').join('') +
+      '</select>';
+  }
+  const services = o.services || [];
+  const svc = services.find(x => x.name === v.service);
+
+  const form =
+    '<div class="team-head"><div><h3>New campaign</h3>' +
+      '<p class="muted">Pick who you want to reach and what you’re offering. Xorora Prospector finds the companies, ' +
+      'finds the owner’s email, writes the emails as you and sends them from your mailbox.</p></div></div>' +
+    '<div class="team-section">Who’s sending</div>' +
+    '<div class="team-grid">' +
+      '<label><span>Your name</span><input id="tm-owner" class="team-input" placeholder="e.g. Sadia" value="' + escHtml(v.owner) + '"></label>' +
+      '<label><span>Send from (Instantly)</span>' + accHtml + '</label>' +
+    '</div>' +
+    '<div class="team-section">What you’re offering <a href="#" onclick="toggleServiceEditor();return false">Edit services</a></div>' +
+    '<div class="team-grid"><label class="span2"><span>Service</span><select id="tm-service" class="team-input" onchange="loadTeamPanel(true)">' +
+      '<option value="">Choose a service…</option>' +
+      services.map(x => _opt(x.name, x.name, x.name === v.service)).join('') + '</select>' +
+      (svc ? '<span class="team-hint">' + escHtml(svc.pitch) + '</span>' : '') + '</label></div>' +
+    (_teamEditServices ? _serviceEditor(services) : '') +
+    '<div class="team-section">Who you’re targeting</div>' +
+    '<div class="team-grid">' +
+      '<label><span>Industries</span><input id="tm-industries" class="team-input" placeholder="restaurants, dental clinics" value="' + escHtml(v.industries || '') + '"><span class="team-hint">Separate with commas</span></label>' +
+      '<label><span>Regions / cities</span><input id="tm-regions" class="team-input" placeholder="Miami, FL, Dubai, London" value="' + escHtml(v.regions || '') + '"><span class="team-hint">One city per entry works best, e.g. “Miami, FL; Austin, TX”</span></label>' +
+      '<label><span>Company headcount</span><select id="tm-headcount" class="team-input">' + _opt('', 'Any size', !v.headcount) +
+        (o.headcounts || []).map(h => _opt(h, h + ' employees', v.headcount === h)).join('') + '</select>' +
+        '<span class="team-hint">Used when a company’s size is known</span></label>' +
+    '</div>' +
+    '<div class="team-section">How many</div>' +
+    '<div class="team-grid">' +
+      '<label><span>Contacts to reach</span><input id="tm-leads" type="number" min="1" max="2000" class="team-input" value="' + escHtml(v.max_leads) + '">' +
+        '</label>' +
+    '</div>' +
+    '<div class="team-grid"><label class="span2"><span>Campaign name (optional)</span><input id="tm-name" class="team-input" placeholder="Filled in from service, industry and region" value="' + escHtml(v.name || '') + '"></label></div>' +
+    '<div class="team-actions"><button class="btn btn-primary" onclick="startTeamCampaign(this)">Start campaign</button>' +
+      '<span id="team-msg" class="muted" style="font-size:13px"></span></div>';
+
+  const camps = (team && team.campaigns) || [];
+  const owners = (team && team.owners) || [];
+  const who = _teamFilter();
+  const shown = who ? camps.filter(c => c.owner === who) : camps;
+  const statusLabel = c => {
+    if (c.status === 'stopped') return ['Stopped', 't-waiting'];
+    if (c.status === 'complete') return ["Done", "t-good"];
+    if (c.discovery === 'queued') return ['Waiting to search', 't-waiting'];
+    if (c.discovery === 'running') return ['Finding companies', 't-waiting'];
+    if (c.discovery === 'failed') return ["Search failed", "t-bad"];
+    if (!c.contacts) return ['Finding contacts', 't-waiting'];
+    return ['Running', 't-good'];
+  };
+  const list = shown.map(c => {
+    const [label, tone] = statusLabel(c);
+    const pct = Math.min(100, Math.round(100 * (c.written || 0) / Math.max(1, c.max_leads || 1)));
+    return '<div class="tc-card">' +
+      '<div class="tc-top"><div><span class="owner-chip">' + escHtml(c.owner) + '</span> ' +
+        '<strong>' + escHtml(c.name) + '</strong></div>' +
+        '<span class="mini ' + tone + '">' + label + '</span></div>' +
+      '<div class="tc-meta">' + escHtml(c.service) + ' &middot; ' + escHtml((c.industries || []).join(', ')) +
+        ' &middot; ' + escHtml((c.regions || []).join(', ')) +
+        (c.headcount ? ' &middot; ' + escHtml(c.headcount) + ' employees' : '') +
+        ' &middot; from ' + escHtml((c.accounts || []).join(', ')) + '</div>' +
+      '<div class="tc-funnel">' +
+        '<div><b>' + (c.companies || 0) + '</b><span>companies</span></div>' +
+        '<div><b>' + (c.contacts || 0) + '</b><span>contacts found</span></div>' +
+        '<div><b>' + (c.ready || 0) + '</b><span>ready to write</span></div>' +
+        '<div><b>' + (c.written || 0) + ' / ' + (c.max_leads || 0) + '</b><span>emailed</span></div>' +
+      '</div>' +
+      '<div class="tc-bar"><i style="width:' + pct + '%"></i></div>' +
+      (c.discovery_note ? '<div class="team-hint">' + escHtml(c.discovery_note) + '</div>' : '') +
+      '<div class="tc-actions">' +
+        (c.status === 'active'
+          ? '<button class="btn btn-secondary btn-sm" onclick="teamAction(\'' + c.id + '\',\'stop\')">Pause</button>'
+          : '<button class="btn btn-secondary btn-sm" onclick="teamAction(\'' + c.id + '\',\'resume\')">Resume</button>') +
+        '<button class="btn btn-secondary btn-sm" onclick="teamAction(\'' + c.id + '\',\'find-more\')"' +
+          (c.discovery === 'running' || c.discovery === 'queued' ? ' disabled' : '') + '>Find more companies</button>' +
+        '<button class="btn btn-ghost btn-sm" onclick="if(confirm(\'Delete this campaign? Emails already sent stay sent.\'))teamAction(\'' + c.id + '\',\'delete\')">Delete</button>' +
+      '</div></div>';
+  }).join('');
+
+  const listHtml = '<div class="team-list-head"><h3>Team campaigns</h3>' +
+      '<div class="team-filter"><button class="btn btn-sm ' + (!who ? 'btn-primary' : 'btn-secondary') + '" onclick="setTeamFilter(\'\')">Everyone</button>' +
+      owners.map(n => '<button class="btn btn-sm ' + (who === n ? 'btn-primary' : 'btn-secondary') +
+        '" onclick="setTeamFilter(' + escHtml(JSON.stringify(n)) + ')">' + escHtml(n) + '</button>').join('') + '</div></div>' +
+      (list || '<p class="muted" style="font-size:13px">No campaigns yet. Start yours on the left.</p>') +
+      '<p class="team-hint" style="margin-top:12px">Xorora Prospector must be running (Controls → Start) for campaigns to move. The emails it writes show below.</p>';
+  const formEl = el.querySelector('.team-form');
+  if (formEl && !force) {
+    // Keep what someone is typing: refreshes only update the campaign list.
+    el.querySelector('.team-list').innerHTML = listHtml;
+    return;
+  }
+  el.innerHTML = '<div class="team-layout"><div class="team-form">' + form + '</div>' +
+    '<div class="team-list">' + listHtml + '</div></div>';
+}
+
+function _teamFormValues() {
+  const g = id => { const e = document.getElementById(id); return e ? e.value : undefined; };
+  if (!document.getElementById('tm-owner')) return null;
+  return {owner: g('tm-owner'), account: g('tm-account'), service: g('tm-service'),
+    industries: g('tm-industries'), regions: g('tm-regions'), headcount: g('tm-headcount'),
+    max_leads: g('tm-leads'), name: g('tm-name')};
+}
+
+function _serviceEditor(services) {
+  return '<div class="svc-editor">' + services.map((x, i) =>
+    '<div class="svc-row"><input class="team-input svc-name" value="' + escHtml(x.name) + '" placeholder="Service name">' +
+    '<textarea class="team-input svc-pitch" rows="2" placeholder="One or two sentences on what Xorora does for them">' + escHtml(x.pitch || '') + '</textarea>' +
+    '<button class="btn btn-ghost btn-sm" onclick="this.parentElement.remove()">Remove</button></div>').join('') +
+    '<div class="svc-actions"><button class="btn btn-secondary btn-sm" onclick="addServiceRow(this)">Add service</button>' +
+    '<button class="btn btn-primary btn-sm" onclick="saveServices()">Save services</button></div></div>';
+}
+function toggleServiceEditor() { _teamEditServices = !_teamEditServices; loadTeamPanel(true); }
+function addServiceRow(btn) {
+  const row = document.createElement('div');
+  row.className = 'svc-row';
+  row.innerHTML = '<input class="team-input svc-name" placeholder="Service name">' +
+    '<textarea class="team-input svc-pitch" rows="2" placeholder="One or two sentences on what Xorora does for them"></textarea>' +
+    '<button class="btn btn-ghost btn-sm" onclick="this.parentElement.remove()">Remove</button>';
+  btn.parentElement.before(row);
+}
+async function saveServices() {
+  const old = (_teamOptions && _teamOptions.services) || [];
+  const services = [...document.querySelectorAll('.svc-row')].map(r => {
+    const name = r.querySelector('.svc-name').value.trim();
+    const prev = old.find(x => x.name === name) || {};
+    return {name, pitch: r.querySelector('.svc-pitch').value.trim(), benefits: prev.benefits || []};
+  }).filter(x => x.name);
+  const res = await api('/api/team/services', {method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({services})});
+  if (res && res.success) { _teamOptions = null; _teamEditServices = false; loadTeamPanel(true); }
+}
+
+function showTabByName(name) {
+  const btn = [...document.querySelectorAll('.sidebar nav button')]
+    .find(b => (b.getAttribute('onclick') || '').includes("'" + name + "'"));
+  if (btn) btn.click();
+}
+
+async function startTeamCampaign(btn) {
+  const msg = document.getElementById('team-msg');
+  const v = _teamFormValues();
+  const split = t => (t || '').split(/[;\n]|,(?!\s*[A-Z]{2}\b)/).map(x => x.trim()).filter(Boolean);
+  if (!v.owner.trim()) { msg.textContent = 'Enter your name.'; return; }
+  if (!v.account) { msg.textContent = 'Pick the mailbox to send from.'; return; }
+  if (!v.service) { msg.textContent = 'Pick the service to offer.'; return; }
+  _lsSet(TEAM_NAME_KEY, v.owner.trim());
+  btn.disabled = true; msg.textContent = 'Starting…';
+  const res = await api('/api/team/campaign', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({owner: v.owner.trim(), accounts: [v.account], service: v.service,
+      industries: split(v.industries), regions: split(v.regions), headcount: v.headcount,
+      max_leads: parseInt(v.max_leads || '100', 10),
+      name: v.name}),
+  });
+  btn.disabled = false;
+  if (!res || res.success === false) { msg.textContent = (res && res.error) || 'Couldn’t start it. Try again.'; return; }
+  msg.textContent = '“' + res.campaign + '” started.' +
+    (res.existing_companies ? ' ' + res.existing_companies + ' matching companies already in Xorora Prospector.' : '');
+  ['tm-industries', 'tm-regions', 'tm-name'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+  _teamFilterValue = v.owner.trim();
+  loadCampaigns();
+}
+
+async function teamAction(id, action) {
+  await api('/api/team/campaign/' + encodeURIComponent(id) + '/' + action, {method: 'POST'});
+  loadCampaigns();
+}

@@ -12,22 +12,24 @@ design). Every draft still passes the deterministic pre-send gate.
 import json
 import logging
 import re
+from contextlib import contextmanager
 from datetime import datetime, timezone
 
 from harvey.brain import Brain
-from harvey.config import EmailRulesError, HarveyConfig, compliance_of, load_email_rules
+from harvey.config import EmailRulesError, ProspectorConfig, compliance_of, load_email_rules
 from harvey.humanize import humanize, humanizer_enabled
 from harvey.integrations.mail_provider import NATIVE_PROVIDERS
 from harvey.models.campaign import Campaign, EmailStep
 from harvey.state import WRITABLE_EMAIL_STATUSES, StateManager
 from harvey.sending_mode import sync_sending_mode
 from harvey.startups import startup_facts
+from harvey import team
 from harvey.untrusted import UNTRUSTED_RULE, fence
 
 logger = logging.getLogger("harvey.writer")
 
 # How many times the model may fail to write a usable sequence for a
-# prospect before Prospector stops trying (status 'write_failed'). A provider
+# prospect before Xorora Prospector stops trying (status 'write_failed'). A provider
 # outage never counts; only a reply that came back unusable does.
 MAX_WRITE_ATTEMPTS = 3
 WRITE_ATTEMPTS_KEY = "write_attempts:"
@@ -53,18 +55,18 @@ SEQUENCE_STYLE = """- Never be pushy or salesy. Be consultative and value-driven
 - Subject lines: lowercase, 2-5 words."""
 # Why the Writer stopped: Today and `harvey status` show it.
 EMAIL_RULES_PROBLEM_KEY = "email_rules_problem"
-BUILT_IN_FOOTER = "- No postal address, unsubscribe or opt-out line: Prospector adds them when it sends."
+BUILT_IN_FOOTER = "- No postal address, unsubscribe or opt-out line: Xorora Prospector adds them when it sends."
 
 
 def operator_rules_block(rules: str) -> str:
     """The operator's email rules as a prompt section ("" when there are none).
 
-    Trusted text from the person running Prospector, so it isn't fenced. It wins
+    Trusted text from the person running Xorora Prospector, so it isn't fenced. It wins
     over the built-in style and shape rules, never over the FACTS rule."""
     if not rules:
         return ""
     return (
-        "\n\nOPERATOR'S EMAIL RULES — written by the person running Prospector. For\n"
+        "\n\nOPERATOR'S EMAIL RULES — written by the person running Xorora Prospector. For\n"
         "length, structure, what to say about the product, links, subject lines\n"
         "and sign-off, these replace the STRICT EMAIL RULES and skills above\n"
         "wherever the two disagree. They never override the FACTS rule: what you\n"
@@ -76,9 +78,9 @@ def operator_rules_block(rules: str) -> str:
 
 
 def footer_rule(config, rules: str) -> str:
-    """What the prompt says about the lines Prospector adds when it sends.
+    """What the prompt says about the lines Xorora Prospector adds when it sends.
 
-    With operator rules it names only what Prospector really adds: an opt-out
+    With operator rules it names only what Xorora Prospector really adds: an opt-out
     sentence the operator writes into the body must not sit on top of the
     configured opt_out_line, and must not be dropped when there is none."""
     if not rules:
@@ -86,15 +88,15 @@ def footer_rule(config, rules: str) -> str:
     compliance = compliance_of(config)
     lines = []
     if compliance.postal_address.strip():
-        lines.append("- No postal address: Prospector adds it under the email when it sends.")
+        lines.append("- No postal address: Xorora Prospector adds it under the email when it sends.")
     opt_out = compliance.opt_out_line.strip()
     if opt_out:
         lines.append(
-            f'- Prospector adds this opt-out line under the email when it sends: "{opt_out}".\n'
+            f'- Xorora Prospector adds this opt-out line under the email when it sends: "{opt_out}".\n'
             "  Don't write another way to opt out, even if the operator's rules give one.")
     else:
         lines.append(
-            "- Prospector adds no opt-out line. If the operator's rules give a sentence that\n"
+            "- Xorora Prospector adds no opt-out line. If the operator's rules give a sentence that\n"
             "  lets the reader say no, write it into the body as they say.")
     return "\n".join(lines)
 
@@ -104,7 +106,7 @@ class Writer:
         self,
         brain: Brain,
         state: StateManager,
-        config: HarveyConfig,
+        config: ProspectorConfig,
         env=None,
     ):
         self.brain = brain
@@ -134,6 +136,12 @@ class Writer:
             return
         if await self.state.get_setting(EMAIL_RULES_PROBLEM_KEY):
             await self.state.delete_setting(EMAIL_RULES_PROBLEM_KEY)
+
+        # Team campaigns first: each one a person started, signed as them.
+        # In team mode nothing else is written, so every campaign has an owner.
+        await self._run_team_requests()
+        if await team.team_mode(self.state):
+            return
 
         # Get prospects that haven't been contacted yet
         new_prospects = await self.state.get_prospects_by_status("new")
@@ -222,6 +230,82 @@ class Writer:
                 f"Writer: Campaign '{batch_name}' created with "
                 f"{len(sequence)} emails for {len(prospects)} prospects."
             )
+
+    async def _run_team_requests(self):
+        """Draft the next batch for each active team campaign, as its owner,
+        pitching the service that campaign offers."""
+        requests = await team.load_requests(self.state)
+        claimed: set[str] = set()
+        for req in requests:
+            if req.get("status") != "active":
+                continue
+            owner = team.clean_name(req.get("owner"))
+            left = await team.remaining(req)
+            if not owner or left <= 0:
+                if left <= 0:
+                    await team.update_request(self.state, req["id"], status="complete")
+                continue
+            ids = [i for i in await team.candidate_prospect_ids(self.state, req)
+                   if i not in claimed][:min(left, team.BATCH_SIZE)]
+            if not ids:
+                continue
+            claimed.update(ids)
+            prospects = [p for p in [await self.state.get_prospect(i) for i in ids] if p]
+            name = team.campaign_name(owner, req.get("name") or "")
+            logger.info(f"Writer: team campaign '{name}' — {len(prospects)} contacts.")
+            self._no_reply = False
+            with self._as_team_member(owner, req.get("service") or {}):
+                sequence = await self._write_sequence(prospects)
+            if not sequence:
+                paused = getattr(self.brain, "paused_reason", "") or (
+                    "no reply from the model" if self._no_reply else "")
+                if paused:
+                    logger.warning(f"Writer: {paused}; leaving '{name}' for later.")
+                    return
+                logger.warning(f"Writer: failed to write team campaign '{name}'.")
+                await self._count_failed_attempt(name, prospects)
+                continue
+            campaign = Campaign(
+                id="", name=name, channel="email", sequence=sequence,
+                prospect_ids=[p.id for p in prospects], status="draft",
+                owner=owner, sending_accounts=list(req.get("accounts") or []),
+            )
+            campaign_id = await self.state.add_campaign(campaign)
+            for p in prospects:
+                await self.state.queue_prospect_if_unsent(p.id)
+                await self.state.delete_setting(WRITE_ATTEMPTS_KEY + p.id)
+            if self.is_native:
+                with self._as_team_member(owner, req.get("service") or {}):
+                    await self._personalize_first_emails(campaign_id, prospects)
+            written = int(req.get("written") or 0) + len(prospects)
+            await team.update_request(
+                self.state, req["id"], written=written,
+                status="complete" if written >= int(req.get("max_leads") or 0) else "active")
+            await self.state.log_action(
+                action_type="write_campaign", agent="writer",
+                details={"campaign_id": campaign_id, "campaign_name": name,
+                         "owner": owner, "service": (req.get("service") or {}).get("name", ""),
+                         "prospect_count": len(prospects), "steps": len(sequence)},
+            )
+            logger.info(f"Writer: team campaign '{name}' drafted for {owner}.")
+
+    @contextmanager
+    def _as_team_member(self, owner: str, service: dict):
+        """Write as this person, offering this service, then put the
+        configured persona and product back."""
+        persona, product = self.config.persona, self.config.product
+        saved = (persona.name, product.name, product.description, list(product.key_benefits))
+        persona.name = owner
+        if service.get("name"):
+            product.name = service["name"]
+            product.description = service.get("pitch") or product.description
+            if service.get("benefits"):
+                product.key_benefits = list(service["benefits"])
+        try:
+            yield
+        finally:
+            persona.name, product.name, product.description, product.key_benefits = (
+                saved[0], saved[1], saved[2], saved[3])
 
     async def _count_failed_attempt(self, batch_name: str, prospects: list):
         """Count one unusable sequence against each prospect in the batch.
@@ -334,7 +418,7 @@ class Writer:
             f"- {str(n.get('created_at') or '')[:10]} on {n['about']}: "
             f"{' '.join(str(n['comment']).split())[:500]}" for n in notes)
         return (
-            "\n\nOWNER FEEDBACK — notes the person running Prospector left on earlier\n"
+            "\n\nOWNER FEEDBACK — notes the person running Xorora Prospector left on earlier\n"
             "campaigns and contacts, newest first (a newer note wins). Apply them to\n"
             "this writing. They never override the STRICT EMAIL RULES or the FACTS rule:\n"
             + lines

@@ -1,4 +1,4 @@
-"""Configuration loader for Prospector. Reads harvey.yaml + .env."""
+"""Configuration loader for Xorora Prospector. Reads harvey.yaml + .env."""
 
 import logging
 import os
@@ -20,7 +20,7 @@ logger = logging.getLogger("harvey.config")
 
 
 class ConfigError(Exception):
-    """Raised when Prospector's configuration is missing or invalid."""
+    """Raised when Xorora Prospector's configuration is missing or invalid."""
 
 
 class ConfigFileNotFoundError(ConfigError, FileNotFoundError):
@@ -80,7 +80,7 @@ class ICPConfig(BaseModel):
 class WarmupConfig(BaseModel):
     """Cold-email ramp for a new domain or mailbox.
 
-    Prospector doesn't run a warmup network itself; that needs a pool of real
+    Xorora Prospector doesn't run a warmup network itself; that needs a pool of real
     inboxes (Instantly, Lemwarm, Mailreach...). This is the other half: no
     cold email goes out for ``min_days`` after ``start_date``, then the cold
     cap climbs from ``start_sends`` by ``daily_increase`` a day until it
@@ -152,7 +152,7 @@ class SendWindowConfig(BaseModel):
 
     Off unless ``channels.email.send_window`` is set. A cold email goes out
     only between ``start`` and ``end`` (on weekdays, with ``weekdays_only``)
-    in the recipient's own time zone, worked out from what Prospector knows
+    in the recipient's own time zone, worked out from what Xorora Prospector knows
     about them (see harvey/send_window.py). Recipients whose zone can't be
     told get the window in ``usage.quiet_hours.timezone``; so does everyone
     with ``recipient_timezone: false``. Follow-ups keep their delay_days and
@@ -199,7 +199,7 @@ def send_window_of(config) -> "SendWindowConfig | None":
 
 
 def operator_timezone(config) -> str:
-    """usage.quiet_hours.timezone: the zone Prospector itself runs on."""
+    """usage.quiet_hours.timezone: the zone Xorora Prospector itself runs on."""
     quiet = getattr(getattr(config, "usage", None), "quiet_hours", None)
     return getattr(quiet, "timezone", "") or "UTC"
 
@@ -312,7 +312,7 @@ def legacy_sending_held(config) -> bool:
     """True when Instantly is the provider and approval is required.
 
     Instantly has no per-email approval queue, so with require_approval on
-    Prospector holds campaign deployment and hands replies to a human.
+    Xorora Prospector holds campaign deployment and hands replies to a human.
     """
     email = getattr(getattr(config, "channels", None), "email", None)
     return (getattr(email, "provider", "") == "instantly"
@@ -378,7 +378,7 @@ class PreclearedConfig(BaseModel):
     enabled: bool = False
     # Where your business is based: GB or US. Required when enabled.
     sender_country: str = ""
-    # Where prospect addresses come from, in Precleared's terms. Prospector
+    # Where prospect addresses come from, in Precleared's terms. Xorora Prospector
     # builds most addresses from a learned pattern, so the honest default
     # is "unknown"; use "published" only if yours are copied from the
     # businesses' own websites.
@@ -452,7 +452,7 @@ class ComplianceConfig(BaseModel):
     # CAN-SPAM requires a postal address you receive mail at (a street
     # address, PO box or virtual mailbox) and a working way to opt out.
     postal_address: str = ""
-    # Must ask for wording Prospector recognises as an opt-out (OPT_OUT_WORDS,
+    # Must ask for wording Xorora Prospector recognises as an opt-out (OPT_OUT_WORDS,
     # HEBREW_OPT_OUT_WORDS).
     # "" leaves it off (and harvey warns).
     opt_out_line: str = DEFAULT_OPT_OUT_LINE
@@ -512,7 +512,7 @@ class ComplianceConfig(BaseModel):
             )
         if not (_ASKS_FOR_OPT_OUT_RE.search(v) or _ASKS_FOR_OPT_OUT_HE_RE.search(v)):
             raise ValueError(
-                "opt_out_line must ask for a reply Prospector recognises as an opt-out, "
+                "opt_out_line must ask for a reply Xorora Prospector recognises as an opt-out, "
                 'e.g. Reply "no thanks" / Reply STOP, in Hebrew השיבו "הסר", or in Spanish Responda BAJA. Recognised: '
                 + ", ".join(f'"{w}"' for w in OPT_OUT_WORDS + HEBREW_OPT_OUT_WORDS
                             + SPANISH_OPT_OUT_WORDS) + "."
@@ -551,7 +551,7 @@ def compliance_notice(config) -> str:
     return (
         "Cold emails are going out without " + " or ".join(missing) + ". US law "
         "(CAN-SPAM) requires both in every cold email. Set them in harvey.yaml "
-        "(or harvey.local.yaml if you trained Prospector)."
+        "(or harvey.local.yaml if you trained Xorora Prospector)."
     )
 
 
@@ -612,11 +612,11 @@ _MODEL_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/\[\]-]{0,127}$")
 
 
 class BrainConfig(BaseModel):
-    """Which subscription Prospector thinks with.
+    """Which subscription Xorora Prospector thinks with.
 
     ``claude`` (default) runs Claude Code headless on your Claude plan.
     ``codex`` runs Codex on your ChatGPT plan. There is never an automatic
-    fallback between them, and an explicit ``model`` only affects Prospector —
+    fallback between them, and an explicit ``model`` only affects Xorora Prospector —
     your own Claude Code / Codex settings are never read or changed.
     """
 
@@ -659,13 +659,13 @@ class WriterConfig(BaseModel):
     # Run every draft through one extra editing-only brain call using the
     # Humanizer skill's instructions (~/.claude/skills/humanizer/SKILL.md,
     # or HARVEY_HUMANIZER_SKILL). Off by default: installing the skill for
-    # your own Claude Code use never changes what Prospector sends on its own.
+    # your own Claude Code use never changes what Xorora Prospector sends on its own.
     humanizer: bool = False
-    # Your own rules for the emails Prospector drafts, as a markdown file:
+    # Your own rules for the emails Xorora Prospector drafts, as a markdown file:
     # length, structure, what to say about the product, links, subject lines,
     # sign-off. When set, it replaces the Writer's built-in shape (email 1
     # under 75 words, an observation and a question, no pitch). A path
-    # relative to the Prospector folder; skills/email_rules.md is gitignored.
+    # relative to the Xorora Prospector folder; skills/email_rules.md is gitignored.
     # The FACTS rule, the send gate and do-not-contact still apply. A file
     # that is set but can't be read stops writing until it's fixed.
     email_rules: str = ""
@@ -684,7 +684,7 @@ MAX_EMAIL_RULES_CHARS = 20_000
 
 
 class EmailRulesError(ConfigError):
-    """writer.email_rules names a file Prospector can't use."""
+    """writer.email_rules names a file Xorora Prospector can't use."""
 
 
 def load_email_rules(config) -> str:
@@ -714,7 +714,7 @@ def load_email_rules(config) -> str:
     return text
 
 
-class HarveyConfig(BaseModel):
+class ProspectorConfig(BaseModel):
     persona: PersonaConfig
     product: ProductConfig
     icp: ICPConfig
@@ -723,7 +723,7 @@ class HarveyConfig(BaseModel):
     brain: BrainConfig = BrainConfig()
     compliance: ComplianceConfig = ComplianceConfig()
     writer: WriterConfig = WriterConfig()
-    # The file it was loaded from, so a running Prospector can re-read the
+    # The file it was loaded from, so a running Xorora Prospector can re-read the
     # sending mode from that same file (refresh_sending_mode).
     _source_path: str | None = PrivateAttr(default=None)
 
@@ -769,8 +769,12 @@ def _format_validation_error(e: ValidationError) -> str:
     return "\n".join(lines)
 
 
-def load_config(config_path: str | None = None) -> HarveyConfig:
-    """Load Prospector configuration from YAML file.
+# Old name, kept so anything that still imports it keeps working.
+HarveyConfig = ProspectorConfig
+
+
+def load_config(config_path: str | None = None) -> ProspectorConfig:
+    """Load Xorora Prospector configuration from YAML file.
 
     Raises ConfigError with a clear, actionable message on any problem.
     """
@@ -790,7 +794,7 @@ def load_config(config_path: str | None = None) -> HarveyConfig:
         raise ConfigError(f"Could not read {config_path}: {e}")
 
     if data is None:
-        raise ConfigError(f"{config_path} is empty. Run 'harvey setup' to configure Prospector.")
+        raise ConfigError(f"{config_path} is empty. Run 'harvey setup' to configure Xorora Prospector.")
     if not isinstance(data, dict):
         raise ConfigError(
             f"{config_path} must contain a YAML mapping (key: value pairs), "
@@ -798,7 +802,7 @@ def load_config(config_path: str | None = None) -> HarveyConfig:
         )
 
     try:
-        config = HarveyConfig(**data)
+        config = ProspectorConfig(**data)
         config._source_path = str(config_path)
         return config
     except ValidationError as e:
@@ -912,7 +916,7 @@ def _with_approval_line(raw: str, word: str) -> list[str]:
 
 
 def set_require_approval(value: bool, path=None) -> Path:
-    """Write channels.email.require_approval into the config file Prospector
+    """Write channels.email.require_approval into the config file Xorora Prospector
     reads (harvey.local.yaml wins, as in load_config). Only that value
     changes: the result must parse to the same settings apart from it, or
     nothing is written and ConfigError says to set it by hand."""
@@ -943,7 +947,7 @@ def set_require_approval(value: bool, path=None) -> Path:
                 continue
         except yaml.YAMLError:
             continue
-        HarveyConfig(**expected)          # still a valid config
+        ProspectorConfig(**expected)          # still a valid config
         if b"\r\n" in data_bytes:
             new = new.replace("\n", "\r\n")
         tmp = target.with_name(target.name + ".tmp")
@@ -964,7 +968,7 @@ _mode_cache: dict[str, tuple[tuple, object]] = {}
 
 def refresh_sending_mode(config, path=None) -> bool:
     """Bring a running config's require_approval in line with the file it was
-    loaded from, so a switch made while Prospector runs counts at once: the
+    loaded from, so a switch made while Xorora Prospector runs counts at once: the
     sender, writer and handler call this before they queue or send. Cheap:
     the file is only read again when it changed. True when the value
     changed. A config not loaded from a file, or a file that can't be read,
@@ -1004,7 +1008,7 @@ def live_do_not_contact(config) -> list[str]:
     """The do-not-contact list as the config file says it is now.
 
     Someone who sees an approved email to a company they must not contact
-    adds it to the list while Prospector runs; waiting for a restart would let
+    adds it to the list while Xorora Prospector runs; waiting for a restart would let
     that email go. Re-read only when the file changed (as refresh_sending_mode
     does). A file that can't be read, or a list with a mistake in it, keeps
     the last good list: never an empty one.
@@ -1048,7 +1052,7 @@ def do_not_contact_from_file(path=None) -> list[str]:
 
 
 def _find_config_file() -> str:
-    """Search for Prospector's config.
+    """Search for Xorora Prospector's config.
 
     ``harvey.local.yaml`` wins when present. It is gitignored, so a fork can
     carry a real product configuration (trained on an actual company) while

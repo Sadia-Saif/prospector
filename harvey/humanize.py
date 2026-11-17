@@ -1,6 +1,6 @@
 """Humanizer pass — rewrites drafts with the operator's installed Humanizer skill.
 
-Prospector's brain calls run with no tools and no skills (see brain.py), so a
+Xorora Prospector's brain calls run with no tools and no skills (see brain.py), so a
 Claude Code skill can't be invoked directly. Instead the skill's
 instructions are read from the operator's skills folder and sent as a
 second, editing-only call over drafts that are already written.

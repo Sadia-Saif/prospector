@@ -142,7 +142,7 @@ def test_status_garbage_pid_file(status_client):
 # ── The loop lock: a PID file alone can outlive the loop ──
 #
 # After a crash or a reboot data/harvey.pid can name a process that is not
-# Prospector at all (PIDs are reused). Only the running loop holds the lock, so
+# Xorora Prospector at all (PIDs are reused). Only the running loop holds the lock, so
 # a live PID with no lock held is somebody else's process.
 
 

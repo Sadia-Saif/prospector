@@ -1,6 +1,6 @@
 """Why someone is opted out, and undoing it from the dashboard.
 
-An opt-out is permanent to Prospector (state.update_prospect_status never moves
+An opt-out is permanent to Xorora Prospector (state.update_prospect_status never moves
 anyone off it), so a mistaken one needs a deliberate human action, and the
 human needs to see what triggered it before deciding."""
 
@@ -139,7 +139,7 @@ def test_the_panel_shows_the_reason_and_escapes_their_message():
 def test_the_panel_asks_before_undoing_and_says_what_happens():
     html = _render_panel({"first_name": "Iris", "email": "i@x.test"},
                          {"opted_out": True, "recorded": False, "message": "", "history": []}, armed=True)
-    assert "before Prospector kept a record" in html
+    assert "before Xorora Prospector kept a record" in html
     assert "Confirm undo" in html and "Nothing is sent automatically" in html
 
 

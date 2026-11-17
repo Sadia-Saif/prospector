@@ -1,0 +1,54 @@
+/* Xorora brand theme — navy sidebar, light workspace, orange accent (xorora.com) */
+@font-face{font-family:'Poppins';font-weight:400;font-display:swap;src:url('/static/fonts/poppins-400.woff2') format('woff2')}
+@font-face{font-family:'Poppins';font-weight:500;font-display:swap;src:url('/static/fonts/poppins-500.woff2') format('woff2')}
+@font-face{font-family:'Poppins';font-weight:600;font-display:swap;src:url('/static/fonts/poppins-600.woff2') format('woff2')}
+@font-face{font-family:'Poppins';font-weight:700;font-display:swap;src:url('/static/fonts/poppins-700.woff2') format('woff2')}
+@font-face{font-family:'Poppins';font-weight:800;font-display:swap;src:url('/static/fonts/poppins-800.woff2') format('woff2')}
+html:root, html:root[data-theme], html:root:not([data-theme='light']){
+  color-scheme:light;
+  --sans:'Poppins',system-ui,-apple-system,'Segoe UI',sans-serif !important;
+  --bg:#F6F7FB !important; --surface:#FFFFFF !important; --surface-2:#F1F2F8 !important; --surface-3:#E7E9F3 !important;
+  --line:rgba(8,8,13,.08) !important; --line-strong:rgba(8,8,13,.14) !important;
+  --text:#08080D !important; --text-2:#3E4359 !important; --text-3:#5B6178 !important;
+  --accent:#F26B21 !important; --accent-hover:#D2540F !important; --accent-text:#FFFFFF !important;
+  --accent-soft:rgba(242,107,33,.10) !important; --accent-line:rgba(242,107,33,.35) !important;
+  --chart-muted:#C2C7D8 !important;
+  --good:#0F9D6B !important; --good-bg:rgba(15,157,107,.10) !important; --good-line:rgba(15,157,107,.30) !important;
+  --wait:#B7791F !important; --wait-bg:rgba(183,121,31,.10) !important; --wait-line:rgba(183,121,31,.30) !important;
+  --bad:#D93636 !important; --bad-bg:rgba(217,54,54,.08) !important; --bad-line:rgba(217,54,54,.30) !important;
+  --active:#F26B21 !important; --active-bg:rgba(242,107,33,.10) !important; --active-line:rgba(242,107,33,.30) !important;
+  --note:#5B6178 !important; --note-bg:rgba(8,8,13,.05) !important; --note-line:rgba(8,8,13,.14) !important;
+  --shadow-border:0 0 0 1px rgba(8,8,13,.07),0 1px 2px rgba(8,8,13,.04) !important;
+  --shadow-border-hover:0 0 0 1px rgba(8,8,13,.14),0 4px 14px rgba(8,8,13,.06) !important;
+  --shadow-pop:0 16px 48px rgba(8,8,13,.14),0 0 0 1px rgba(8,8,13,.08) !important;
+  --btn-shadow:0 0 0 1px rgba(8,8,13,.12) !important; --btn-primary-shadow:0 6px 18px rgba(242,107,33,.28) !important;
+  --r-sm:10px !important; --r-md:14px !important; --r-lg:20px !important;
+}
+body{background:#F6F7FB !important;color:#08080D;font-family:var(--sans)}
+h1,h2,h3{font-family:var(--sans);letter-spacing:-.01em}
+
+/* Sidebar: the only navy surface, like the xorora.com header */
+.sidebar{
+  --bg:#010C28; --surface:rgba(255,255,255,.04); --surface-2:rgba(255,255,255,.06); --surface-3:rgba(255,255,255,.10);
+  --line:rgba(255,255,255,.08); --line-strong:rgba(255,255,255,.16);
+  --text:#FFFFFF; --text-2:#C2C7D8; --text-3:#9CA2BA;
+  --accent-soft:rgba(242,107,33,.16); --btn-shadow:0 0 0 1px rgba(255,255,255,.14);
+  color-scheme:dark;
+  background:#010C28 radial-gradient(420px 320px at 0% 0%,rgba(70,76,159,.30),transparent 70%) !important;
+  border-right:none !important; color:#fff;
+}
+.sidebar button{color:var(--text-2)}
+.sidebar button:hover{background:rgba(255,255,255,.06);color:#fff}
+.sidebar button.active{background:rgba(255,255,255,.08) !important;color:#fff !important;box-shadow:inset 3px 0 0 #F26B21}
+.sidebar .nav-label{color:#5B6178 !important;letter-spacing:.12em}
+.brand{gap:4px !important;padding:6px 8px 12px !important}
+.brand h1{font-weight:800 !important;font-size:20px !important;letter-spacing:.06em !important;text-transform:uppercase;color:#fff}
+.brand h1 .x-dot{color:#F26B21}
+.brand .tagline{display:block !important;font-size:11px !important;letter-spacing:.2em;text-transform:uppercase;color:#9CA2BA !important}
+
+/* Xorora pill buttons: dark pill primary, orange on hover */
+button,.btn{border-radius:999px}
+.btn-primary{background:#010C28 !important;color:#fff !important;border-color:#010C28 !important;box-shadow:none !important}
+.btn-primary:hover:not(:disabled){background:#F26B21 !important;border-color:#F26B21 !important}
+.btn-secondary{background:#fff !important;color:#08080D !important}
+input,select,textarea{border-radius:12px}

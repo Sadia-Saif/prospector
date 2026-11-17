@@ -1,4 +1,4 @@
-"""Prospects the Writer can't use must not stop Prospector from prospecting.
+"""Prospects the Writer can't use must not stop Xorora Prospector from prospecting.
 
 The Writer only drafts for verified or risky addresses; a guessed, invalid or
 missing email leaves the prospect 'new'. The heartbeat used to count every
@@ -66,7 +66,7 @@ async def age_all(state, days):
 @pytest.mark.asyncio
 async def test_a_day_of_unusable_prospects_pauses_spending_and_says_why(state):
     # With no usable email at all (say, no verifier key), prospecting every
-    # cycle would burn search and verifier credits on people Prospector can
+    # cycle would burn search and verifier credits on people Xorora Prospector can
     # never email. A day's worth pauses it, and status explains why.
     from harvey.main import PROSPECT_BACKLOG, unusable_backlog_notice
     for n in range(PROSPECT_BACKLOG):
@@ -165,7 +165,7 @@ async def test_the_summary_reports_the_kill_switch(state):
 
 @pytest.mark.asyncio
 async def test_an_open_conversation_does_not_starve_prospecting():
-    # One auto-reply left a conversation open, and Prospector read the mailbox
+    # One auto-reply left a conversation open, and Xorora Prospector read the mailbox
     # every cycle for days without ever prospecting again. The handler rides
     # along each cycle instead, so the pipeline keeps moving.
     summary = {"prospects": {"new": 0}, "draft_campaigns": 0, "open_conversations": 1}
@@ -228,7 +228,7 @@ async def _all_conversations(state):
 
 @pytest.mark.asyncio
 async def test_a_real_reply_after_an_auto_reply_stays_in_the_thread_with_you(tmp_path, monkeypatch):
-    # You may already have answered by hand, so Prospector doesn't draft over you.
+    # You may already have answered by hand, so Xorora Prospector doesn't draft over you.
     state, handler, pid = await _handler(tmp_path, monkeypatch, ["ooo", "interested"])
     await handler._process_reply("jane@acme.example", "I'm away until Monday.", "u1")
     await handler._process_reply("jane@acme.example", "Back now. Tell me more.", "u2")
@@ -284,8 +284,8 @@ async def test_an_auto_reply_hand_off_keeps_instantly_replies_being_read(state):
 def _instantly_with_a_draft_and_an_open_conversation(monkeypatch, state, calls, stop, read_ok):
     from tests.test_send_window import BASE, _patch_heartbeat
     from harvey.agents import handler as handler_mod, sender as sender_mod
-    from harvey.config import HarveyConfig
-    cfg = HarveyConfig(**BASE, channels={"email": {"provider": "instantly", "require_approval": False}})
+    from harvey.config import ProspectorConfig
+    cfg = ProspectorConfig(**BASE, channels={"email": {"provider": "instantly", "require_approval": False}})
     main_mod = _patch_heartbeat(monkeypatch, cfg, state, calls, stop)
     monkeypatch.setattr(main_mod, "in_quiet_hours", lambda c: False)
     monkeypatch.setattr(sender_mod.Sender, "is_native", False)

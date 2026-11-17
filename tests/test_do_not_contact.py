@@ -248,7 +248,7 @@ def test_a_running_harvey_picks_up_an_edit_to_the_list(tmp_path):
     assert text != path.read_text()
     path.write_text(text)
     assert live_do_not_contact(config) == ["acme.example"]
-    # A typo while Prospector runs keeps the last good list, never an empty one.
+    # A typo while Xorora Prospector runs keeps the last good list, never an empty one.
     path.write_text(text.replace('["acme.example"]', "[5"))
     assert live_do_not_contact(config) == ["acme.example"]
 

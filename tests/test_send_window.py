@@ -2,7 +2,7 @@
 recipient's zone, the window maths (DST, weekends, windows that cross UTC
 midnight), staging and draining through the outbox, Precleared's country
 filling a gap, and quiet hours that no longer hold due mail. Also the
-country Prospector works out the same way and gives Precleared, when it is sure.
+country Xorora Prospector works out the same way and gives Precleared, when it is sure.
 
 No network and no real clock where it matters: the sender's clock is pinned
 with monkeypatch, and Precleared calls go to an httpx.MockTransport.
@@ -24,7 +24,7 @@ import pytz
 from pydantic import ValidationError
 
 import harvey.agents.sender as sender_mod
-from harvey.config import EmailChannelConfig, HarveyConfig, SendWindowConfig
+from harvey.config import EmailChannelConfig, ProspectorConfig, SendWindowConfig
 from harvey.integrations.precleared import SETTINGS_PREFIX, PreclearedClient
 from harvey.models.company import Company
 from harvey.models.prospect import Prospect
@@ -280,7 +280,7 @@ def test_icp_country():
     # "CO" is Colombia's code too: a guess unless the coordinates settle it.
     assert icp_country(_icp(["Denver, CO"])) == ""
     assert icp_country(_icp(["Denver, CO"], {"Denver, CO": "39.7392,-104.9903,50"})) == "US"
-    assert icp_country(HarveyConfig(**{**BASE, "icp": {**BASE["icp"], "geography": ["Oslo, Norway"]}})) == "NO"
+    assert icp_country(ProspectorConfig(**{**BASE, "icp": {**BASE["icp"], "geography": ["Oslo, Norway"]}})) == "NO"
 
 
 @pytest.mark.asyncio
@@ -421,7 +421,7 @@ def test_window_that_crosses_utc_midnight():
 
 def test_window_is_off_unless_configured():
     assert EmailChannelConfig().send_window is None
-    assert HarveyConfig(**BASE).channels.email.send_window is None
+    assert ProspectorConfig(**BASE).channels.email.send_window is None
 
 
 def test_window_settings():
@@ -433,7 +433,7 @@ def test_window_settings():
         SendWindowConfig(start="8am")
     with pytest.raises(ValidationError):
         SendWindowConfig(start="17:00", end="08:00")  # can't run past midnight
-    cfg = HarveyConfig(**BASE, channels={"email": {
+    cfg = ProspectorConfig(**BASE, channels={"email": {
         "provider": "gmail", "send_window": {"start": "09:00", "end": "16:30"}}})
     assert cfg.channels.email.send_window.end == "16:30"
 
@@ -442,7 +442,7 @@ def test_which_configs_send_through_quiet_hours():
     from harvey.main import sends_through_quiet_hours
 
     def cfg(**email):
-        return HarveyConfig(**BASE, channels={"email": {"provider": "gmail", **email}})
+        return ProspectorConfig(**BASE, channels={"email": {"provider": "gmail", **email}})
     assert sends_through_quiet_hours(cfg(send_window={}))
     assert not sends_through_quiet_hours(cfg())
     assert not sends_through_quiet_hours(cfg(send_window={"recipient_timezone": False}))
@@ -660,7 +660,7 @@ async def test_precleared_keeps_the_country_with_the_cached_verdict(state):
     assert (await odd.clear("x@y.co.uk", state)).country == ""
 
 
-# ── The country Prospector gives Precleared ──
+# ── The country Xorora Prospector gives Precleared ──
 
 def checked_sender(state, provider, calls, body=OK_GB, **client):
     """A sender without a window, so only the check matters, on a mocked Precleared."""
@@ -675,7 +675,7 @@ async def test_sender_passes_the_company_country_to_precleared(state):
     await approved(state, pid, "jane@tx-acme.com")
     calls, provider = [], FakeProvider()
     ok_us = {**OK_GB, "facts": {"recipient_country": "US"}}
-    # Even with a default configured, a country Prospector is sure of goes instead.
+    # Even with a default configured, a country Xorora Prospector is sure of goes instead.
     await checked_sender(state, provider, calls, ok_us, prospect_country="GB")._drain_due()
     assert [m["to"] for m in provider.sent] == ["jane@tx-acme.com"]
     assert calls[0]["recipient_country"] == "US"
@@ -791,7 +791,7 @@ def _patch_heartbeat(monkeypatch, cfg, state, calls, stop):
 
 @pytest.mark.asyncio
 async def test_quiet_hours_read_replies_then_send_what_is_due(state, monkeypatch):
-    cfg = HarveyConfig(**BASE, channels={"email": {"provider": "gmail", "send_window": {}}})
+    cfg = ProspectorConfig(**BASE, channels={"email": {"provider": "gmail", "send_window": {}}})
     pid = await seed_at(state, "Tokyo, Japan", "aiko@tokyo-acme.jp")
     await approved(state, pid, "aiko@tokyo-acme.jp")
     calls, stop = [], asyncio.Event()
@@ -802,7 +802,7 @@ async def test_quiet_hours_read_replies_then_send_what_is_due(state, monkeypatch
 
 @pytest.mark.asyncio
 async def test_quiet_hours_with_nothing_due_do_nothing(state, monkeypatch):
-    cfg = HarveyConfig(**BASE, channels={"email": {"provider": "gmail", "send_window": {}}})
+    cfg = ProspectorConfig(**BASE, channels={"email": {"provider": "gmail", "send_window": {}}})
     calls, stop = [], asyncio.Event()
     main_mod = _patch_heartbeat(monkeypatch, cfg, state, calls, stop)
     await asyncio.wait_for(main_mod.heartbeat(stop), timeout=30)
@@ -811,7 +811,7 @@ async def test_quiet_hours_with_nothing_due_do_nothing(state, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_without_recipient_zones_quiet_hours_hold_everything(state, monkeypatch):
-    cfg = HarveyConfig(**BASE, channels={"email": {"provider": "gmail"}})
+    cfg = ProspectorConfig(**BASE, channels={"email": {"provider": "gmail"}})
     pid = await seed_at(state, "Tokyo, Japan", "aiko@tokyo-acme.jp")
     await approved(state, pid, "aiko@tokyo-acme.jp")
     calls, stop = [], asyncio.Event()
@@ -832,7 +832,7 @@ def _patch_heartbeat_real_sender(monkeypatch, cfg, state, calls, stop, provider)
 
 
 def _quiet_cfg(**email):
-    return HarveyConfig(**BASE, channels={"email": {
+    return ProspectorConfig(**BASE, channels={"email": {
         "provider": "gmail", "require_approval": False, "send_window": {}, **email}})
 
 

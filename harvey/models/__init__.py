@@ -1,4 +1,4 @@
-"""Prospector data models."""
+"""Xorora Prospector data models."""
 
 from harvey.models.campaign import Campaign, EmailStep
 from harvey.models.company import Company

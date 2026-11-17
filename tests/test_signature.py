@@ -1,4 +1,4 @@
-"""A logo under every email: loading it safely, the HTML around Prospector's
+"""A logo under every email: loading it safely, the HTML around Xorora Prospector's
 text, the MIME layout for Gmail/SMTP, and the outbox holding when the logo
 can't be used. Microsoft's Graph calls are tested in test_microsoft.py."""
 
