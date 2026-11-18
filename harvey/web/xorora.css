@@ -205,3 +205,10 @@ input,select,textarea{border-radius:12px}
 /* Sidebar: hide the scrollbar, keep wheel/touch scrolling */
 .sidebar,.sidebar nav{scrollbar-width:none !important;-ms-overflow-style:none !important}
 .sidebar::-webkit-scrollbar,.sidebar nav::-webkit-scrollbar{width:0 !important;height:0 !important;display:none !important}
+
+/* Mailbox picker: tick several and Instantly rotates between them */
+.mbox-list{display:flex;flex-direction:column;gap:10px;max-height:220px;overflow:auto;padding:10px 12px;border:1px solid var(--line-strong,rgba(127,127,127,.35));border-radius:12px}
+.mbox-domain{font-size:11px;letter-spacing:.06em;text-transform:uppercase;opacity:.65;margin-bottom:4px}
+.mbox{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:14px;cursor:pointer;line-height:1.4}
+.mbox input{width:16px;height:16px;flex:none;margin:0}
+.mbox span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

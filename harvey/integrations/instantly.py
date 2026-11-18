@@ -175,6 +175,12 @@ class InstantlyClient:
                                      {"daily_limit": int(limit)})
         return result if isinstance(result, dict) else None
 
+    async def set_campaign_accounts(self, campaign_id: str, emails: list[str]) -> dict | None:
+        """The mailboxes a campaign rotates between."""
+        result = await self._request("PATCH", f"/campaigns/{campaign_id}",
+                                     {"email_list": list(emails)})
+        return result if isinstance(result, dict) else None
+
     async def set_account_daily_limit(self, email: str, limit: int) -> dict | None:
         """Cap what one mailbox sends a day, across every campaign it's in."""
         result = await self._request("PATCH", f"/accounts/{email}",

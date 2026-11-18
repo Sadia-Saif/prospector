@@ -2025,8 +2025,24 @@ async def _edit_team_campaign(state, request_id: str, body: dict):
         changes["status"] = "active"
     await team.update_request(state, request_id, **changes)
     if "daily_limit" in changes or "accounts" in changes:
-        await _apply_mailbox_limits(changes.get("accounts", req.get("accounts") or []),
-                                    changes.get("daily_limit", team.clean_daily_limit(req.get("daily_limit"))))
+        accounts = changes.get("accounts", req.get("accounts") or [])
+        name = team.campaign_name(req.get("owner") or "", changes.get("name", req.get("name") or ""))
+        async with state._connect() as db:
+            async with db.execute(
+                "SELECT instantly_campaign_id FROM campaigns WHERE name = ? "
+                "AND COALESCE(instantly_campaign_id, '') != ''", (name,)) as cur:
+                ids = [r[0] for r in await cur.fetchall()]
+        if "accounts" in changes and ids and _instantly_key():
+            from harvey.integrations.instantly import InstantlyClient
+            client = InstantlyClient(_instantly_key())
+            for cid in ids:  # a live campaign starts rotating the new mailboxes too
+                try:
+                    await client.set_campaign_accounts(cid, accounts)
+                except Exception as e:
+                    logger.warning(f"Team: couldn't update the mailboxes on campaign {cid}: {e}")
+        await _apply_mailbox_limits(accounts,
+                                    changes.get("daily_limit", team.clean_daily_limit(req.get("daily_limit"))),
+                                    ids)
     if retarget:
         _kick_team_discovery()
     return {"success": True, "retargeted": retarget}
@@ -2045,9 +2061,11 @@ async def _apply_mailbox_limits(accounts: list[str], limit: int, campaign_ids=()
             await client.set_account_daily_limit(email, limit)
         except Exception as e:  # best effort: the campaign's own cap still applies
             logger.warning(f"Team: couldn't set the daily limit on {email}: {e}")
+    # The limit is per mailbox: a campaign rotating between several sends
+    # that many from each.
     for cid in campaign_ids:
         try:
-            await client.set_campaign_daily_limit(cid, limit)
+            await client.set_campaign_daily_limit(cid, limit * max(1, len(accounts)))
         except Exception as e:
             logger.warning(f"Team: couldn't set the daily limit on campaign {cid}: {e}")
 

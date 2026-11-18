@@ -373,7 +373,9 @@ class Sender:
                     await team.load_requests(self.state), campaign.name)
                 kwargs = {"email_list": campaign.sending_accounts}
                 if limit:
-                    kwargs["daily_limit"] = limit
+                    # The limit is per mailbox; Instantly rotates between
+                    # them, so the campaign may send that many from each.
+                    kwargs["daily_limit"] = limit * max(1, len(campaign.sending_accounts))
                 instantly_campaign = await self.instantly.create_campaign(
                     campaign.name, **kwargs)
             else:

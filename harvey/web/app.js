@@ -2877,7 +2877,7 @@ async function loadTeamPanel(force) {
   const o = opts || {services: [], headcounts: [], providers: []};
   if (keep) keep.owner = me();
   const v = Object.assign({owner: me(), provider: o.default_provider || '',
-    max_spend: '1', max_leads: '100', daily_limit: '30'}, keep || {});
+    max_spend: '1', max_leads: '100', daily_limit: '50'}, keep || {});
 
   let accHtml;
   if (!acc || !acc.connected) {
@@ -2888,10 +2888,13 @@ async function loadTeamPanel(force) {
   } else {
     const byDomain = {};
     acc.accounts.forEach(a => (byDomain[a.domain] = byDomain[a.domain] || []).push(a));
-    accHtml = '<select id="tm-account" class="team-input"><option value="">Choose your mailbox…</option>' +
-      Object.entries(byDomain).map(([d, list]) => '<optgroup label="' + escHtml(d) + '">' +
-        list.map(a => _opt(a.email, a.email, v.account === a.email)).join('') + '</optgroup>').join('') +
-      '</select>';
+    const picked = v.accounts || [];
+    accHtml = '<div id="tm-account" class="mbox-list">' +
+      Object.entries(byDomain).map(([d, list]) => '<div class="mbox-group"><div class="mbox-domain">' + escHtml(d) + '</div>' +
+        list.map(a => '<label class="mbox"><input type="checkbox" name="tm-acc" value="' + escHtml(a.email) + '"' +
+          (picked.includes(a.email) ? ' checked' : '') + '> <span>' + escHtml(a.email) + '</span></label>').join('') +
+        '</div>').join('') + '</div>' +
+      '<span class="team-hint">Tick several mailboxes and Instantly rotates between them, so the campaign sends more.</span>';
   }
   const services = o.services || [];
   const svc = services.find(x => x.name === v.service);
@@ -2927,8 +2930,8 @@ async function loadTeamPanel(force) {
     '<div class="team-grid">' +
       '<label><span>Contacts to reach</span><input id="tm-leads" type="number" min="1" max="2000" class="team-input" value="' + escHtml(v.max_leads) + '">' +
         '</label>' +
-      '<label><span>Emails per day</span><input id="tm-daily" type="number" min="1" max="50" class="team-input" value="' + escHtml(v.daily_limit) + '">' +
-        '<span class="team-hint">From your mailbox, follow-ups included. 30 keeps a warmed domain healthy; 50 is the most it allows.</span></label>' +
+      '<label><span>Emails per day, per mailbox</span><input id="tm-daily" type="number" min="1" max="50" class="team-input" value="' + escHtml(v.daily_limit) + '">' +
+        '<span class="team-hint">Per mailbox, follow-ups included. 50 is the healthy maximum; 3 mailboxes at 50 send up to 150 a day.</span></label>' +
     '</div>' +
     '<div class="team-grid"><label class="span2"><span>Campaign name (optional)</span><input id="tm-name" class="team-input" placeholder="Filled in from service, industry and region" value="' + escHtml(v.name || '') + '"></label></div>' +
     '<div class="team-actions"><button class="btn btn-primary" onclick="startTeamCampaign(this)">' + (_teamEditing ? 'Save changes' : 'Start campaign') + '</button>' +
@@ -2971,7 +2974,7 @@ async function loadTeamPanel(force) {
         ' &middot; ' + escHtml((c.regions || []).join(', ')) +
         (c.headcount ? ' &middot; ' + escHtml(c.headcount) + ' employees' : '') +
         ' &middot; from ' + escHtml((c.accounts || []).join(', ')) +
-        ' &middot; ' + (c.daily_limit || 30) + ' emails/day</div>' +
+        ' &middot; ' + (c.daily_limit || 50) * Math.max(1, (c.accounts || []).length) + ' emails/day</div>' +
       '<div class="tc-funnel">' +
         '<div><b>' + (c.companies || 0) + '</b><span>companies</span></div>' +
         '<div><b>' + (c.contacts || 0) + '</b><span>contacts found</span></div>' +
@@ -2988,7 +2991,7 @@ async function loadTeamPanel(force) {
           : '<button class="btn btn-secondary btn-sm" onclick="teamAction(\'' + c.id + '\',\'resume\')">Resume</button>') +
         '<button class="btn btn-secondary btn-sm" onclick="teamAction(\'' + c.id + '\',\'find-more\')"' +
           (c.discovery === 'running' || c.discovery === 'queued' ? ' disabled' : '') + '>Find more companies</button>' +
-        '<button class="btn btn-secondary btn-sm" onclick="teamLimit(\'' + c.id + '\',' + (c.daily_limit || 30) + ')">Emails per day</button>' +
+        '<button class="btn btn-secondary btn-sm" onclick="teamLimit(\'' + c.id + '\',' + (c.daily_limit || 50) + ')">Emails per day</button>' +
         '<button class="btn btn-ghost btn-sm" onclick="if(confirm(\'Delete this campaign? Emails already sent stay sent.\'))teamAction(\'' + c.id + '\',\'delete\')">Delete</button>' +
       '</div></div>');
   }).join('');
@@ -3012,7 +3015,8 @@ async function loadTeamPanel(force) {
 function _teamFormValues() {
   const g = id => { const e = document.getElementById(id); return e ? e.value : undefined; };
   if (!document.getElementById('tm-owner')) return null;
-  return {owner: g('tm-owner'), account: g('tm-account'), service: g('tm-service'),
+  return {owner: g('tm-owner'), service: g('tm-service'),
+    accounts: [...document.querySelectorAll('input[name="tm-acc"]:checked')].map(x => x.value),
     industries: g('tm-industries'), regions: g('tm-regions'), headcount: g('tm-headcount'),
     max_leads: g('tm-leads'), daily_limit: g('tm-daily'), name: g('tm-name'), titles: g('tm-titles')};
 }
@@ -3060,14 +3064,14 @@ async function startTeamCampaign(btn) {
   const splitR = t => (t || '').split(/[;\n]/).map(x => x.trim()).filter(Boolean);
   v.owner = me();
   if (!_meAccount) { location.replace('/member'); return; }
-  if (!v.account) { msg.textContent = 'Pick the mailbox to send from.'; return; }
+  if (!(v.accounts || []).length) { msg.textContent = 'Tick at least one mailbox to send from.'; return; }
   if (!v.service) { msg.textContent = 'Pick the service to offer.'; return; }
   if (!split(v.titles).length) { msg.textContent = 'Add who to email, e.g. CEO; Founder.'; return; }
   btn.disabled = true; msg.textContent = _teamEditing ? 'Saving…' : 'Starting…';
-  const payload = {owner: v.owner.trim(), accounts: [v.account], service: v.service,
+  const payload = {owner: v.owner.trim(), accounts: v.accounts, service: v.service,
       industries: split(v.industries), regions: splitR(v.regions), headcount: v.headcount,
       titles: split(v.titles), max_leads: parseInt(v.max_leads || '100', 10),
-      daily_limit: Math.max(1, Math.min(50, parseInt(v.daily_limit || '30', 10) || 30)),
+      daily_limit: Math.max(1, Math.min(50, parseInt(v.daily_limit || '50', 10) || 50)),
       name: v.name};
   if (_teamEditing) {
     delete payload.owner;
@@ -3133,10 +3137,10 @@ async function editTeamCampaign(id) {
   await loadTeamPanel(true);
   const set = (k, v) => { const e = document.getElementById(k); if (e) e.value = v; };
   set('tm-service', c.service || ''); await loadTeamPanel(true);
-  set('tm-account', (c.accounts || [])[0] || '');
+  document.querySelectorAll('input[name="tm-acc"]').forEach(x => { x.checked = (c.accounts || []).includes(x.value); });
   set('tm-industries', (c.industries || []).join('; ')); set('tm-regions', (c.regions || []).join('; '));
   set('tm-titles', (c.titles || []).join('; ')); set('tm-headcount', c.headcount || '');
-  set('tm-leads', c.max_leads || 100); set('tm-daily', c.daily_limit || 30); set('tm-name', c.name || '');
+  set('tm-leads', c.max_leads || 100); set('tm-daily', c.daily_limit || 50); set('tm-name', c.name || '');
   const msg = document.getElementById('team-msg');
   if (msg) msg.textContent = 'Editing “' + c.name + '”. It keeps running while you change it.';
   const f = document.querySelector('.team-form'); if (f) f.scrollIntoView({behavior: 'smooth', block: 'start'});
@@ -3149,7 +3153,7 @@ function cancelTeamEdit() {
 }
 
 async function teamLimit(id, current) {
-  const raw = prompt('Emails per day from your mailbox (1–50). 30 keeps a warmed domain healthy.', current);
+  const raw = prompt('Emails per day for each mailbox (1 to 50). 50 is the healthy maximum.', current);
   if (raw === null) return;
   const n = parseInt(raw, 10);
   if (!(n >= 1 && n <= 50)) { alert('Pick a number from 1 to 50.'); return; }

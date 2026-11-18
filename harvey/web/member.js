@@ -196,10 +196,11 @@ function renderPortal() {
   else {
     const byDomain = {};
     (acc.accounts || []).forEach(a => (byDomain[a.domain] = byDomain[a.domain] || []).push(a));
-    mailbox = '<select id="f-account" class="team-input"><option value="">Choose your mailbox…</option>' +
-      Object.entries(byDomain).map(([d, list]) => '<optgroup label="' + esc(d) + '">' +
-        list.map(a => '<option value="' + esc(a.email) + '">' + esc(a.email) + '</option>').join('') + '</optgroup>').join('') +
-      '</select>';
+    mailbox = '<div id="f-account" class="mbox-list">' +
+      Object.entries(byDomain).map(([d, list]) => '<div class="mbox-group"><div class="mbox-domain">' + esc(d) + '</div>' +
+        list.map(a => '<label class="mbox"><input type="checkbox" name="f-acc" value="' + esc(a.email) + '"> <span>' + esc(a.email) + '</span></label>').join('') +
+        '</div>').join('') + '</div>' +
+      '<small class="team-hint">Tick several mailboxes and Instantly rotates between them, so the campaign sends more.</small>';
   }
   const sg = opts.suggest || {};
   $('m-app').innerHTML =
@@ -227,12 +228,12 @@ function renderPortal() {
         '<label class="m-field"><span>Contacts to reach</span><input id="f-leads" type="number" min="1" max="2000" value="100" class="team-input"></label>' +
       '</div>' +
       '<label class="m-field"><span>Who to email (persona)</span>' + chipInput('f-titles', [], sg.titles || [], 'e.g. CEO, Founder…') +
-        '<small class="team-hint">Their own mailboxes first. A small business in your target industry may be reached at info@ when the owner reads it.</small></label>' +
+        '<small class="team-hint">Their own mailbox first. When it can’t be found, the business inbox (info@, contact@).</small></label>' +
       '<div class="m-step"><span>3</span>How it sends</div>' +
       '<div class="m-two">' +
         '<label class="m-field"><span>Send from (Instantly)</span>' + mailbox + '</label>' +
-        '<label class="m-field"><span>Emails per day</span><input id="f-daily" type="number" min="1" max="50" value="30" class="team-input">' +
-          '<small class="team-hint">30 keeps a warmed domain healthy. 50 at most.</small></label>' +
+        '<label class="m-field"><span>Emails per day, per mailbox</span><input id="f-daily" type="number" min="1" max="50" value="50" class="team-input">' +
+          '<small class="team-hint">50 a mailbox is the healthy maximum. 3 mailboxes at 50 send up to 150 a day.</small></label>' +
       '</div>' +
       '<label class="m-field"><span>Campaign name <em>(optional)</em></span><input id="f-name" class="team-input" placeholder="Filled in from service, industry and city"></label>' +
       '<div class="m-actions"><button class="btn btn-primary" id="f-go">Start campaign</button><span class="m-msg" id="f-msg"></span></div>' +
@@ -257,8 +258,8 @@ function resetForm() {
   $('f-cancel').hidden = true;
   $('f-service').value = ''; applyService('');
   ['f-ind', 'f-reg', 'f-titles'].forEach(id => chips[id].set([]));
-  $('f-head').value = ''; $('f-leads').value = 100; $('f-daily').value = 30; $('f-name').value = '';
-  if ($('f-account')) $('f-account').value = '';
+  $('f-head').value = ''; $('f-leads').value = 100; $('f-daily').value = 50; $('f-name').value = '';
+  document.querySelectorAll('input[name="f-acc"]').forEach(x => { x.checked = false; });
   $('f-msg').textContent = '';
   document.querySelector('.m-form').classList.remove('editing');
 }
@@ -271,8 +272,8 @@ function startEdit(c) {
   $('f-service').value = c.service || ''; applyService(c.service || '');
   chips['f-ind'].set(c.industries || []); chips['f-reg'].set(c.regions || []); chips['f-titles'].set(c.titles || []);
   $('f-head').value = c.headcount || ''; $('f-leads').value = c.max_leads || 100;
-  $('f-daily').value = c.daily_limit || 30; $('f-name').value = c.name || '';
-  if ($('f-account')) $('f-account').value = (c.accounts || [])[0] || '';
+  $('f-daily').value = c.daily_limit || 50; $('f-name').value = c.name || '';
+  document.querySelectorAll('input[name="f-acc"]').forEach(x => { x.checked = (c.accounts || []).includes(x.value); });
   $('f-msg').textContent = 'Editing “' + c.name + '”. It keeps running while you change it.';
   const form = document.querySelector('.m-form');
   form.classList.add('editing');
@@ -308,16 +309,16 @@ async function startCampaign() {
   const msg = $('f-msg'), btn = $('f-go');
   const v = id => ($(id) || {}).value || '';
   const body = {
-    service: v('f-service'), accounts: v('f-account') ? [v('f-account')] : [],
+    service: v('f-service'), accounts: [...document.querySelectorAll('input[name="f-acc"]:checked')].map(x => x.value),
     industries: chips['f-ind'].values, regions: chips['f-reg'].values, titles: chips['f-titles'].values,
     headcount: v('f-head'), max_leads: parseInt(v('f-leads') || '100', 10),
-    daily_limit: Math.max(1, Math.min(50, parseInt(v('f-daily') || '30', 10) || 30)), name: v('f-name'),
+    daily_limit: Math.max(1, Math.min(50, parseInt(v('f-daily') || '50', 10) || 50)), name: v('f-name'),
   };
   if (!body.service) { msg.textContent = 'Pick the service to offer.'; return; }
   if (!body.industries.length) { msg.textContent = 'Add at least one industry.'; return; }
   if (!body.regions.length) { msg.textContent = 'Add at least one city or region.'; return; }
   if (!body.titles.length) { msg.textContent = 'Add who to email, e.g. CEO or Founder.'; return; }
-  if (!body.accounts.length) { msg.textContent = 'Pick the mailbox to send from.'; return; }
+  if (!body.accounts.length) { msg.textContent = 'Tick at least one mailbox to send from.'; return; }
   btn.disabled = true; msg.textContent = editing ? 'Saving…' : 'Starting…';
   const r = editing
     ? await call('/api/member/campaign/' + encodeURIComponent(editing) + '/edit', {method: 'POST', body: JSON.stringify(body)})
@@ -370,7 +371,7 @@ async function loadCampaigns() {
       '<div class="m-meta">' + esc((c.industries || []).join(', ')) + ' · ' + esc((c.regions || []).join(', ')) +
         (c.headcount ? ' · ' + esc(c.headcount) + ' employees' : '') + '</div>' +
       '<div class="m-meta">Emailing ' + esc((c.titles || []).join(', ') || 'decision makers') +
-        ' · from ' + esc((c.accounts || []).join(', ')) + ' · ' + (c.daily_limit || 30) + '/day</div>' +
+        ' · from ' + esc((c.accounts || []).join(', ')) + ' · ' + (c.daily_limit || 50) * Math.max(1, (c.accounts || []).length) + '/day</div>' +
       '<div class="m-funnel">' +
         '<div><b>' + (c.companies || 0) + '</b><span>companies</span></div>' +
         '<div><b>' + (c.contacts || 0) + '</b><span>decision makers</span></div>' +
@@ -386,7 +387,7 @@ async function loadCampaigns() {
           : '<button class="btn btn-secondary btn-sm" data-a="resume" data-id="' + c.id + '">Resume</button>') +
         '<button class="btn btn-secondary btn-sm" data-a="find-more" data-id="' + c.id + '"' +
           (c.discovery === 'running' || c.discovery === 'queued' ? ' disabled' : '') + '>Find more</button>' +
-        '<button class="btn btn-secondary btn-sm" data-a="limit" data-id="' + c.id + '" data-limit="' + (c.daily_limit || 30) + '">Emails/day</button>' +
+        '<button class="btn btn-secondary btn-sm" data-a="limit" data-id="' + c.id + '" data-limit="' + (c.daily_limit || 50) + '">Emails/day</button>' +
         '<button class="btn btn-secondary btn-sm" data-a="edit" data-id="' + c.id + '">Edit</button>' +
         '<button class="btn btn-secondary btn-sm" data-a="contacts" data-id="' + c.id + '">Contacts</button>' +
         '<button class="btn btn-ghost btn-sm" data-a="delete" data-id="' + c.id + '">Delete</button>' +
@@ -410,7 +411,7 @@ async function campaignAction(b) {
   let body;
   if (a === 'delete' && !confirm('Delete this campaign? Emails already sent stay sent.')) return;
   if (a === 'limit') {
-    const raw = prompt('Emails per day from your mailbox (1–50). 30 keeps a warmed domain healthy.', b.dataset.limit);
+    const raw = prompt('Emails per day for each mailbox (1 to 50). 50 is the healthy maximum.', b.dataset.limit);
     if (raw === null) return;
     const n = parseInt(raw, 10);
     if (!(n >= 1 && n <= 50)) { alert('Pick a number from 1 to 50.'); return; }
