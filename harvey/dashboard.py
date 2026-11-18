@@ -2386,6 +2386,9 @@ async def _team_discovery_loop():
             async def _run():
                 return await run_prospecting(state, config, req.get("provider") or None,
                                              queries, max_spend=0.0)
+            # A Stop pressed on an earlier manual run must not block every
+            # campaign forever: a campaign starting its round is a fresh start.
+            await state.set_setting("discovery_paused", "")
             _discovery_task = asyncio.create_task(_run())
             result = await _discovery_task
             _discovery_report = {**(result.discover or {}),
