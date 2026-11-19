@@ -1473,7 +1473,7 @@ async def _cached(key: str, fetch, seconds: int = 300):
         value = await fetch()
     except Exception as e:
         logger.warning(f"Outbox: reading Instantly failed ({key}): {e}")
-        value = hit[1] if hit else ({} if key == "sigs" else [])
+        value = hit[1] if hit else ({} if key == "sigs" else "" if key.startswith("img:") else [])
     _OUTBOX_CACHE[key] = (time.time(), value)
     return value
 
@@ -1490,6 +1490,10 @@ async def outbox_instantly():
     sc = _scope()
     see_all = sc is None or members.is_admin(sc.member)
     from harvey.config import load_config, compliance_footer_lines
+    from harvey.mailhtml import fetch_image, safe_email_html, text_to_html
+
+    async def _image(url):
+        return await _cached("img:" + url, lambda: fetch_image(url), seconds=86400)
     out = []
     client = _outbox_client()
     sigs = await _cached("sigs", lambda: client.account_signatures()) if client else {}
@@ -1522,15 +1526,20 @@ async def outbox_instantly():
                         e = went[i]
                         emails.append({"step": step.step, "day": day, "sent": True,
                                        "subject": e["subject"], "body": e["body"],
+                                       "html": await safe_email_html(e.get("html") or "", _image),
                                        "from": e["eaccount"], "sent_at": e["sent_at"]})
                         continue
                     # Not sent yet: as it will go out, signed by the mailbox.
-                    sig = next((sigs.get(a) for a in accounts if sigs.get(a)), "")
-                    body = Sender._render(None, step.body, p).rstrip()
-                    body += "\n\n" + (sig or "[signature of the sending mailbox]")
+                    sig = next((sigs.get(a) for a in accounts if (sigs.get(a) or {}).get("html")), None) or {}
+                    text = Sender._render(None, step.body, p).rstrip()
+                    body = text + "\n\n" + (sig.get("text") or "[signature of the sending mailbox]")
+                    markup = text_to_html(text) + "<br><br>" + (
+                        await safe_email_html(sig["html"], _image) if sig.get("html")
+                        else "<i>[signature of the sending mailbox]</i>")
                     if footer:
                         body += "\n\n" + footer
-                    emails.append({"step": step.step, "day": day, "sent": False,
+                        markup += "<br><br>" + text_to_html(footer)
+                    emails.append({"step": step.step, "day": day, "sent": False, "html": markup,
                                    "subject": Sender._render(None, step.subject, p), "body": body})
                 leads.append({"id": p.id, "name": p.full_name(), "email": p.email,
                               "company": p.company, "title": p.title, "status": p.status,

@@ -122,6 +122,10 @@ _SIGN_OFF = re.compile(
     r"talk soon|sincerely)[,.!]?\s*(\n[^\n]{0,40}){0,3}\s*$", re.IGNORECASE)
 
 
+# A bare name the model signed with ("...?\n\nSadia"): the signature has it.
+_NAME_LINE = re.compile(r"\n+\s*[A-Z][a-z'.-]+(\s+[A-Z][a-z'.-]*){0,2}\s*$")
+
+
 def tidy_subject(subject: str) -> str:
     """Sentence case: the first letter capitalised, unless it opens with a merge variable."""
     s = (subject or "").strip()
@@ -145,6 +149,7 @@ def tidy_body(body: str, inbox: bool = False) -> str:
             if len(parts) > 2:
                 text = " ".join(parts[:-1]) + "\n\n" + parts[-1]
     text = _SIGN_OFF.sub("", text).strip()
+    text = _NAME_LINE.sub("", text).strip()
     text = re.sub(r"\n{3,}", "\n\n", text)
     return greeting + "\n\n" + text
 

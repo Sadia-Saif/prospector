@@ -430,10 +430,13 @@ class InstantlyClient:
                     continue
                 body = item.get("body")
                 if isinstance(body, dict):
-                    text = _html_to_text(body.get("html") or "") or body.get("text") or ""
+                    raw = body.get("html") or ""
+                    text = _html_to_text(raw) or body.get("text") or ""
                 else:
-                    text = _html_to_text(str(body or ""))
+                    raw = str(body or "")
+                    text = _html_to_text(raw)
                 out.append({
+                    "html": raw,
                     "lead_email": (item.get("lead") or item.get("to_address_email_list") or "").lower(),
                     "subject": item.get("subject") or "",
                     "body": text,
@@ -447,12 +450,12 @@ class InstantlyClient:
         return out
 
     async def account_signatures(self) -> dict:
-        """Each sending mailbox's own signature as plain text, by address."""
+        """Each sending mailbox's own signature, by address: {"text", "html"}."""
         sigs = {}
         for a in await self.list_accounts():
             if isinstance(a, dict) and a.get("email"):
                 sig = a.get("signature") or ""
-                sigs[a["email"].lower()] = _html_to_text(sig) if sig else ""
+                sigs[a["email"].lower()] = {"text": _html_to_text(sig) if sig else "", "html": sig}
         return sigs
 
     async def send_reply(

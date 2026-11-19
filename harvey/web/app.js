@@ -1692,7 +1692,8 @@ async function loadInstantlySent() {
           (e.sent ? ' <span class="ob-sent">Sent' + (e.from ? ' from ' + escHtml(e.from) : '') +
                     (e.sent_at ? ' · ' + relTime(e.sent_at) : '') + '</span>'
                   : ' <span class="ob-later">Not sent yet</span>') + '</div>' +
-          '<div class="ob-mail-body">' + escHtml(e.body).replace(/\n/g, '<br>') + '</div></div>').join('') +
+          // e.html is cleaned on the server (no scripts, links or images from elsewhere).
+          '<div class="ob-mail-body">' + (e.html || escHtml(e.body).replace(/\n/g, '<br>')) + '</div></div>').join('') +
       '</details>').join('');
     return '<details class="ob-folder"' + (ci === 0 ? ' open' : '') + '>' + head +
       (leads || '<p class="desc" style="padding:12px 16px">No leads added yet.</p>') + '</details>';

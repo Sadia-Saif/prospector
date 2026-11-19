@@ -239,3 +239,6 @@ input,select,textarea{border-radius:12px}
 
 .ob-sent { margin-left: 8px; font-size: 12px; color: #1a7f37; font-weight: 500; }
 .ob-later { margin-left: 8px; font-size: 12px; color: var(--muted, #8a8f98); }
+
+.ob-mail-body img { max-width: 100%; height: auto; }
+.ob-mail-body table { border-collapse: collapse; }

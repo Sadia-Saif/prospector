@@ -343,9 +343,9 @@ async def test_outbox_lists_each_instantly_lead_with_their_emails(state, monkeyp
     # Once Instantly has sent it, the Outbox shows the email exactly as it went out.
     class Client:
         async def account_signatures(self):
-            return {"me@send.example": "Ann Lee\nXorora"}
+            return {"me@send.example": {"text": "Ann Lee\nXorora", "html": "<b>Ann Lee</b><br>Xorora"}}
         async def get_sent_emails(self, cid):
-            return [{"lead_email": "jo@cafe.example", "subject": "Hi Cafe Uno",
+            return [{"lead_email": "jo@cafe.example", "subject": "Hi Cafe Uno", "html": "Hi Jo,<br><br>A note.",
                      "body": "Hi Jo,\n\nA note.\n\nAnn Lee\nXorora", "eaccount": "me@send.example",
                      "sent_at": "2026-11-19T15:00:00Z"}]
     D._OUTBOX_CACHE.clear()
@@ -355,6 +355,7 @@ async def test_outbox_lists_each_instantly_lead_with_their_emails(state, monkeyp
     first, second = lead["emails"]
     assert first["sent"] and first["from"] == "me@send.example" and first["body"].endswith("Ann Lee\nXorora")
     assert not second["sent"] and "Ann Lee\nXorora" in second["body"]
+    assert "<b>Ann Lee</b><br>Xorora" in second["html"] and first["html"] == "Hi Jo,<br><br>A note."
     D._OUTBOX_CACHE.clear()
 
 
@@ -440,3 +441,17 @@ def test_a_shared_mailbox_sends_30_a_day_in_total_not_30_per_campaign():
         {"owner": "Cy", "accounts": ["d@send.example"], "daily_limit": 50},          # never above 30
         {"owner": "Di", "accounts": ["e@send.example"], "status": "stopped"}])
     assert caps == {"a@send.example": 30, "b@send.example": 30, "c@send.example": 30, "d@send.example": 30}
+
+
+def test_outbox_email_html_is_cleaned_and_names_are_not_signed():
+    from harvey.mailhtml import sanitize
+    from harvey.agents.writer import tidy_body
+    dirty = ('<p onclick="x()">Hi<script>alert(1)</script></p><a href="javascript:x">a</a>'
+             '<img src="https://evil.example/x.png"><img src="data:image/png;base64,AA" width="80">'
+             '<a href="https://xorora.example">site</a>')
+    clean = sanitize(dirty)
+    assert "script" not in clean and "onclick" not in clean and "javascript" not in clean
+    assert "evil.example" not in clean and 'src="data:image/png;base64,AA"' in clean
+    assert 'href="https://xorora.example"' in clean
+    assert tidy_body("A.\n\nWho handles it?\n\nSadia") == "Hi {{first_name}},\n\nA.\n\nWho handles it?"
+    assert tidy_body("A.\n\nWho handles it?\n\nHumayun Khan") == "Hi {{first_name}},\n\nA.\n\nWho handles it?"
