@@ -234,7 +234,7 @@ async def test_a_team_campaign_sequence_reads_each_leads_own_copy(state):
     campaign.id = await state.add_campaign(campaign)
     await sender._deploy_campaign(campaign)
     seq = sender.instantly.set_campaign_emails.await_args.args[1]
-    assert seq[0]["subject"] == "{{s1_subject}}" and seq[0]["body"] == "{{s1_body}}"
+    assert seq[0]["subject"] == "{{s1_subject}}" and seq[0]["body"].startswith("{{s1_body}}<br><br>{{accountSignature}}")
     lead = sender.instantly.add_leads.await_args.args[1][0]
     assert lead["variables"]["s1_body"].startswith("Hi Jo at Cafe Uno")
     [req] = await team.load_requests(state)
@@ -390,3 +390,23 @@ async def test_outbox_admins_see_the_team_members_see_their_own(state, monkeypat
         D._SCOPE.reset(tok)
     assert [p["name"] for p in everyone["people"]] == ["Bo", "Ann"]  # the admin first, then the team
     assert everyone["admin_view"] is True
+
+
+def test_email_tidy_greets_by_name_and_keeps_paragraphs():
+    from harvey.agents.writer import tidy_body, tidy_subject
+    from harvey.integrations.instantly import to_html_breaks
+    assert tidy_subject("order status emails") == "Order status emails"
+    assert tidy_subject("{{company}} orders") == "{{company}} orders"
+    body = tidy_body("Hi there, Noticed the new shop. Orders pile up. Who answers them?")
+    assert body.startswith("Hi {{first_name}},\n\n")
+    assert body.endswith("\n\nWho answers them?")
+    assert tidy_body("Hello,\nA.\nB?", inbox=True) == "Hi {{company}} team,\n\nA.\n\nB?"
+    assert to_html_breaks("Hi,\n\nA") == "Hi,<br><br>A"
+
+
+def test_sequences_are_six_emails_signed_by_the_mailbox():
+    from harvey.agents import writer, sender
+    assert writer.SEQUENCE_LENGTH == 6
+    assert "five follow-ups" in writer.SEQUENCE_SHAPE.replace("\n", " ") or "Email 6" in writer.SEQUENCE_SHAPE
+    assert sender.ACCOUNT_SIGNATURE == "{{accountSignature}}"
+    assert writer.tidy_body("A.\n\nB?\n\nThanks,\nSam") == "Hi {{first_name}},\n\nA.\n\nB?"

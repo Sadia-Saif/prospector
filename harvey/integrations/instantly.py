@@ -26,6 +26,14 @@ TIMEOUT = httpx.Timeout(connect=10.0, read=30.0, write=30.0, pool=10.0)
 _INSTANTLY_VARS = {"first_name": "firstName", "last_name": "lastName", "company": "companyName"}
 
 
+def to_html_breaks(body: str) -> str:
+    """Instantly collapses plain newlines, so paragraphs need <br> tags."""
+    text = (body or "").replace("\r\n", "\n")
+    if "<br" in text.lower() or "<p" in text.lower():
+        return text
+    return text.replace("\n", "<br>")
+
+
 def to_instantly_vars(text: str) -> str:
     import re
     return re.sub(r"\{\{\s*(first_name|last_name|company)\s*\}\}",
@@ -309,7 +317,7 @@ class InstantlyClient:
                 "type": "email",
                 "delay": int(nxt or 0),
                 "variants": [{"subject": to_instantly_vars(s.get("subject", "")),
-                              "body": to_instantly_vars(s.get("body", ""))}],
+                              "body": to_html_breaks(to_instantly_vars(s.get("body", "")))}],
             })
         result = await self._request(
             "PATCH",

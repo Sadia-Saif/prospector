@@ -130,7 +130,9 @@ async def test_instantly_sequences_carry_the_footer(state):
                         sequence=[EmailStep(step=1, subject="a note", body="Would this help?")])
     await sender._deploy_campaign(campaign)
     uploaded = sender.instantly.set_campaign_emails.await_args.args[1]
-    assert uploaded[0]["body"] == "Would this help?\n\n" + ADDRESS + "\n" + LINE
+    # Each Instantly mailbox signs with its own signature, then the footer.
+    assert uploaded[0]["body"] == ("Would this help?\n\n{{accountSignature}}\n\n"
+                                   + ADDRESS + "\n" + LINE)
 
 
 def test_the_notice_asks_for_an_address_only_when_email_is_on():

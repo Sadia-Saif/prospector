@@ -216,8 +216,8 @@ If the draft doesn't clearly hit one of these, it will be ignored no matter how 
 ## Subject Lines
 
 ### Rules
-- Always lowercase
-- 2-5 words max
+- Sentence case: capitalise the first letter only
+- 2-6 words max
 - Never include the prospect's name in the subject
 - Never use "quick question" (overused beyond recognition)
 - Should look like an internal email, not a marketing email

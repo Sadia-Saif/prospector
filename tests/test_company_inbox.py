@@ -299,4 +299,4 @@ async def test_inbox_sequence_with_company_only_is_kept():
         {"step": 1, "subject": "quick one", "body": "Hi there, who answers at {{company}}?", "delay_days": 0},
     ]
     out = await sequence_writer(steps)._write_sequence([inbox(industry="Roofing")])
-    assert [s.body for s in out] == ["Hi there, who answers at {{company}}?"]
+    assert [s.body for s in out] == ["Hi {{company}} team,\n\nWho answers at {{company}}?"]

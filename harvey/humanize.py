@@ -113,7 +113,8 @@ Hard limits on the rewrite, on top of the instructions above:
 - Add no fact, name, number or claim that is not already in the draft.
 - No em dashes, no bullets, no bold, no exclamation marks.
 - Do not make the email longer. Keep exactly one question.
-- The subject stays lowercase, 2-5 words. An empty subject stays empty.
+- The subject stays 2-6 words in sentence case (first letter capitalised). An empty subject stays empty.
+- Keep the greeting line, the blank lines between paragraphs and the paragraph breaks.
 
 Draft:
 {fence(json.dumps(payload, ensure_ascii=False, indent=2), "draft")}

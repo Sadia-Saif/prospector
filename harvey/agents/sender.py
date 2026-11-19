@@ -74,6 +74,10 @@ SENDABLE_STATUSES = {"new", "queued"}
 SENDABLE_EMAIL_STATUSES = {"verified"}
 # Settings switch: send to a business's own published inbox (info@ on its
 # site) even when the verifier calls it risky. Off by default.
+# Instantly puts each sending mailbox's own signature here, so every email is
+# signed by whichever inbox it goes out from.
+ACCOUNT_SIGNATURE = "{{accountSignature}}"
+SIGNATURE_HTML = "<br><br>" + ACCOUNT_SIGNATURE
 PUBLISHED_RISKY_KEY = "send_published_risky"
 SENDABLE_EMAIL_STATUSES_WITH_RISKY = {"verified", "risky"}
 
@@ -381,10 +385,14 @@ class Sender:
             steps = int((team_req or {}).get("instantly_steps") or 0)
             if shared and steps and steps != len(campaign.sequence):
                 # The Instantly sequence has a fixed number of steps; a batch
-                # with a different count would send blank emails.
-                logger.warning(f"Sender: batch for '{campaign.name}' has {len(campaign.sequence)} "
-                               f"emails, its Instantly campaign {steps}; held.")
-                return
+                # with a different count would send blank emails. Its leads get
+                # a new Instantly campaign with the right number of steps; the
+                # old one keeps sending to the leads already in it.
+                logger.info(f"Sender: batch for '{campaign.name}' has {len(campaign.sequence)} "
+                            f"emails, its Instantly campaign {steps}; starting a new one.")
+                if campaign_id == shared:
+                    campaign_id = None
+                shared = None
             if shared and shared != campaign_id:
                 campaign_id = shared
                 reusing = True
@@ -442,7 +450,8 @@ class Sender:
         sequences = [
             {
                 "subject": ("{{s%d_subject}}" % i) if per_lead else step.subject.strip(),
-                "body": ("{{s%d_body}}" % i) if per_lead else self._with_footer(step.body.strip()),
+                "body": (("{{s%d_body}}" % i) + SIGNATURE_HTML + self._footer_html()) if per_lead
+                        else self._with_footer(step.body.strip() + "\n\n" + ACCOUNT_SIGNATURE),
                 "wait": step.delay_days,
             }
             for i, step in enumerate(campaign.sequence, start=1)
@@ -651,7 +660,7 @@ class Sender:
         this one, as the custom variables the Instantly sequence reads."""
         out = {}
         for i, step in enumerate(campaign.sequence, start=1):
-            body = self._render(self._with_footer(step.body.strip()), prospect)
+            body = self._render(step.body.strip(), prospect)
             out[f"s{i}_subject"] = self._render(step.subject.strip(), prospect)
             out[f"s{i}_body"] = body.replace("\r\n", "\n").replace("\n", "<br>")
         return out
@@ -767,6 +776,11 @@ class Sender:
                 agent="sender",
                 details={"campaign": campaign.name, "staged": staged, "mode": mode},
             )
+
+    def _footer_html(self) -> str:
+        """The compliance lines under a per-lead Instantly email, after the signature."""
+        footer = "<br>".join(compliance_footer_lines(self.config))
+        return ("<br><br>" + footer) if footer else ""
 
     def _with_footer(self, body: str) -> str:
         """A cold email as it leaves: the postal address and opt-out line

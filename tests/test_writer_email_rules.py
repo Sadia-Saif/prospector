@@ -168,9 +168,9 @@ async def test_rules_replace_the_built_in_shape_of_the_sequence(state):
                      "Subject lines: lowercase", "Never be pushy"):
         assert built_in not in prompt
     # Three emails, their timing and the output format don't change.
-    assert "email 2 a follow-up 3 days later" in prompt
-    assert '{"step": 3, "subject": "...", "body": "...", "delay_days": 4}' in prompt
-    assert "Use {{first_name}}, {{company}}, {{title}} as merge variables" in prompt
+    assert "five follow-ups: email 2 three days" in prompt
+    assert '{"step": 6, "subject": "...", "body": "...", "delay_days": 7}' in prompt
+    assert "Use {{first_name}}, {{company}}, {{title}} as" in prompt
 
 
 @pytest.mark.asyncio
@@ -178,8 +178,8 @@ async def test_without_rules_the_prompts_keep_the_built_in_shape(state):
     personal = await personal_prompt(state)
     sequence = await sequence_prompt(state)
     assert "OPERATOR'S EMAIL RULES" not in personal + sequence
-    assert "Under 75 words. One specific observation" in personal
-    assert "Email 3: Break-up email 4 days after that. Under 40 words." in sequence
+    assert "Under 90 words." in personal and "One specific observation" in personal
+    assert "Email 6: A short, gracious close 7 days after that. Under 50 words." in sequence
     assert BUILT_IN_FOOTER in personal and BUILT_IN_FOOTER in sequence
 
 

@@ -47,17 +47,33 @@ LEGACY_BATCH_CAP = 50
 
 # The built-in "how" lines each prompt ends with: email 1 is an observation
 # and a question, with no pitch. Operator email rules replace exactly these.
-PERSONAL_SHAPE = """- Under 75 words. One specific observation from the FACTS above, one
-  question. No pitch, no product name.
+PERSONAL_SHAPE = """- Under 90 words. Open with "Hi <their first name>," on its own line, then a
+  blank line. One specific observation from the FACTS above, the pain point it
+  likely causes them, and one question. No pitch, no product name.
+- 2 or 3 short paragraphs separated by a blank line; the question on its own.
 - Write the actual text (no merge variables — you know their name/company).
-- Subject: lowercase, 2-5 words."""
-SEQUENCE_SHAPE = """- Email 1: Personalized cold observation + one question. Under 75 words. No pitch.
-- Email 2: Follow-up 3 days later. Different angle, one concrete proof point. Under 75 words.
-- Email 3: Break-up email 4 days after that. Under 40 words. Gracious, not guilt-tripping."""
-SEQUENCE_STYLE = """- Never be pushy or salesy. Be consultative and value-driven.
-- Subject lines: lowercase, 2-5 words."""
+- Subject: 2-6 words, sentence case (capitalise the first letter)."""
+SEQUENCE_SHAPE = """- Every email starts with the greeting line, then a blank line, then 2 or 3
+  short paragraphs separated by blank lines. The question is its own last paragraph.
+- Email 1: Built on this prospect's own signal. Open with what you noticed about
+  their business, name the pain point it most likely causes, ask one question.
+  Warm, professional and human. Under 90 words. No pitch.
+- Email 2: Follow-up 3 days later. A different angle on the same pain point and
+  one concrete proof point that fits it. Under 90 words.
+- Email 3: Follow-up 4 days after that. A short, practical idea they could use
+  for that pain point. Under 70 words.
+- Email 4: Follow-up 5 days after that. One more angle: what the problem costs
+  them in time or customers. Under 70 words.
+- Email 5: Follow-up 6 days after that. A light, friendly check-in with one easy
+  question. Under 50 words.
+- Email 6: A short, gracious close 7 days after that. Under 50 words. No guilt.
+- No sign-off or name at the end of any email: each mailbox's own signature is
+  added under it when it sends."""
+SEQUENCE_STYLE = """- Never be pushy or salesy. Be consultative, warm and value-driven.
+- Subject lines: 2-6 words, sentence case (capitalise the first letter only)."""
 # Why the Writer stopped: Today and `xorora-prospector status` show it.
 EMAIL_RULES_PROBLEM_KEY = "email_rules_problem"
+SEQUENCE_LENGTH = 6  # the first email and five follow-ups
 BUILT_IN_FOOTER = "- No postal address, unsubscribe or opt-out line: Xorora Prospector adds them when it sends."
 
 
@@ -103,6 +119,42 @@ def footer_rule(config, rules: str) -> str:
             "  lets the reader say no, write it into the body as they say.")
     return "\n".join(lines)
 
+
+
+_GREETING = re.compile(r"^\s*(hi|hello|hey|dear|good (morning|afternoon))\b[^\n,]*,?[ \t]*\n*", re.IGNORECASE)
+
+
+# A sign-off the model wrote ("Best,\nSadia"): the mailbox's own signature replaces it.
+_SIGN_OFF = re.compile(
+    r"\n+\s*(best|best regards|kind regards|regards|warm regards|thanks|thank you|cheers|"
+    r"talk soon|sincerely)[,.!]?\s*(\n[^\n]{0,40}){0,3}\s*$", re.IGNORECASE)
+
+
+def tidy_subject(subject: str) -> str:
+    """Sentence case: the first letter capitalised, unless it opens with a merge variable."""
+    s = (subject or "").strip()
+    return s[:1].upper() + s[1:] if s and s[0].isalpha() else s
+
+
+def tidy_body(body: str, inbox: bool = False) -> str:
+    """Every email reads like a person wrote it: a greeting by name on its own
+    line, then short paragraphs with a blank line between them."""
+    text = (body or "").replace("\r\n", "\n").strip()
+    text = _GREETING.sub("", text, count=1).strip()
+    if text[:1].isalpha():
+        text = text[0].upper() + text[1:]
+    greeting = "Hi {{company}} team," if inbox else "Hi {{first_name}},"
+    if "\n\n" not in text:
+        # One block: give the closing question its own paragraph.
+        lines = [l.strip() for l in text.split("\n") if l.strip()]
+        text = "\n\n".join(lines) if len(lines) > 1 else text
+        if "\n\n" not in text:
+            parts = re.split(r"(?<=[.!?])\s+", text)
+            if len(parts) > 2:
+                text = " ".join(parts[:-1]) + "\n\n" + parts[-1]
+    text = _SIGN_OFF.sub("", text).strip()
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return greeting + "\n\n" + text
 
 class Writer:
     def __init__(
@@ -556,11 +608,12 @@ Return ONLY JSON: {{"subject": "...", "body": "..."}}"""
             merge_rule = (
                 "- These go to each company's general inbox, so no names are known.\n"
                 "  Use {{company}} as the merge variable in every email and NEVER\n"
-                "  {{first_name}} or {{title}}. Greet with 'Hi there' or the company's team."
+                "  {{first_name}} or {{title}}. Greet with 'Hi {{company}} team,'."
             )
         else:
             merge_rule = (
-                "- Use {{first_name}}, {{company}}, {{title}} as merge variables — every email\n"
+                "- Greet with 'Hi {{first_name}},'. Use {{first_name}}, {{company}}, {{title}} as\n"
+                "  merge variables — every email\n"
                 "  must use at least one, and email 1 must reference something specific to\n"
                 "  these prospects' industry or role (use the notes above)."
             )
@@ -601,8 +654,9 @@ Pricing: {self.config.product.pricing}"""
         prompt += operator_rules_block(rules)
         if rules:
             shape = (
-                "- Email 1 is the first touch, email 2 a follow-up 3 days later, email 3 a\n"
-                "  last one 4 days after that. Follow the OPERATOR'S EMAIL RULES above for\n"
+                "- Email 1 is the first touch, then five follow-ups: email 2 three days\n"
+                "  later, email 3 four days after that, email 4 five days after, email 5 six\n"
+                "  days after and email 6, the last, seven days after that. Follow the OPERATOR'S EMAIL RULES above for\n"
                 "  each one's length, structure, what it says about the product, links and\n"
                 "  subject line.")
             style = ""
@@ -614,7 +668,7 @@ Pricing: {self.config.product.pricing}"""
 
         prompt += f"""
 
-Write a 3-email cold outreach sequence for prospects like these:
+Write a 6-email cold outreach sequence (the first email and five follow-ups) for prospects like these:
 {fence(prospect_summary, "sample prospects")}
 
 {UNTRUSTED_RULE}
@@ -629,7 +683,10 @@ Return ONLY a JSON array (no markdown fences, no commentary):
 [
   {{"step": 1, "subject": "...", "body": "...", "delay_days": 0}},
   {{"step": 2, "subject": "...", "body": "...", "delay_days": 3}},
-  {{"step": 3, "subject": "...", "body": "...", "delay_days": 4}}
+  {{"step": 3, "subject": "...", "body": "...", "delay_days": 4}},
+  {{"step": 4, "subject": "...", "body": "...", "delay_days": 5}},
+  {{"step": 5, "subject": "...", "body": "...", "delay_days": 6}},
+  {{"step": 6, "subject": "...", "body": "...", "delay_days": 7}}
 ]"""
 
         result = await self.brain.think_json(
@@ -651,7 +708,8 @@ Return ONLY a JSON array (no markdown fences, no commentary):
             agent="writer", enabled=humanizer_enabled(self.config),
         )
         for step, draft in zip(steps, polished):
-            step.subject, step.body = draft["subject"], draft["body"]
+            step.subject = tidy_subject(draft["subject"])
+            step.body = tidy_body(draft["body"], inbox=inbox_batch)
         return steps
 
     def _parse_sequence(self, result) -> list[EmailStep]:
@@ -700,8 +758,8 @@ Return ONLY a JSON array (no markdown fences, no commentary):
         if steps and steps[0].delay_days != 0:
             steps[0].delay_days = 0  # first email always sends immediately
 
-        if len(steps) < 3:
-            logger.warning(f"Writer: Expected 3 emails, got {len(steps)}.")
+        if len(steps) < SEQUENCE_LENGTH:
+            logger.warning(f"Writer: Expected {SEQUENCE_LENGTH} emails, got {len(steps)}.")
         return steps
 
     def _group_prospects(self, prospects: list) -> dict[str, list]:
