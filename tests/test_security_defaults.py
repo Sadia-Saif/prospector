@@ -430,3 +430,13 @@ def test_sequences_are_six_emails_signed_by_the_mailbox():
     assert "five follow-ups" in writer.SEQUENCE_SHAPE.replace("\n", " ") or "Email 6" in writer.SEQUENCE_SHAPE
     assert sender.ACCOUNT_SIGNATURE == "{{accountSignature}}"
     assert writer.tidy_body("A.\n\nB?\n\nThanks,\nSam") == "Hi {{first_name}},\n\nA.\n\nB?"
+
+
+def test_a_shared_mailbox_sends_30_a_day_in_total_not_30_per_campaign():
+    from harvey import dashboard as D
+    caps = D.mailbox_caps([
+        {"owner": "Ann", "accounts": ["a@send.example", "b@send.example", "c@send.example"], "daily_limit": 30},
+        {"owner": "Bo", "accounts": ["A@send.example"], "daily_limit": 30},
+        {"owner": "Cy", "accounts": ["d@send.example"], "daily_limit": 50},          # never above 30
+        {"owner": "Di", "accounts": ["e@send.example"], "status": "stopped"}])
+    assert caps == {"a@send.example": 30, "b@send.example": 30, "c@send.example": 30, "d@send.example": 30}

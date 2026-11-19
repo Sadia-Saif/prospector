@@ -937,6 +937,39 @@ async def _bounce_guard():
         logger.warning(f"Bounce guard: {r.get('owner')} · {r.get('name')}: {note}")
 
 
+def mailbox_caps(requests: list[dict]) -> dict[str, int]:
+    """Each mailbox's daily cap across EVERY campaign that uses it.
+
+    The cap is per mailbox, not per campaign: two people (or two campaigns)
+    who tick the same mailbox share its 30 a day, never 30 each, because
+    what protects a domain is how much one mailbox sends in a day."""
+    from harvey import team
+    caps: dict[str, int] = {}
+    for r in requests:
+        if r.get("status") == "stopped":
+            continue
+        limit = min(int(r.get("daily_limit") or team.DEFAULT_DAILY_LIMIT), team.MAX_DAILY_LIMIT)
+        for a in r.get("accounts") or []:
+            a = a.lower()
+            caps[a] = min(caps.get(a, limit), limit)
+    return caps
+
+
+async def _cap_shared_mailboxes(requests: list[dict]):
+    """Hold every mailbox to its cap in Instantly itself (the account's own
+    daily limit, which Instantly enforces across all campaigns)."""
+    key = _instantly_key()
+    if not key:
+        return
+    from harvey.integrations.instantly import InstantlyClient
+    client = InstantlyClient(key)
+    for email, cap in mailbox_caps(requests).items():
+        try:
+            await client.set_account_daily_limit(email, cap)
+        except Exception as e:
+            logger.warning(f"Team: couldn't cap {email} at {cap} a day: {e}")
+
+
 async def _keep_campaigns_supplied():
     """Every 30 minutes: a live campaign with nobody left to write to, and
     still short of its target, searches again wider, so sending keeps going
@@ -947,6 +980,7 @@ async def _keep_campaigns_supplied():
         try:
             state = _state()
             await state.init_db()
+            await _cap_shared_mailboxes(await team.load_requests(state))
             for r in await team.load_requests(state):
                 if r.get("status") == "active":
                     # Keep every live Instantly campaign on its leads' local
@@ -2301,9 +2335,11 @@ async def _apply_mailbox_limits(accounts: list[str], limit: int, campaign_ids=()
         return
     from harvey.integrations.instantly import InstantlyClient
     client = InstantlyClient(key)
+    from harvey import team
+    caps = mailbox_caps(await team.load_requests(_state()))
     for email in accounts:
         try:
-            await client.set_account_daily_limit(email, limit)
+            await client.set_account_daily_limit(email, min(limit, caps.get(email.lower(), limit)))
         except Exception as e:  # best effort: the campaign's own cap still applies
             logger.warning(f"Team: couldn't set the daily limit on {email}: {e}")
     # The limit is per mailbox: a campaign rotating between several sends
