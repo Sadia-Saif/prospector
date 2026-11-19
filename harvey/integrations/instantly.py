@@ -21,6 +21,17 @@ RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 TIMEOUT = httpx.Timeout(connect=10.0, read=30.0, write=30.0, pool=10.0)
 
 
+# Prospector writes {{first_name}} and {{company}}; Instantly names its own
+# lead fields firstName and companyName. Anything else is a custom variable.
+_INSTANTLY_VARS = {"first_name": "firstName", "last_name": "lastName", "company": "companyName"}
+
+
+def to_instantly_vars(text: str) -> str:
+    import re
+    return re.sub(r"\{\{\s*(first_name|last_name|company)\s*\}\}",
+                  lambda m: "{{" + _INSTANTLY_VARS[m.group(1)] + "}}", text or "")
+
+
 def campaign_schedule(timezone: str) -> dict:
     """Weekdays, 9am to 5pm in ``timezone``: the schedule Instantly requires."""
     return {"schedules": [{
@@ -259,10 +270,22 @@ class InstantlyClient:
             ...
         ]
         """
+        # Instantly's v2 API keeps the sequence on the campaign itself, as
+        # steps with variants. A step's delay is the days to wait before the
+        # NEXT step, so each step carries the following step's wait.
+        steps = []
+        for i, s in enumerate(sequences):
+            nxt = sequences[i + 1].get("wait", 0) if i + 1 < len(sequences) else 0
+            steps.append({
+                "type": "email",
+                "delay": int(nxt or 0),
+                "variants": [{"subject": to_instantly_vars(s.get("subject", "")),
+                              "body": to_instantly_vars(s.get("body", ""))}],
+            })
         result = await self._request(
-            "POST",
-            f"/campaigns/{campaign_id}/emails",
-            {"sequences": [sequences]},
+            "PATCH",
+            f"/campaigns/{campaign_id}",
+            {"sequences": [{"steps": steps}]},
         )
         return result if isinstance(result, dict) else None
 
@@ -289,10 +312,17 @@ class InstantlyClient:
         if not leads:
             logger.warning("add_leads called with an empty lead list; skipping.")
             return {}
+        v2 = []
+        for lead in leads:
+            lead = dict(lead)
+            if "variables" in lead:  # v2 calls them custom variables
+                lead["custom_variables"] = {k: v for k, v in (lead.pop("variables") or {}).items()
+                                            if v not in (None, "")}
+            v2.append(lead)
         result = await self._request(
             "POST",
-            "/leads",
-            {"campaign_id": campaign_id, "leads": leads},
+            "/leads/add",
+            {"campaign_id": campaign_id, "leads": v2},
         )
         return result if isinstance(result, dict) else None
 

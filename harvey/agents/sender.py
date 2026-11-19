@@ -480,6 +480,13 @@ class Sender:
 
         # Check remaining daily send budget
         max_sends = self.config.channels.email.max_daily_sends
+        if campaign.sending_accounts:
+            # A team campaign's own cap is per mailbox; Instantly rotates
+            # between them and holds each to it.
+            from harvey import team
+            per = team.daily_limit_for(await team.load_requests(self.state), campaign.name)
+            if per:
+                max_sends = max(max_sends, per * len(campaign.sending_accounts))
         sends_today = await self._count_sends_today()
         remaining = max_sends - sends_today
         if remaining <= 0:
@@ -497,7 +504,8 @@ class Sender:
         leads = [
             {
                 "email": p.email.strip().lower(),
-                "first_name": p.first_name,
+                # A company inbox has no name; "there" keeps "Hi {{first_name}}," readable.
+                "first_name": p.first_name or ("there" if p.is_company_inbox else ""),
                 "last_name": p.last_name,
                 "company_name": p.company,
                 "variables": {

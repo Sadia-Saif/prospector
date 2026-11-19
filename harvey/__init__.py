@@ -17,3 +17,18 @@ if sys.version_info < (3, 11):  # pragma: no cover - version guard
     )
 
 """Xorora Prospector — Autonomous Sales Agent."""
+
+# Logs read "[xorora-prospector.sender]", not the internal package name.
+import logging as _logging
+
+_base_factory = _logging.getLogRecordFactory()
+
+
+def _branded_record(*args, **kwargs):
+    record = _base_factory(*args, **kwargs)
+    if record.name == "harvey" or record.name.startswith("harvey."):
+        record.name = "xorora-prospector" + record.name[len("harvey"):]
+    return record
+
+
+_logging.setLogRecordFactory(_branded_record)
