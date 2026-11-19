@@ -405,6 +405,9 @@ async def heartbeat(stop_event: asyncio.Event | None = None):
                 # cycle. Finding people keeps going alongside it, so a draft
                 # that keeps failing to deploy can't stall the pipeline.
                 tasks.append(("prospect", scout.run()))
+                # ...and so does writing: a draft holding back its only
+                # unverified contact must not keep new contacts unwritten.
+                tasks.append(("write_campaign", writer.run()))
             if action == "prospect":
                 tasks.append(("prospect", scout.run()))
                 # Analyst is cheap (no Claude calls) — keep analytics fresh
