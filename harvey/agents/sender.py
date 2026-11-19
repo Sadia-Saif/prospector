@@ -486,7 +486,7 @@ class Sender:
             from harvey import team
             per = team.daily_limit_for(await team.load_requests(self.state), campaign.name)
             if per:
-                max_sends = max(max_sends, per * len(campaign.sending_accounts))
+                max_sends = per * len(campaign.sending_accounts)
         sends_today = await self._count_sends_today()
         remaining = max_sends - sends_today
         if remaining <= 0:

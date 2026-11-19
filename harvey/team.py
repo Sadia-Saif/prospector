@@ -33,10 +33,10 @@ MAX_LIST = 20
 DEFAULT_MAX_LEADS = 100
 MAX_MAX_LEADS = 2000
 BATCH_SIZE = 25
-# Emails a day per mailbox, follow-ups included. 50 is the healthy maximum
+# Emails a day per mailbox, follow-ups included. 30 is the safe maximum
 # for a warmed mailbox; past it a domain's reputation starts to suffer.
-DEFAULT_DAILY_LIMIT = 50
-MAX_DAILY_LIMIT = 50
+DEFAULT_DAILY_LIMIT = 30
+MAX_DAILY_LIMIT = 30
 
 
 def clean_daily_limit(raw) -> int:
