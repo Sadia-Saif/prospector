@@ -1673,10 +1673,11 @@ async function loadInstantlySent() {
   const el = document.getElementById('outbox-instantly');
   const data = await api('/api/outbox/instantly');
   if (!data || data.error) { el.innerHTML = emptyState(icon('alert'), 'Couldn\'t read what was sent', escHtml((data && data.error) || '')); return; }
+  const people = data.people || [];
   const camps = data.campaigns || [];
   if (!camps.length) { el.innerHTML = emptyState(icon('outbox'), 'Nothing sent yet', 'Leads appear here once Xorora Prospector adds them to your Instantly campaign.'); return; }
   const pct = (a, b) => b ? Math.round(100 * a / b) + '%' : '0%';
-  el.innerHTML = camps.map((c, ci) => {
+  const campHtml = (c, ci) => {
     const s = c.stats || {};
     const head = '<summary class="ob-folder-head"><span class="ob-folder-name">' + escHtml(c.name) + '</span>' +
       '<span class="ob-folder-meta">' + c.leads.length + ' leads' +
@@ -1692,7 +1693,17 @@ async function loadInstantlySent() {
       '</details>').join('');
     return '<details class="ob-folder"' + (ci === 0 ? ' open' : '') + '>' + head +
       (leads || '<p class="desc" style="padding:12px 16px">No leads added yet.</p>') + '</details>';
-  }).join('');
+  };
+  el.innerHTML = (data.admin_view ? '<p class="desc" style="margin:0 0 14px">You\'re an admin, so you see everyone on the team.</p>' : '') +
+    people.map((p, pi) => {
+      const leadCount = p.campaigns.reduce((n, c) => n + c.leads.length, 0);
+      return '<details class="ob-person"' + (pi === 0 ? ' open' : '') + '><summary class="ob-person-head">' +
+        '<span class="ob-avatar">' + escHtml((p.name || '?').trim().charAt(0).toUpperCase()) + '</span>' +
+        '<span class="ob-person-name">' + escHtml(p.name) + (p.you ? ' <em>(you)</em>' : '') + '</span>' +
+        '<span class="ob-folder-meta">' + p.campaigns.length + ' campaign' + (p.campaigns.length === 1 ? '' : 's') +
+        ' · ' + leadCount + ' leads</span></summary>' +
+        '<div class="ob-person-body">' + p.campaigns.map(campHtml).join('') + '</div></details>';
+    }).join('');
 }
 
 async function loadOutbox() {

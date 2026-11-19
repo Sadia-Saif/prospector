@@ -366,3 +366,27 @@ async def test_every_team_prospect_gets_a_sequence_of_their_own(state, monkeypat
     assert seen == [["Jo"], ["Al"], ["Mo"]]          # one prospect per sequence
     drafts = await state.get_campaigns_by_status("draft")
     assert sorted(len(c.prospect_ids) for c in drafts) == [1, 1, 1]
+
+
+@pytest.mark.asyncio
+async def test_outbox_admins_see_the_team_members_see_their_own(state, monkeypatch):
+    from harvey import dashboard as D, team
+    await team.save_requests(state, [
+        {"id": "r1", "owner": "Ann", "name": "A", "member_id": "m1", "instantly_campaign_id": "i1"},
+        {"id": "r2", "owner": "Bo", "name": "B", "member_id": "m2", "instantly_campaign_id": "i2"}])
+    monkeypatch.setattr(D, "_state", lambda: state)
+    ann = {"id": "m1", "name": "Ann", "email": "ann@x.example", "role": "member"}
+    bo = {"id": "m2", "name": "Bo", "email": "bo@x.example", "role": "admin"}
+    tok = D._SCOPE.set(D.Scope(ann, set(), set(), {"Ann"}))
+    try:
+        mine = await D.outbox_instantly()
+    finally:
+        D._SCOPE.reset(tok)
+    assert [p["name"] for p in mine["people"]] == ["Ann"] and not mine["admin_view"]
+    tok = D._SCOPE.set(D.Scope(bo, set(), set(), {"Bo"}))
+    try:
+        everyone = await D.outbox_instantly()
+    finally:
+        D._SCOPE.reset(tok)
+    assert [p["name"] for p in everyone["people"]] == ["Bo", "Ann"]  # the admin first, then the team
+    assert everyone["admin_view"] is True

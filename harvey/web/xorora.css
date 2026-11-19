@@ -228,3 +228,11 @@ input,select,textarea{border-radius:12px}
 .ob-mail-head{font-size:13px;margin-bottom:6px;color:var(--muted,#6b7280)}
 .ob-mail-head b{color:var(--text,inherit)}
 .ob-mail-body{font-size:14px;line-height:1.55}
+.ob-person{margin-bottom:16px}
+.ob-person-head{display:flex;align-items:center;gap:12px;padding:10px 4px;cursor:pointer;list-style:none}
+.ob-person-head::-webkit-details-marker{display:none}
+.ob-avatar{width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--accent,#f97316);color:#fff;font-weight:700;font-size:14px;flex:none}
+.ob-person-name{font-weight:700;font-size:16px}
+.ob-person-name em{font-style:normal;font-weight:500;color:var(--muted,#6b7280)}
+.ob-person-body{padding-left:42px}
+@media (max-width:640px){.ob-person-body{padding-left:0}}

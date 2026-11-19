@@ -1422,16 +1422,18 @@ async def _with_context(items: list[dict]) -> list[dict]:
 
 @app.get("/api/outbox/instantly")
 async def outbox_instantly():
-    """Everything sent through Instantly: each campaign, its leads, and the
-    emails each lead gets (their own batch's copy, personalised for them)."""
-    from harvey import team
+    """Everything sent through Instantly, by person, then campaign, then
+    lead and the emails that lead gets. Admins see the whole team's; everyone
+    else only their own."""
+    from harvey import team, members
     from harvey.agents.sender import Sender
     state = _state()
     await state.init_db()
     sc = _scope()
+    see_all = sc is None or members.is_admin(sc.member)
     out = []
     for r in await team.load_requests(state):
-        if sc is not None and not _owns(r, sc.member):
+        if not see_all and not _owns(r, sc.member):
             continue
         name = team.campaign_name(r.get("owner") or "", r.get("name") or "")
         leads = []
@@ -1457,7 +1459,13 @@ async def outbox_instantly():
                         "campaign": r.get("name"), "status": r.get("status"),
                         "timezone": team.ZONE_LABELS.get(team.request_timezone(r), ""),
                         "stats": r.get("instantly_stats") or {}, "leads": leads})
-    return {"campaigns": out}
+    people: dict[str, list] = {}
+    for c in out:
+        people.setdefault(c.get("owner") or "Unknown", []).append(c)
+    me = (sc.member.get("name") if sc is not None else "") or ""
+    order = sorted(people, key=lambda n: (n != me, n.lower()))   # you first
+    return {"campaigns": out, "admin_view": see_all and sc is not None,
+            "people": [{"name": n, "you": n == me, "campaigns": people[n]} for n in order]}
 
 
 @app.get("/api/outbox")
