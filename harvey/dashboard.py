@@ -1420,6 +1420,30 @@ async def _with_context(items: list[dict]) -> list[dict]:
     return items
 
 
+_OUTBOX_CACHE: dict = {}
+
+
+def _outbox_client():
+    from harvey.integrations.instantly import InstantlyClient
+    key = _instantly_key()
+    return InstantlyClient(key) if key else None
+
+
+async def _cached(key: str, fetch, seconds: int = 300):
+    """Instantly reads for the Outbox, kept a few minutes so the page stays fast."""
+    import time
+    hit = _OUTBOX_CACHE.get(key)
+    if hit and time.time() - hit[0] < seconds:
+        return hit[1]
+    try:
+        value = await fetch()
+    except Exception as e:
+        logger.warning(f"Outbox: reading Instantly failed ({key}): {e}")
+        value = hit[1] if hit else ({} if key == "sigs" else [])
+    _OUTBOX_CACHE[key] = (time.time(), value)
+    return value
+
+
 @app.get("/api/outbox/instantly")
 async def outbox_instantly():
     """Everything sent through Instantly, by person, then campaign, then
@@ -1431,11 +1455,23 @@ async def outbox_instantly():
     await state.init_db()
     sc = _scope()
     see_all = sc is None or members.is_admin(sc.member)
+    from harvey.config import load_config, compliance_footer_lines
     out = []
+    client = _outbox_client()
+    sigs = await _cached("sigs", lambda: client.account_signatures()) if client else {}
+    footer = "\n".join(compliance_footer_lines(load_config()))
     for r in await team.load_requests(state):
         if not see_all and not _owns(r, sc.member):
             continue
         name = team.campaign_name(r.get("owner") or "", r.get("name") or "")
+        # What Instantly really sent, by lead, so the Outbox shows each email
+        # exactly as it went out: the mailbox's own signature and footer too.
+        sent: dict[str, list] = {}
+        if client:
+            for cid in await _campaign_instantly_ids(state, r):
+                for e in await _cached("sent:" + cid, lambda cid=cid: client.get_sent_emails(cid)):
+                    sent.setdefault(e["lead_email"], []).append(e)
+        accounts = [a.lower() for a in (r.get("accounts") or [])]
         leads = []
         batches = [c for st in ("active", "paused", "completed")
                    for c in await state.get_campaigns_by_status(st) if c.name == name]
@@ -1445,11 +1481,23 @@ async def outbox_instantly():
                 if not p or p.status == "new":
                     continue  # held back (unverified) or not sent yet
                 day, emails = 0, []
-                for step in c.sequence:
+                went = sorted(sent.get((p.email or "").lower(), []), key=lambda e: e["sent_at"] or "")
+                for i, step in enumerate(c.sequence):
                     day += int(step.delay_days or 0)
-                    emails.append({"step": step.step, "day": day,
-                                   "subject": Sender._render(None, step.subject, p),
-                                   "body": Sender._render(None, step.body, p)})
+                    if i < len(went):
+                        e = went[i]
+                        emails.append({"step": step.step, "day": day, "sent": True,
+                                       "subject": e["subject"], "body": e["body"],
+                                       "from": e["eaccount"], "sent_at": e["sent_at"]})
+                        continue
+                    # Not sent yet: as it will go out, signed by the mailbox.
+                    sig = next((sigs.get(a) for a in accounts if sigs.get(a)), "")
+                    body = Sender._render(None, step.body, p).rstrip()
+                    body += "\n\n" + (sig or "[signature of the sending mailbox]")
+                    if footer:
+                        body += "\n\n" + footer
+                    emails.append({"step": step.step, "day": day, "sent": False,
+                                   "subject": Sender._render(None, step.subject, p), "body": body})
                 leads.append({"id": p.id, "name": p.full_name(), "email": p.email,
                               "company": p.company, "title": p.title, "status": p.status,
                               "sent_at": c.created_at.isoformat() if c.created_at else "",

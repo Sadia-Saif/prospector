@@ -331,12 +331,31 @@ async def test_outbox_lists_each_instantly_lead_with_their_emails(state, monkeyp
     cid = await state.add_campaign(c)
     await state.update_campaign(cid, status="active")
     monkeypatch.setattr(D, "_state", lambda: state)
+    monkeypatch.setattr(D, "_outbox_client", lambda: None)
     out = await D.outbox_instantly()
     [camp] = out["campaigns"]
     [lead] = camp["leads"]
     assert lead["email"] == "jo@cafe.example"
     assert [(e["subject"], e["day"]) for e in lead["emails"]] == [("hi Cafe Uno", 0), ("again", 3)]
-    assert lead["emails"][0]["body"] == "Hi Jo"
+    assert lead["emails"][0]["body"].startswith("Hi Jo\n\n[signature of the sending mailbox]")
+    assert lead["emails"][0]["sent"] is False
+
+    # Once Instantly has sent it, the Outbox shows the email exactly as it went out.
+    class Client:
+        async def account_signatures(self):
+            return {"me@send.example": "Ann Lee\nXorora"}
+        async def get_sent_emails(self, cid):
+            return [{"lead_email": "jo@cafe.example", "subject": "Hi Cafe Uno",
+                     "body": "Hi Jo,\n\nA note.\n\nAnn Lee\nXorora", "eaccount": "me@send.example",
+                     "sent_at": "2026-11-19T15:00:00Z"}]
+    D._OUTBOX_CACHE.clear()
+    monkeypatch.setattr(D, "_outbox_client", lambda: Client())
+    await team.update_request(state, "r1", accounts=["me@send.example"])
+    [lead] = (await D.outbox_instantly())["campaigns"][0]["leads"]
+    first, second = lead["emails"]
+    assert first["sent"] and first["from"] == "me@send.example" and first["body"].endswith("Ann Lee\nXorora")
+    assert not second["sent"] and "Ann Lee\nXorora" in second["body"]
+    D._OUTBOX_CACHE.clear()
 
 
 @pytest.mark.asyncio
@@ -375,6 +394,7 @@ async def test_outbox_admins_see_the_team_members_see_their_own(state, monkeypat
         {"id": "r1", "owner": "Ann", "name": "A", "member_id": "m1", "instantly_campaign_id": "i1"},
         {"id": "r2", "owner": "Bo", "name": "B", "member_id": "m2", "instantly_campaign_id": "i2"}])
     monkeypatch.setattr(D, "_state", lambda: state)
+    monkeypatch.setattr(D, "_outbox_client", lambda: None)
     ann = {"id": "m1", "name": "Ann", "email": "ann@x.example", "role": "member"}
     bo = {"id": "m2", "name": "Bo", "email": "bo@x.example", "role": "admin"}
     tok = D._SCOPE.set(D.Scope(ann, set(), set(), {"Ann"}))

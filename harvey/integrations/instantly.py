@@ -61,8 +61,10 @@ def zone_candidates(timezone: str) -> list[str]:
 
 def _html_to_text(html: str) -> str:
     import re
+    import html as _html
     text = re.sub(r"(?i)<br\s*/?>|</p>|</div>", "\n", html or "")
-    return re.sub(r"<[^>]+>", "", text).strip()
+    text = _html.unescape(re.sub(r"<[^>]+>", "", text))
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
 def campaign_schedule(timezone: str) -> dict:
@@ -411,6 +413,47 @@ class InstantlyClient:
                 self.__dict__.setdefault("_reply_meta", {})[uid] = (reply["eaccount"], reply["subject"])
             out.append(reply)
         return out
+
+    async def get_sent_emails(self, campaign_id: str, max_pages: int = 5) -> list:
+        """The emails a campaign actually sent, exactly as they went out
+        (with the mailbox's signature and footer), oldest first.
+
+        Each is {lead_email, subject, body, eaccount, sent_at}."""
+        out, after = [], None
+        for _ in range(max_pages):
+            params = {"campaign_id": campaign_id, "email_type": "sent", "limit": 100}
+            if after:
+                params["starting_after"] = after
+            result = await self._request("GET", "/emails", params=params)
+            for item in self._extract_items(result):
+                if not isinstance(item, dict):
+                    continue
+                body = item.get("body")
+                if isinstance(body, dict):
+                    text = _html_to_text(body.get("html") or "") or body.get("text") or ""
+                else:
+                    text = _html_to_text(str(body or ""))
+                out.append({
+                    "lead_email": (item.get("lead") or item.get("to_address_email_list") or "").lower(),
+                    "subject": item.get("subject") or "",
+                    "body": text,
+                    "eaccount": item.get("eaccount") or item.get("from_address_email") or "",
+                    "sent_at": item.get("timestamp_email") or item.get("timestamp_created") or "",
+                })
+            after = result.get("next_starting_after") if isinstance(result, dict) else None
+            if not after:
+                break
+        out.sort(key=lambda e: e["sent_at"] or "")
+        return out
+
+    async def account_signatures(self) -> dict:
+        """Each sending mailbox's own signature as plain text, by address."""
+        sigs = {}
+        for a in await self.list_accounts():
+            if isinstance(a, dict) and a.get("email"):
+                sig = a.get("signature") or ""
+                sigs[a["email"].lower()] = _html_to_text(sig) if sig else ""
+        return sigs
 
     async def send_reply(
         self,

@@ -236,3 +236,6 @@ input,select,textarea{border-radius:12px}
 .ob-person-name em{font-style:normal;font-weight:500;color:var(--muted,#6b7280)}
 .ob-person-body{padding-left:42px}
 @media (max-width:640px){.ob-person-body{padding-left:0}}
+
+.ob-sent { margin-left: 8px; font-size: 12px; color: #1a7f37; font-weight: 500; }
+.ob-later { margin-left: 8px; font-size: 12px; color: var(--muted, #8a8f98); }

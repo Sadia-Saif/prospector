@@ -1688,7 +1688,10 @@ async function loadInstantlySent() {
         '<span class="ob-lead-meta">' + escHtml(l.company || '') + (l.title ? ' · ' + escHtml(l.title) : '') +
         ' · ' + escHtml(l.email) + ' · added ' + relTime(l.sent_at) + '</span></summary>' +
         l.emails.map(e => '<div class="ob-mail"><div class="ob-mail-head">Email ' + e.step +
-          (e.day ? ' · day ' + e.day : ' · first') + ' · <b>' + escHtml(e.subject) + '</b></div>' +
+          (e.day ? ' · day ' + e.day : ' · first') + ' · <b>' + escHtml(e.subject) + '</b>' +
+          (e.sent ? ' <span class="ob-sent">Sent' + (e.from ? ' from ' + escHtml(e.from) : '') +
+                    (e.sent_at ? ' · ' + relTime(e.sent_at) : '') + '</span>'
+                  : ' <span class="ob-later">Not sent yet</span>') + '</div>' +
           '<div class="ob-mail-body">' + escHtml(e.body).replace(/\n/g, '<br>') + '</div></div>').join('') +
       '</details>').join('');
     return '<details class="ob-folder"' + (ci === 0 ? ' open' : '') + '>' + head +
