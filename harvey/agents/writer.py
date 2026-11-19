@@ -47,30 +47,22 @@ LEGACY_BATCH_CAP = 50
 
 # The built-in "how" lines each prompt ends with: email 1 is an observation
 # and a question, with no pitch. Operator email rules replace exactly these.
-PERSONAL_SHAPE = """- Under 90 words. Open with "Hi <their first name>," on its own line, then a
-  blank line. One specific observation from the FACTS above, the pain point it
-  likely causes them, and one question. No pitch, no product name.
-- 2 or 3 short paragraphs separated by a blank line; the question on its own.
+PERSONAL_SHAPE = """- Under 75 words. One specific observation from the FACTS above, one
+  question. No pitch, no product name.
+- Open with "Hi <their first name>," on its own line, then a blank line. Short
+  paragraphs separated by a blank line; the question on its own line.
 - Write the actual text (no merge variables — you know their name/company).
-- Subject: 2-6 words, sentence case (capitalise the first letter)."""
-SEQUENCE_SHAPE = """- Every email starts with the greeting line, then a blank line, then 2 or 3
-  short paragraphs separated by blank lines. The question is its own last paragraph.
-- Email 1: Built on this prospect's own signal. Open with what you noticed about
-  their business, name the pain point it most likely causes, ask one question.
-  Warm, professional and human. Under 90 words. No pitch.
-- Email 2: Follow-up 3 days later. A different angle on the same pain point and
-  one concrete proof point that fits it. Under 90 words.
-- Email 3: Follow-up 4 days after that. A short, practical idea they could use
-  for that pain point. Under 70 words.
-- Email 4: Follow-up 5 days after that. One more angle: what the problem costs
-  them in time or customers. Under 70 words.
-- Email 5: Follow-up 6 days after that. A light, friendly check-in with one easy
-  question. Under 50 words.
-- Email 6: A short, gracious close 7 days after that. Under 50 words. No guilt.
-- No sign-off or name at the end of any email: each mailbox's own signature is
-  added under it when it sends."""
-SEQUENCE_STYLE = """- Never be pushy or salesy. Be consultative, warm and value-driven.
-- Subject lines: 2-6 words, sentence case (capitalise the first letter only)."""
+- Subject: 2-5 words, first letter capitalised."""
+SEQUENCE_SHAPE = """- Email 1: Personalized cold observation + one question. Under 75 words. No pitch.
+- Email 2: Follow-up 3 days later. Different angle, one concrete proof point. Under 75 words.
+- Emails 3, 4 and 5: Short follow-ups 4, 5 and 6 days after the one before. Each
+  a new, brief angle. Under 50 words.
+- Email 6: Break-up email 7 days after that. Under 40 words. Gracious, not guilt-tripping.
+- Formatting only: every email opens with the greeting line, then a blank line,
+  then short paragraphs separated by blank lines, the question on its own line.
+- No sign-off or name at the end: each mailbox's own signature is added when it sends."""
+SEQUENCE_STYLE = """- Never be pushy or salesy. Be consultative and value-driven.
+- Subject lines: 2-5 words, first letter capitalised."""
 # Why the Writer stopped: Today and `xorora-prospector status` show it.
 EMAIL_RULES_PROBLEM_KEY = "email_rules_problem"
 SEQUENCE_LENGTH = 6  # the first email and five follow-ups
