@@ -457,3 +457,20 @@ def test_outbox_email_html_is_cleaned_and_names_are_not_signed():
     assert 'href="https://xorora.example"' in clean
     assert tidy_body("A.\n\nWho handles it?\n\nSadia") == "Hi {{first_name}},\n\nA.\n\nWho handles it?"
     assert tidy_body("A.\n\nWho handles it?\n\nHumayun Khan") == "Hi {{first_name}},\n\nA.\n\nWho handles it?"
+
+
+@pytest.mark.asyncio
+async def test_each_team_campaign_counts_only_its_own_sends_today(state):
+    from harvey.agents.sender import Sender
+    a = await state.add_prospect(Prospect(first_name="Jo", company="A", email="jo@a.example", email_status="verified"))
+    b = await state.add_prospect(Prospect(first_name="Al", company="B", email="al@b.example", email_status="verified"))
+    for pid in (a, b):
+        await state.update_prospect_status(pid, "contacted")
+    for name, pid in (("Ann · Cafes", a), ("Bo · Retail", b)):
+        cid = await state.add_campaign(Campaign(id="", name=name, prospect_ids=[pid],
+                                               sequence=[EmailStep(step=1, subject="s", body="b")]))
+        await state.update_campaign(cid, status="active")
+    sender = Sender.__new__(Sender)
+    sender.state = state
+    assert await sender._count_sends_today("Ann · Cafes") == 1      # not Bo's send too
+    assert await sender._count_sends_today() == 2

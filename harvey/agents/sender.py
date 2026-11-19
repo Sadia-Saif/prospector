@@ -286,8 +286,13 @@ class Sender:
         sends_today = await self._count_sends_today()
         remaining = max_sends - sends_today
         if remaining <= 0:
-            logger.info(f"Sender: Daily send limit reached ({sends_today}/{max_sends}). Skipping.")
-            return
+            # Team campaigns have their own cap (30 a day per mailbox), checked
+            # per campaign below; one person's sends never stop another's.
+            draft_campaigns = [c for c in draft_campaigns if c.sending_accounts]
+            logger.info(f"Sender: Daily send limit reached ({sends_today}/{max_sends}); "
+                        f"only team campaigns, each under its own cap, go on.")
+            if not draft_campaigns:
+                return
 
         for campaign in draft_campaigns:
             try:
@@ -543,7 +548,8 @@ class Sender:
             per = team.daily_limit_for(await team.load_requests(self.state), campaign.name)
             if per:
                 max_sends = per * len(campaign.sending_accounts)
-        sends_today = await self._count_sends_today()
+        # A team campaign counts only its own sends against its own cap.
+        sends_today = await self._count_sends_today(campaign.name if campaign.sending_accounts else None)
         remaining = max_sends - sends_today
         if remaining <= 0:
             logger.info(f"Sender: Daily limit reached. Deferring campaign '{campaign.name}'.")
@@ -615,10 +621,25 @@ class Sender:
             f"with {len(leads)} leads. Campaign ID: {campaign_id}"
         )
 
-    async def _count_sends_today(self) -> int:
-        """Count how many prospects were contacted today."""
+    async def _count_sends_today(self, campaign_name: str | None = None) -> int:
+        """Count how many prospects were contacted today: everyone's, or only
+        those in the batches of one (team) campaign when it's named."""
         import aiosqlite
-        today = date.today().isoformat()
+        from datetime import datetime, timezone
+        # Stored timestamps are UTC, so "today" is the UTC day too.
+        today = datetime.now(timezone.utc).date().isoformat()
+        if campaign_name:
+            ids = set()
+            for status in ("draft", "active", "paused", "completed"):
+                for c in await self.state.get_campaigns_by_status(status):
+                    if c.name == campaign_name:
+                        ids.update(c.prospect_ids)
+            n = 0
+            for pid in ids:
+                p = await self.state.get_prospect(pid)
+                if p and p.status == "contacted" and str(p.updated_at or "").startswith(today):
+                    n += 1
+            return n
         async with aiosqlite.connect(self.state.db_path) as db:
             async with db.execute(
                 "SELECT COUNT(*) FROM prospects WHERE status = 'contacted' AND updated_at LIKE ?",
