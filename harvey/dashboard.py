@@ -512,7 +512,37 @@ async def get_settings():
         "apollo_api_key_set": is_set("APOLLO_API_KEY"),
         "apollo_monthly_credits": env_vars.get("APOLLO_MONTHLY_CREDITS", "") or "50",
         "apollo_used": await _apollo_used(),
+        "send_published_risky": await _published_risky(),
     }
+
+
+async def _published_risky() -> bool:
+    try:
+        from harvey.agents.sender import PUBLISHED_RISKY_KEY
+        state = _state()
+        await state.init_db()
+        return (await state.get_setting(PUBLISHED_RISKY_KEY)) == "1"
+    except Exception:
+        return False
+
+
+@app.post("/api/settings/published-risky")
+async def set_published_risky(request: Request):
+    """Admins: send to a business's own published inbox even when the
+    verifier can't confirm it. {"on": true|false}"""
+    if (denied := await _admins_only(request)) is not None:
+        return denied
+    try:
+        body = await request.json()
+    except ValueError:
+        body = None
+    if not isinstance(body, dict) or not isinstance(body.get("on"), bool):
+        return JSONResponse({"success": False, "message": 'expected {"on": true|false}'}, status_code=400)
+    from harvey.agents.sender import PUBLISHED_RISKY_KEY
+    state = _state()
+    await state.init_db()
+    await state.set_setting(PUBLISHED_RISKY_KEY, "1" if body["on"] else "")
+    return {"success": True, "on": body["on"]}
 
 
 async def _apollo_used() -> int:

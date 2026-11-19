@@ -592,6 +592,7 @@ async def test_instantly_reply_survives_an_outage_while_drafting(harvey):
     from harvey.models.campaign import Campaign
 
     await harvey.state.init_db()
+    await harvey.state.set_setting("instantly_auto_reply", "1")  # automatic answers on
     _, convo_id = await _open_thread(harvey.state)
     config = ProspectorConfig(**{**BASE, "channels": {"email": {
                                 "provider": "instantly", "require_approval": False}},

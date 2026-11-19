@@ -30,6 +30,9 @@ from harvey.sending_mode import sync_sending_mode
 from harvey.startups import startup_facts
 from harvey.untrusted import UNTRUSTED_RULE, fence
 
+# Settings switch: let Prospector answer Instantly replies by itself. Off:
+# every real reply waits for a person in Conversations.
+INSTANTLY_AUTO_REPLY_KEY = "instantly_auto_reply"
 logger = logging.getLogger("harvey.handler")
 
 KILL_SWITCH_KEY = "sending_paused"
@@ -797,6 +800,11 @@ class Handler:
         # Instantly setup can't send it, so don't spend a model call on it.
         await sync_sending_mode(self.config, self.state)
         held = not self.is_native and legacy_sending_held(self.config)
+        if not self.is_native and not held:
+            # Instantly sends an answer the moment it's written, with no
+            # Outbox: real replies wait for a person in Conversations unless
+            # automatic answers were switched on.
+            held = (await self.state.get_setting(INSTANTLY_AUTO_REPLY_KEY)) != "1"
         # Nothing can be sent to someone on the do-not-contact list, so don't
         # spend a model call drafting; they go to you instead (step 3).
         listed = do_not_contact_match(prospect.email or lead_email,
@@ -912,8 +920,7 @@ class Handler:
                          "reply_preview": reply_text[:200]},
             )
             logger.warning(
-                f"Handler: reply from {lead_email} held for a human: Instantly can't "
-                "queue replies for approval while require_approval is true."
+                f"Handler: reply from {lead_email} is waiting for you in Conversations."
             )
             return
 

@@ -72,6 +72,9 @@ SENDABLE_STATUSES = {"new", "queued"}
 # "risky" (catch-all domains) is opt-in via config. Never send to a "guess"
 # or "invalid" address — that bounces and burns the sending domain.
 SENDABLE_EMAIL_STATUSES = {"verified"}
+# Settings switch: send to a business's own published inbox (info@ on its
+# site) even when the verifier calls it risky. Off by default.
+PUBLISHED_RISKY_KEY = "send_published_risky"
 SENDABLE_EMAIL_STATUSES_WITH_RISKY = {"verified", "risky"}
 
 
@@ -440,6 +443,9 @@ class Sender:
             SENDABLE_EMAIL_STATUSES_WITH_RISKY if allow_risky
             else SENDABLE_EMAIL_STATUSES
         )
+        # Opt-in (Settings): a business's own published inbox may go out
+        # even when the verifier can't confirm it; a guessed one never does.
+        published_ok = (await self.state.get_setting(PUBLISHED_RISKY_KEY)) == "1"
         prospects = []
         seen_emails: set[str] = set()
         skipped_unverified = 0
@@ -463,11 +469,13 @@ class Sender:
                 continue  # the user emailed them by hand
             # Deliverability gate: never send to unverified/guessed addresses —
             # bounces are the fastest way to torch a sending domain.
-            if (prospect.email_status or "guess") not in sendable_email:
+            status = prospect.email_status or "guess"
+            published = published_ok and status == "risky" and prospect.is_company_inbox
+            if status not in sendable_email and not published:
                 skipped_unverified += 1
                 logger.debug(
                     f"Sender: Skipping {email} (email_status "
-                    f"'{prospect.email_status or 'guess'}' not deliverable)."
+                    f"'{status}' not deliverable)."
                 )
                 continue
             seen_emails.add(email)

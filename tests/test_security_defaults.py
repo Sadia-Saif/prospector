@@ -60,6 +60,7 @@ async def test_legacy_campaign_autopilot_is_still_available(state):
 async def test_legacy_replies_respect_approval_and_record_inbound_messages(state, require_approval):
     pid = await state.add_prospect(Prospect(first_name="Jane", last_name="Doe", company="Acme",
                                           title="Owner", email="jane@acme.test"))
+    await state.set_setting("instantly_auto_reply", "1")  # automatic answers on
     handler = Handler(None, state, legacy_config(require_approval), EnvConfig())
     handler.instantly = AsyncMock()
     handler._classify_intent = AsyncMock(return_value="question")
@@ -209,3 +210,40 @@ async def test_a_team_campaign_adds_every_batch_to_its_one_instantly_campaign(st
     sender.instantly.create_campaign.assert_not_awaited()      # no second campaign
     sender.instantly.set_campaign_emails.assert_not_awaited()  # its sequence stays
     assert sender.instantly.add_leads.await_args.args[0] == "inst-1"
+
+
+@pytest.mark.asyncio
+async def test_instantly_replies_wait_for_a_person_unless_automatic_answers_are_on(state):
+    pid = await state.add_prospect(Prospect(first_name="Jane", last_name="Doe", company="Acme",
+                                          title="Owner", email="jane@acme.test"))
+    handler = Handler(None, state, legacy_config(False), EnvConfig())
+    handler.instantly = AsyncMock()
+    handler._classify_intent = AsyncMock(return_value="question")
+    handler._generate_response = AsyncMock(return_value="Happy to help.")
+    await handler._process_reply("jane@acme.test", "What does it cost?", "reply-id")
+    handler.instantly.send_reply.assert_not_awaited()
+    [convo] = await state.get_conversations_by_status("needs_human")
+    assert convo.prospect_id == pid
+
+
+@pytest.mark.asyncio
+async def test_instantly_v2_replies_are_read_as_received_emails():
+    from harvey.integrations.instantly import InstantlyClient
+    client = InstantlyClient.__new__(InstantlyClient)
+    calls = []
+
+    async def fake_request(method, path, body=None, params=None, **kw):
+        calls.append((method, path, params, body))
+        if method == "GET":
+            return {"items": [{"id": "e1", "from_address_email": "jo@cafe.example",
+                               "subject": "Your note", "eaccount": "me@send.example",
+                               "body": {"text": "Sounds good"}}]}
+        return {"id": "sent"}
+    client._request = fake_request
+    [r] = await client.get_replies("c1")
+    assert (r["lead_email"], r["body"], r["id"]) == ("jo@cafe.example", "Sounds good", "e1")
+    assert calls[0][1] == "/emails" and calls[0][2]["email_type"] == "received"
+    await client.send_reply("e1", "Thanks")
+    _, path, _, body = calls[-1]
+    assert path == "/emails/reply" and body["eaccount"] == "me@send.example"
+    assert body["subject"] == "Re: Your note" and body["reply_to_uuid"] == "e1"

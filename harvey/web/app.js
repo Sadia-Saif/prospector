@@ -1322,6 +1322,8 @@ async function loadSettings() {
   if (ac) ac.value = data.apollo_monthly_credits || '50';
   const au = document.getElementById('apollo-usage');
   if (au) { au.className = 'email-tag'; au.textContent = (data.apollo_used || 0) + ' used this month'; }
+  const pr = document.getElementById('published-risky');
+  if (pr) pr.checked = !!data.send_published_risky;
   lockSettingsForMembers();
 }
 
@@ -1375,6 +1377,14 @@ function saveVerifiers() {
   if (acr !== undefined && acr !== '') payload.APOLLO_MONTHLY_CREDITS = String(Math.max(0, parseInt(acr, 10) || 0));
   if (!Object.keys(payload).length) { showToast('Enter at least one key first.', 'error'); return; }
   saveEnv(payload, 'Verification keys saved.').then(loadSettings);
+}
+
+async function setPublishedRisky(on) {
+  const data = await api('/api/settings/published-risky', {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({on})
+  });
+  if (data && data.success) showToast(on ? 'Published inboxes will be sent to.' : 'Only verified emails will be sent.', 'success');
+  else { showToast((data && data.message) || 'Only admins can change this.', 'error'); loadSettings(); }
 }
 
 async function saveEnv(payload, okMsg) {

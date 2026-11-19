@@ -402,6 +402,10 @@
         <div class="form-group"><label class="form-label" for="apollo-credits">Apollo credits per month <span id="apollo-usage" class="email-tag"></span></label>
           <input type="number" min="0" class="form-input" id="apollo-credits" placeholder="50">
           <p class="desc" style="margin-top:6px">Shared by every campaign and spread evenly over the month, so it never runs out early. Only used when no other way finds a verified email.</p></div>
+        <div class="form-group"><label class="form-label" style="display:flex;gap:10px;align-items:center;cursor:pointer">
+            <input type="checkbox" id="published-risky" onchange="setPublishedRisky(this.checked)">
+            Also send to a business's own published inbox when it can't be confirmed</label>
+          <p class="desc" style="margin-top:6px">For example info@ shown on the restaurant's own contact page. Guessed addresses are never sent. Turn this on only after a week or two of bounces under 2% in Instantly.</p></div>
         <button class="btn btn-primary btn-sm" onclick="saveVerifiers()">Save verification keys</button>
       </div>
     </div>

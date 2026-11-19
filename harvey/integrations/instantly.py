@@ -51,6 +51,12 @@ def zone_candidates(timezone: str) -> list[str]:
     return list(dict.fromkeys(_ZONE_ALIASES.get(timezone, [timezone, "America/Detroit"])))
 
 
+def _html_to_text(html: str) -> str:
+    import re
+    text = re.sub(r"(?i)<br\s*/?>|</p>|</div>", "\n", html or "")
+    return re.sub(r"<[^>]+>", "", text).strip()
+
+
 def campaign_schedule(timezone: str) -> dict:
     """Weekdays, 9am to 5pm in ``timezone``: the schedule Instantly requires."""
     return {"schedules": [{
@@ -360,21 +366,52 @@ class InstantlyClient:
         return self._extract_items(result)
 
     async def get_replies(self, campaign_id: str | None = None) -> list:
-        """Get replies, optionally filtered by campaign."""
-        params = {"campaign_id": campaign_id} if campaign_id else None
-        result = await self._request("GET", "/emails/replies", params=params)
-        return self._extract_items(result)
+        """Emails leads sent back, optionally for one campaign.
+
+        Instantly's v2 API lists them as received emails; each is reshaped
+        to {id, lead_email, body, subject} for the handler, and the mailbox
+        it came into is remembered so an answer goes out from the same one.
+        """
+        params = {"email_type": "received", "limit": 100}
+        if campaign_id:
+            params["campaign_id"] = campaign_id
+        result = await self._request("GET", "/emails", params=params)
+        out = []
+        for item in self._extract_items(result):
+            if not isinstance(item, dict):
+                continue
+            body = item.get("body")
+            if isinstance(body, dict):
+                text = body.get("text") or _html_to_text(body.get("html") or "")
+            else:
+                text = str(body or "")
+            uid = str(item.get("id") or "")
+            reply = {
+                "id": uid,
+                "lead_email": item.get("from_address_email") or item.get("lead") or "",
+                "body": text,
+                "subject": item.get("subject") or "",
+                "eaccount": item.get("eaccount") or "",
+            }
+            if uid:
+                self.__dict__.setdefault("_reply_meta", {})[uid] = (reply["eaccount"], reply["subject"])
+            out.append(reply)
+        return out
 
     async def send_reply(
         self,
         reply_to_uuid: str,
         body: str,
     ) -> dict | None:
-        """Send a reply to a lead's email."""
+        """Answer a lead's email in its thread, from the mailbox it came into."""
+        eaccount, subject = self.__dict__.get("_reply_meta", {}).get(reply_to_uuid, ("", ""))
+        if subject and not subject.lower().startswith("re:"):
+            subject = "Re: " + subject
         result = await self._request(
             "POST",
             "/emails/reply",
-            {"reply_to_uuid": reply_to_uuid, "body": body},
+            {"reply_to_uuid": reply_to_uuid, "eaccount": eaccount, "subject": subject,
+             "body": {"text": body, "html": body.replace("\n", "<br>")}},
         )
         return result if isinstance(result, dict) else None
 
