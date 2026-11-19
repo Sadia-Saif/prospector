@@ -360,7 +360,24 @@ class Sender:
         # 1. Create campaign in Instantly — or resume one from a previous
         # partially-failed deploy. Never create a duplicate.
         campaign_id = campaign.instantly_campaign_id
-        if campaign_id:
+        # A team campaign is ONE Instantly campaign: every batch Prospector
+        # writes for it adds its leads there, so each campaign keeps its own
+        # leads and numbers in Instantly instead of a new campaign a batch.
+        team_req = None
+        reusing = False
+        if campaign.sending_accounts:
+            from harvey import team
+            team_req = team.request_for(await team.load_requests(self.state), campaign.name)
+            shared = (team_req or {}).get("instantly_campaign_id")
+            if shared and shared != campaign_id:
+                campaign_id = shared
+                reusing = True
+                await self.state.update_campaign(campaign.id, instantly_campaign_id=campaign_id)
+                campaign.instantly_campaign_id = campaign_id
+                logger.info(f"Sender: Adding this batch to '{campaign.name}' in Instantly ({campaign_id}).")
+        if reusing:
+            pass
+        elif campaign_id:
             logger.info(
                 f"Sender: Campaign '{campaign.name}' already has Instantly ID "
                 f"{campaign_id}. Resuming deploy instead of recreating."
@@ -396,8 +413,11 @@ class Sender:
             # campaign instead of creating a second one (double-send guard).
             await self.state.update_campaign(campaign.id, instantly_campaign_id=campaign_id)
             campaign.instantly_campaign_id = campaign_id
+            if team_req:
+                from harvey import team
+                await team.update_request(self.state, team_req["id"], instantly_campaign_id=campaign_id)
 
-        # 2. Set email sequence
+        # 2. Set email sequence (a campaign that already runs keeps its own)
         sequences = [
             {
                 "subject": step.subject.strip(),
@@ -408,10 +428,11 @@ class Sender:
         ]
 
         await self.state.remember_footer_lines(compliance_footer_lines(self.config))
-        result = await self.instantly.set_campaign_emails(campaign_id, sequences)
-        if result is None:
-            logger.error(f"Sender: Failed to set emails for campaign {campaign_id}")
-            return
+        if not reusing:
+            result = await self.instantly.set_campaign_emails(campaign_id, sequences)
+            if result is None:
+                logger.error(f"Sender: Failed to set emails for campaign {campaign_id}")
+                return
 
         # 3. Add leads — validated, deduped, never-contacted, deliverable-only
         allow_risky = getattr(self.config.channels.email, "send_to_risky", False)

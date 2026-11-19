@@ -73,6 +73,14 @@ def request_timezone(r: dict) -> str:
     return "America/New_York"
 
 
+def request_for(requests: list[dict], campaign_name_: str) -> dict | None:
+    """The team campaign an Instantly campaign belongs to."""
+    for r in requests:
+        if campaign_name(r.get("owner") or "", r.get("name") or "") == campaign_name_:
+            return r
+    return None
+
+
 def timezone_for(requests: list[dict], campaign_name_: str) -> str | None:
     """The US time zone a team campaign's prospects are in, for its schedule."""
     for r in requests:

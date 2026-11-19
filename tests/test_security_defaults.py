@@ -188,3 +188,24 @@ def test_status_still_works_when_the_config_is_invalid(tmp_path, monkeypatch, ca
     monkeypatch.setattr(harvey.config, "load_config", invalid)
     cmd_status(SimpleNamespace(check=False))
     assert "Prospects:" in capsys.readouterr().out
+
+
+@pytest.mark.asyncio
+async def test_a_team_campaign_adds_every_batch_to_its_one_instantly_campaign(state):
+    from harvey import team
+    await team.save_requests(state, [{"id": "r1", "owner": "Ann", "name": "Cafes", "daily_limit": 30,
+                                      "regions": ["Miami, FL"], "instantly_campaign_id": "inst-1"}])
+    sender = Sender(None, state, legacy_config(False), EnvConfig())
+    sender.instantly = AsyncMock()
+    sender._reviewed_leads = lambda ps: ps
+    pid = await state.add_prospect(Prospect(first_name="Jo", last_name="Lee", company="Cafe",
+                                          title="Owner", email="jo@cafe.example",
+                                          email_status="verified"))
+    campaign = Campaign(id="", name=team.campaign_name("Ann", "Cafes"), prospect_ids=[pid],
+                        sending_accounts=["me@send.example"],
+                        sequence=[EmailStep(step=1, subject="a note", body="Would this help?")])
+    campaign.id = await state.add_campaign(campaign)
+    await sender._deploy_campaign(campaign)
+    sender.instantly.create_campaign.assert_not_awaited()      # no second campaign
+    sender.instantly.set_campaign_emails.assert_not_awaited()  # its sequence stays
+    assert sender.instantly.add_leads.await_args.args[0] == "inst-1"
