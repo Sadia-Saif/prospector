@@ -54,20 +54,30 @@ _MOUNTAIN = ("colorado", "denver", "utah", "salt lake", "idaho", "boise")
 _ARIZONA = ("arizona", "phoenix", "tucson", "scottsdale")
 
 
+ZONE_LABELS = {"America/Los_Angeles": "Pacific time", "America/Phoenix": "Arizona time",
+               "America/Denver": "Mountain time", "America/Chicago": "Central time",
+               "America/New_York": "Eastern time"}
+
+
+def request_timezone(r: dict) -> str:
+    """The US time zone a campaign's leads are in, from its regions."""
+    where = " ".join(r.get("regions") or []).lower()
+    if any(k in where for k in _PACIFIC):
+        return "America/Los_Angeles"
+    if any(k in where for k in _ARIZONA):
+        return "America/Phoenix"  # no daylight saving
+    if any(k in where for k in _MOUNTAIN):
+        return "America/Denver"
+    if any(k in where for k in _CENTRAL):
+        return "America/Chicago"
+    return "America/New_York"
+
+
 def timezone_for(requests: list[dict], campaign_name_: str) -> str | None:
     """The US time zone a team campaign's prospects are in, for its schedule."""
     for r in requests:
         if campaign_name(r.get("owner") or "", r.get("name") or "") == campaign_name_:
-            where = " ".join(r.get("regions") or []).lower()
-            if any(k in where for k in _PACIFIC):
-                return "America/Los_Angeles"
-            if any(k in where for k in _ARIZONA):
-                return "America/Phoenix"  # no daylight saving
-            if any(k in where for k in _MOUNTAIN):
-                return "America/Denver"
-            if any(k in where for k in _CENTRAL):
-                return "America/Chicago"
-            return "America/New_York"
+            return request_timezone(r)
     return None
 
 

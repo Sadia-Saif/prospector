@@ -831,6 +831,10 @@ async def _keep_campaigns_supplied():
             state = _state()
             await state.init_db()
             for r in await team.load_requests(state):
+                if r.get("status") == "active":
+                    # Keep every live Instantly campaign on its leads' local
+                    # hours, including batches deployed since the last pass.
+                    await _apply_campaign_timezone(r)
                 if r.get("status") != "active" or r.get("discovery") in ("queued", "running"):
                     continue
                 if int(r.get("written") or 0) >= int(r.get("max_leads") or 0):
@@ -1867,6 +1871,7 @@ async def team_overview(request: Request):
             "provider", "max_leads", "daily_limit", "titles", "written", "status", "discovery",
             "discovery_note", "created_at")}
         view["service"] = (r.get("service") or {}).get("name", "")
+        view["timezone"] = team.ZONE_LABELS.get(team.request_timezone(r), "")
         view["can_edit"] = _may_change(r, caller)
         view["mine"] = bool(caller) and r.get("member_id") == caller["id"]
         if view["can_edit"]:
@@ -2043,9 +2048,35 @@ async def _edit_team_campaign(state, request_id: str, body: dict):
         await _apply_mailbox_limits(accounts,
                                     changes.get("daily_limit", team.clean_daily_limit(req.get("daily_limit"))),
                                     ids)
+    if "regions" in changes and changes["regions"] != req.get("regions"):
+        # New regions can mean a new time zone: live Instantly campaigns
+        # switch their sending hours to the leads' new local time.
+        await _apply_campaign_timezone({**req, **changes})
     if retarget:
         _kick_team_discovery()
     return {"success": True, "retargeted": retarget}
+
+
+async def _apply_campaign_timezone(req: dict):
+    """Send this campaign's live Instantly campaigns 9 to 5 in its leads' zone."""
+    from harvey import team
+    key = _instantly_key()
+    if not key:
+        return
+    from harvey.integrations.instantly import InstantlyClient
+    client = InstantlyClient(key)
+    state = _state()
+    name = team.campaign_name(req.get("owner") or "", req.get("name") or "")
+    async with state._connect() as db:
+        async with db.execute(
+            "SELECT instantly_campaign_id FROM campaigns WHERE name = ? "
+            "AND COALESCE(instantly_campaign_id, '') != ''", (name,)) as cur:
+            ids = [r[0] for r in await cur.fetchall()]
+    for cid in ids:
+        try:
+            await client.update_campaign_schedule(cid, team.request_timezone(req))
+        except Exception as e:
+            logger.warning(f"Team: couldn't set the time zone on campaign {cid}: {e}")
 
 
 async def _apply_mailbox_limits(accounts: list[str], limit: int, campaign_ids=()):

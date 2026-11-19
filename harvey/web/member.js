@@ -371,7 +371,7 @@ async function loadCampaigns() {
       '<div class="m-meta">' + esc((c.industries || []).join(', ')) + ' · ' + esc((c.regions || []).join(', ')) +
         (c.headcount ? ' · ' + esc(c.headcount) + ' employees' : '') + '</div>' +
       '<div class="m-meta">Emailing ' + esc((c.titles || []).join(', ') || 'decision makers') +
-        ' · from ' + esc((c.accounts || []).join(', ')) + ' · ' + (c.daily_limit || 30) * Math.max(1, (c.accounts || []).length) + '/day</div>' +
+        ' · from ' + esc((c.accounts || []).join(', ')) + ' · ' + (c.daily_limit || 30) * Math.max(1, (c.accounts || []).length) + '/day' + (c.timezone ? ' · sends 9am to 5pm ' + c.timezone : '') + '</div>' +
       '<div class="m-funnel">' +
         '<div><b>' + (c.companies || 0) + '</b><span>companies</span></div>' +
         '<div><b>' + (c.contacts || 0) + '</b><span>decision makers</span></div>' +

@@ -2974,7 +2974,7 @@ async function loadTeamPanel(force) {
         ' &middot; ' + escHtml((c.regions || []).join(', ')) +
         (c.headcount ? ' &middot; ' + escHtml(c.headcount) + ' employees' : '') +
         ' &middot; from ' + escHtml((c.accounts || []).join(', ')) +
-        ' &middot; ' + (c.daily_limit || 30) * Math.max(1, (c.accounts || []).length) + ' emails/day</div>' +
+        ' &middot; ' + (c.daily_limit || 30) * Math.max(1, (c.accounts || []).length) + ' emails/day' + (c.timezone ? ' &middot; sends 9am to 5pm ' + c.timezone : '') + '</div>' +
       '<div class="tc-funnel">' +
         '<div><b>' + (c.companies || 0) + '</b><span>companies</span></div>' +
         '<div><b>' + (c.contacts || 0) + '</b><span>contacts found</span></div>' +
