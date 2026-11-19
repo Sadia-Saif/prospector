@@ -40,6 +40,9 @@ PERSON_VAR = re.compile(r"\{\{\s*(first_?name|last_?name|title)\s*\}\}", re.IGNO
 # Native mode: one Claude call per prospect for email 1, so batches stay
 # small — the rest of the 'new' pool is picked up on later cycles.
 NATIVE_BATCH_CAP = 8
+# Team campaigns: every prospect gets a sequence of their own, so each cycle
+# writes for up to this many (one model call each); the rest wait a cycle.
+PER_PROSPECT_CAP = 8
 LEGACY_BATCH_CAP = 50
 
 # The built-in "how" lines each prompt ends with: email 1 is an observation
@@ -246,13 +249,27 @@ class Writer:
                     await team.update_request(self.state, req["id"], status="complete")
                 continue
             ids = [i for i in await team.candidate_prospect_ids(self.state, req)
-                   if i not in claimed][:min(left, team.BATCH_SIZE)]
+                   if i not in claimed][:min(left, PER_PROSPECT_CAP)]
             if not ids:
                 continue
             claimed.update(ids)
-            prospects = [p for p in [await self.state.get_prospect(i) for i in ids] if p]
             name = team.campaign_name(owner, req.get("name") or "")
-            logger.info(f"Writer: team campaign '{name}' — {len(prospects)} contacts.")
+            # One sequence per prospect, written from that prospect's own
+            # signals: nobody gets copy written for someone else.
+            for pid in ids:
+                p = await self.state.get_prospect(pid)
+                if not p:
+                    continue
+                if not await self._write_team_one(req, owner, name, [p]):
+                    return  # the model is unavailable: try again next cycle
+                req = next((r for r in await team.load_requests(self.state)
+                            if r.get("id") == req["id"]), req)
+
+    async def _write_team_one(self, req: dict, owner: str, name: str, prospects: list) -> bool:
+        """Write and draft one prospect's own sequence. False = stop this cycle."""
+        if True:
+            logger.info(f"Writer: team campaign '{name}' — writing for "
+                        f"{prospects[0].full_name() or prospects[0].email}.")
             self._no_reply = False
             with self._as_team_member(owner, req.get("service") or {}):
                 sequence = await self._write_sequence(prospects)
@@ -261,10 +278,10 @@ class Writer:
                     "no reply from the model" if self._no_reply else "")
                 if paused:
                     logger.warning(f"Writer: {paused}; leaving '{name}' for later.")
-                    return
+                    return False
                 logger.warning(f"Writer: failed to write team campaign '{name}'.")
                 await self._count_failed_attempt(name, prospects)
-                continue
+                return True
             campaign = Campaign(
                 id="", name=name, channel="email", sequence=sequence,
                 prospect_ids=[p.id for p in prospects], status="draft",
@@ -288,6 +305,7 @@ class Writer:
                          "prospect_count": len(prospects), "steps": len(sequence)},
             )
             logger.info(f"Writer: team campaign '{name}' drafted for {owner}.")
+            return True
 
     @contextmanager
     def _as_team_member(self, owner: str, service: dict):

@@ -264,9 +264,16 @@
     </div>
     <div class="page-actions" id="outbox-actions"></div>
   </div>
-  <div id="outbox-banner"></div>
-  <div id="outbox-desk"></div>
-  <div id="outbox-list"></div>
+  <div class="ob-tabs" role="tablist">
+    <button class="ob-tab on" id="ob-tab-instantly" role="tab" onclick="outboxTab('instantly')">Sent through Instantly</button>
+    <button class="ob-tab" id="ob-tab-review" role="tab" onclick="outboxTab('review')">Waiting for you</button>
+  </div>
+  <div id="outbox-instantly"></div>
+  <div id="outbox-review" hidden>
+    <div id="outbox-banner"></div>
+    <div id="outbox-desk"></div>
+    <div id="outbox-list"></div>
+  </div>
 </div>
 
 <!-- Conversations -->

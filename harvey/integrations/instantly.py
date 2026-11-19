@@ -208,7 +208,9 @@ class InstantlyClient:
         """
         # stop_for_company: a reply from anyone at a company stops the
         # sequence to everyone there, as on Xorora Prospector's own providers.
-        payload = {"name": name, "stop_for_company": True}
+        # open_tracking: Instantly counts opens, so each campaign shows its
+        # open rate (in Instantly and on the Prospector campaign card).
+        payload = {"name": name, "stop_for_company": True, "open_tracking": True}
         if email_list:
             payload["email_list"] = list(email_list)
         if daily_limit:
@@ -230,6 +232,10 @@ class InstantlyClient:
     async def set_campaign_daily_limit(self, campaign_id: str, limit: int) -> dict | None:
         result = await self._request("PATCH", f"/campaigns/{campaign_id}",
                                      {"daily_limit": int(limit)})
+        return result if isinstance(result, dict) else None
+
+    async def set_open_tracking(self, campaign_id: str, on: bool = True) -> dict | None:
+        result = await self._request("PATCH", f"/campaigns/{campaign_id}", {"open_tracking": bool(on)})
         return result if isinstance(result, dict) else None
 
     async def set_campaign_accounts(self, campaign_id: str, emails: list[str]) -> dict | None:
@@ -418,9 +424,12 @@ class InstantlyClient:
     # ── Analytics ──
 
     async def get_campaign_analytics(self, campaign_id: str) -> dict | None:
-        """Get campaign performance stats."""
-        result = await self._request("GET", f"/campaigns/{campaign_id}/analytics")
-        return result if isinstance(result, dict) else None
+        """A campaign's totals: emails_sent_count, bounced_count, reply_count..."""
+        result = await self._request("GET", "/campaigns/analytics", params={"id": campaign_id})
+        items = self._extract_items(result) if not isinstance(result, dict) or "items" in result else [result]
+        if isinstance(result, list):
+            items = result
+        return items[0] if items and isinstance(items[0], dict) else None
 
     # ── Account / Warmup ──
 

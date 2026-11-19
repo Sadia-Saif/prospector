@@ -1653,7 +1653,50 @@ async function loadUsage() {
 // the approval ladder exists to prevent. One email fills the pane; the rest
 // wait in the rail.
 
+// Outbox has two views: what went out through Instantly (campaign folders,
+// their leads, and the emails each lead gets) and the review desk.
+let _obTab = 'instantly';
+try { _obTab = localStorage.getItem('xp.outboxTab') || 'instantly'; } catch (e) {}
+
+function outboxTab(t) {
+  _obTab = t;
+  try { localStorage.setItem('xp.outboxTab', t); } catch (e) {}
+  document.getElementById('ob-tab-instantly').classList.toggle('on', t === 'instantly');
+  document.getElementById('ob-tab-review').classList.toggle('on', t === 'review');
+  document.getElementById('outbox-instantly').hidden = t !== 'instantly';
+  document.getElementById('outbox-review').hidden = t !== 'review';
+  document.getElementById('outbox-actions').hidden = t !== 'review';
+  if (t === 'instantly') loadInstantlySent();
+}
+
+async function loadInstantlySent() {
+  const el = document.getElementById('outbox-instantly');
+  const data = await api('/api/outbox/instantly');
+  if (!data || data.error) { el.innerHTML = emptyState(icon('alert'), 'Couldn\'t read what was sent', escHtml((data && data.error) || '')); return; }
+  const camps = data.campaigns || [];
+  if (!camps.length) { el.innerHTML = emptyState(icon('outbox'), 'Nothing sent yet', 'Leads appear here once Xorora Prospector adds them to your Instantly campaign.'); return; }
+  const pct = (a, b) => b ? Math.round(100 * a / b) + '%' : '0%';
+  el.innerHTML = camps.map((c, ci) => {
+    const s = c.stats || {};
+    const head = '<summary class="ob-folder-head"><span class="ob-folder-name">' + escHtml(c.name) + '</span>' +
+      '<span class="ob-folder-meta">' + c.leads.length + ' leads' +
+      (s.sent ? ' · ' + s.sent + ' sent · ' + pct(s.opened, s.sent) + ' opened · ' + (s.replied || 0) + ' replies · ' + pct(s.bounced, s.sent) + ' bounced' : '') +
+      (c.timezone ? ' · ' + escHtml(c.timezone) : '') + '</span></summary>';
+    const leads = c.leads.map(l =>
+      '<details class="ob-lead"><summary><b>' + escHtml(l.name || l.email) + '</b>' +
+        '<span class="ob-lead-meta">' + escHtml(l.company || '') + (l.title ? ' · ' + escHtml(l.title) : '') +
+        ' · ' + escHtml(l.email) + ' · added ' + relTime(l.sent_at) + '</span></summary>' +
+        l.emails.map(e => '<div class="ob-mail"><div class="ob-mail-head">Email ' + e.step +
+          (e.day ? ' · day ' + e.day : ' · first') + ' · <b>' + escHtml(e.subject) + '</b></div>' +
+          '<div class="ob-mail-body">' + escHtml(e.body).replace(/\n/g, '<br>') + '</div></div>').join('') +
+      '</details>').join('');
+    return '<details class="ob-folder"' + (ci === 0 ? ' open' : '') + '>' + head +
+      (leads || '<p class="desc" style="padding:12px 16px">No leads added yet.</p>') + '</details>';
+  }).join('');
+}
+
 async function loadOutbox() {
+  outboxTab(_obTab);
   const [data, mode] = await Promise.all([api('/api/outbox'), api('/api/sending-mode')]);
   _sendingMode = mode && !mode.error ? mode : null;
   const banner = document.getElementById('outbox-banner');
@@ -2992,6 +3035,8 @@ async function loadTeamPanel(force) {
         '<div><b>' + (c.written || 0) + ' / ' + (c.max_leads || 0) + '</b><span>emailed</span></div>' +
       '</div>' +
       '<div class="tc-bar"><i style="width:' + pct + '%"></i></div>' +
+      (c.instantly_stats && c.instantly_stats.sent ? '<div class="tc-note">In Instantly: ' + c.instantly_stats.sent + ' sent · ' + Math.round(100 * c.instantly_stats.opened / c.instantly_stats.sent) + '% opened · ' + c.instantly_stats.replied + ' replies · ' + (Math.round(1000 * c.instantly_stats.bounced / c.instantly_stats.sent) / 10) + '% bounced</div>' : '') +
+      (c.stop_reason ? '<div class="tc-note" style="color:var(--danger,#d93025);font-weight:600">' + escHtml(c.stop_reason) + '</div>' : '') +
       (c.discovery_note && c.discovery !== 'running' && c.discovery !== 'queued' ? '<div class="tc-note">' + escHtml(c.discovery_note) + '</div>' : '') +
       (!c.can_edit ? '<div class="tc-actions"><span class="team-hint">Run by ' + escHtml(personName(c.owner)) + '. Only they or an admin can change it.</span></div></div>' :
       '<div class="tc-actions">' +

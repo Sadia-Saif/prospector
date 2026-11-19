@@ -195,7 +195,8 @@ def test_status_still_works_when_the_config_is_invalid(tmp_path, monkeypatch, ca
 async def test_a_team_campaign_adds_every_batch_to_its_one_instantly_campaign(state):
     from harvey import team
     await team.save_requests(state, [{"id": "r1", "owner": "Ann", "name": "Cafes", "daily_limit": 30,
-                                      "regions": ["Miami, FL"], "instantly_campaign_id": "inst-1"}])
+                                      "regions": ["Miami, FL"], "instantly_campaign_id": "inst-1",
+                                      "instantly_per_lead": True, "instantly_steps": 1}])
     sender = Sender(None, state, legacy_config(False), EnvConfig())
     sender.instantly = AsyncMock()
     sender._reviewed_leads = lambda ps: ps
@@ -210,6 +211,34 @@ async def test_a_team_campaign_adds_every_batch_to_its_one_instantly_campaign(st
     sender.instantly.create_campaign.assert_not_awaited()      # no second campaign
     sender.instantly.set_campaign_emails.assert_not_awaited()  # its sequence stays
     assert sender.instantly.add_leads.await_args.args[0] == "inst-1"
+    lead = sender.instantly.add_leads.await_args.args[1][0]
+    assert lead["variables"]["s1_body"].startswith("Would this help?")  # this batch's own copy
+    assert lead["variables"]["s1_subject"] == "a note"
+
+
+@pytest.mark.asyncio
+async def test_a_team_campaign_sequence_reads_each_leads_own_copy(state):
+    from harvey import team
+    await team.save_requests(state, [{"id": "r1", "owner": "Ann", "name": "Cafes", "daily_limit": 30,
+                                      "regions": ["Miami, FL"]}])
+    sender = Sender(None, state, legacy_config(False), EnvConfig())
+    sender.instantly = AsyncMock()
+    sender.instantly.create_campaign.return_value = {"id": "new-1"}
+    sender._reviewed_leads = lambda ps: ps
+    pid = await state.add_prospect(Prospect(first_name="Jo", last_name="Lee", company="Cafe Uno",
+                                          title="Owner", email="jo@cafe.example",
+                                          email_status="verified"))
+    campaign = Campaign(id="", name=team.campaign_name("Ann", "Cafes"), prospect_ids=[pid],
+                        sending_accounts=["me@send.example"],
+                        sequence=[EmailStep(step=1, subject="hi", body="Hi {{first_name}} at {{company}}")])
+    campaign.id = await state.add_campaign(campaign)
+    await sender._deploy_campaign(campaign)
+    seq = sender.instantly.set_campaign_emails.await_args.args[1]
+    assert seq[0]["subject"] == "{{s1_subject}}" and seq[0]["body"] == "{{s1_body}}"
+    lead = sender.instantly.add_leads.await_args.args[1][0]
+    assert lead["variables"]["s1_body"].startswith("Hi Jo at Cafe Uno")
+    [req] = await team.load_requests(state)
+    assert req["instantly_campaign_id"] == "new-1" and req["instantly_per_lead"] is True
 
 
 @pytest.mark.asyncio
@@ -247,3 +276,93 @@ async def test_instantly_v2_replies_are_read_as_received_emails():
     _, path, _, body = calls[-1]
     assert path == "/emails/reply" and body["eaccount"] == "me@send.example"
     assert body["subject"] == "Re: Your note" and body["reply_to_uuid"] == "e1"
+
+
+@pytest.mark.asyncio
+async def test_a_campaign_over_two_percent_bounces_is_stopped(state, monkeypatch):
+    from harvey import dashboard as D, team
+    await team.save_requests(state, [
+        {"id": "r1", "owner": "Ann", "name": "A", "status": "active", "instantly_campaign_id": "bad"},
+        {"id": "r2", "owner": "Bo", "name": "B", "status": "active", "instantly_campaign_id": "ok"}])
+    paused = []
+
+    class FakeInstantly:
+        def __init__(self, key): pass
+        async def get_campaign_analytics(self, cid):
+            return {"bad": {"emails_sent_count": 100, "bounced_count": 3},
+                    "ok": {"emails_sent_count": 100, "bounced_count": 2}}[cid]
+        async def pause_campaign(self, cid):
+            paused.append(cid)
+    monkeypatch.setattr(D, "_state", lambda: state)
+    monkeypatch.setattr(D, "_instantly_key", lambda: "k")
+    monkeypatch.setattr("harvey.integrations.instantly.InstantlyClient", FakeInstantly)
+    await D._bounce_guard()
+    reqs = {r["id"]: r for r in await team.load_requests(state)}
+    assert paused == ["bad"]
+    assert reqs["r1"]["status"] == "stopped" and "3.0%" in reqs["r1"]["stop_reason"]
+    assert reqs["r2"]["status"] == "active"  # exactly 2% is still within the limit
+
+
+@pytest.mark.asyncio
+async def test_instantly_campaigns_track_opens():
+    from harvey.integrations.instantly import InstantlyClient
+    client = InstantlyClient.__new__(InstantlyClient)
+    sent = {}
+
+    async def fake_request(method, path, body=None, **kw):
+        sent.update(body or {})
+        return {"id": "c1"}
+    client._request = fake_request
+    await client.create_campaign("x")
+    assert sent["open_tracking"] is True
+
+
+@pytest.mark.asyncio
+async def test_outbox_lists_each_instantly_lead_with_their_emails(state, monkeypatch):
+    from harvey import dashboard as D, team
+    await team.save_requests(state, [{"id": "r1", "owner": "Ann", "name": "Cafes", "regions": ["Miami, FL"],
+                                      "instantly_campaign_id": "i1"}])
+    pid = await state.add_prospect(Prospect(first_name="Jo", last_name="Lee", company="Cafe Uno",
+                                          title="Owner", email="jo@cafe.example", email_status="verified"))
+    await state.update_prospect_status(pid, "contacted")
+    c = Campaign(id="", name=team.campaign_name("Ann", "Cafes"), prospect_ids=[pid], status="active",
+                 sequence=[EmailStep(step=1, subject="hi {{company}}", body="Hi {{first_name}}"),
+                           EmailStep(step=2, subject="again", body="Still there?", delay_days=3)])
+    cid = await state.add_campaign(c)
+    await state.update_campaign(cid, status="active")
+    monkeypatch.setattr(D, "_state", lambda: state)
+    out = await D.outbox_instantly()
+    [camp] = out["campaigns"]
+    [lead] = camp["leads"]
+    assert lead["email"] == "jo@cafe.example"
+    assert [(e["subject"], e["day"]) for e in lead["emails"]] == [("hi Cafe Uno", 0), ("again", 3)]
+    assert lead["emails"][0]["body"] == "Hi Jo"
+
+
+@pytest.mark.asyncio
+async def test_every_team_prospect_gets_a_sequence_of_their_own(state, monkeypatch):
+    from harvey import team
+    from harvey.agents.writer import Writer
+    await team.save_requests(state, [{"id": "r1", "owner": "Ann", "name": "Cafes", "status": "active",
+                                      "max_leads": 10, "accounts": ["me@send.example"]}])
+    pids = [await state.add_prospect(Prospect(first_name=n, last_name="Lee", company=n + " Cafe",
+                                            title="Owner", email=n.lower() + "@cafe.example",
+                                            email_status="verified")) for n in ("Jo", "Al", "Mo")]
+
+    async def candidates(state_, req):
+        return pids
+    monkeypatch.setattr(team, "candidate_prospect_ids", candidates)
+    writer = Writer.__new__(Writer)
+    writer.state, writer.config = state, legacy_config(False)
+    writer.config.persona.name, writer.config.product.key_benefits = "Ann", []
+    writer.brain = SimpleNamespace(paused_reason="")
+    seen = []
+
+    async def write(prospects):
+        seen.append([p.first_name for p in prospects])
+        return [EmailStep(step=1, subject="hi", body="Hi " + prospects[0].first_name)]
+    writer._write_sequence = write
+    await writer._run_team_requests()
+    assert seen == [["Jo"], ["Al"], ["Mo"]]          # one prospect per sequence
+    drafts = await state.get_campaigns_by_status("draft")
+    assert sorted(len(c.prospect_ids) for c in drafts) == [1, 1, 1]

@@ -371,7 +371,20 @@ class Sender:
         if campaign.sending_accounts:
             from harvey import team
             team_req = team.request_for(await team.load_requests(self.state), campaign.name)
-            shared = (team_req or {}).get("instantly_campaign_id")
+            # Only a campaign built for per-lead copy is shared: an older one
+            # holds one batch's emails for everyone, so a new one starts.
+            shared = (team_req or {}).get("instantly_campaign_id") \
+                if (team_req or {}).get("instantly_per_lead") else None
+            if team_req and not shared and campaign_id and \
+                    campaign_id == team_req.get("instantly_campaign_id"):
+                campaign_id = None  # that old shared one: start the new kind
+            steps = int((team_req or {}).get("instantly_steps") or 0)
+            if shared and steps and steps != len(campaign.sequence):
+                # The Instantly sequence has a fixed number of steps; a batch
+                # with a different count would send blank emails.
+                logger.warning(f"Sender: batch for '{campaign.name}' has {len(campaign.sequence)} "
+                               f"emails, its Instantly campaign {steps}; held.")
+                return
             if shared and shared != campaign_id:
                 campaign_id = shared
                 reusing = True
@@ -418,16 +431,21 @@ class Sender:
             campaign.instantly_campaign_id = campaign_id
             if team_req:
                 from harvey import team
-                await team.update_request(self.state, team_req["id"], instantly_campaign_id=campaign_id)
+                await team.update_request(self.state, team_req["id"], instantly_campaign_id=campaign_id,
+                                          instantly_per_lead=True, instantly_steps=len(campaign.sequence))
 
         # 2. Set email sequence (a campaign that already runs keeps its own)
+        # A team campaign's Instantly sequence is per lead: each step is
+        # {{sN_subject}} / {{sN_body}}, filled from the emails Prospector wrote
+        # for that lead's own batch, already personalised for them.
+        per_lead = team_req is not None
         sequences = [
             {
-                "subject": step.subject.strip(),
-                "body": self._with_footer(step.body.strip()),
+                "subject": ("{{s%d_subject}}" % i) if per_lead else step.subject.strip(),
+                "body": ("{{s%d_body}}" % i) if per_lead else self._with_footer(step.body.strip()),
                 "wait": step.delay_days,
             }
-            for step in campaign.sequence
+            for i, step in enumerate(campaign.sequence, start=1)
         ]
 
         await self.state.remember_footer_lines(compliance_footer_lines(self.config))
@@ -540,6 +558,7 @@ class Sender:
                 "variables": {
                     "title": p.title,
                     "personalization": p.personalization_notes,
+                    **(self._per_lead_copy(campaign, p) if team_req is not None else {}),
                 },
             }
             for p in prospects
@@ -626,6 +645,16 @@ class Sender:
                 logger.error(f"Sender: staging '{campaign.name}' failed: {e}")
 
         await self._drain_due()
+
+    def _per_lead_copy(self, campaign, prospect) -> dict:
+        """This batch's emails, written for its leads and personalised for
+        this one, as the custom variables the Instantly sequence reads."""
+        out = {}
+        for i, step in enumerate(campaign.sequence, start=1):
+            body = self._render(self._with_footer(step.body.strip()), prospect)
+            out[f"s{i}_subject"] = self._render(step.subject.strip(), prospect)
+            out[f"s{i}_body"] = body.replace("\r\n", "\n").replace("\n", "<br>")
+        return out
 
     def _render(self, text: str, prospect) -> str:
         """Fill merge variables. The pre-send gate rejects any leftovers."""

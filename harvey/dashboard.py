@@ -850,6 +850,93 @@ async def get_harvey_status():
 AUTOSTART_FILE = PROJECT_ROOT / "data" / "autostart"
 
 
+BOUNCE_LIMIT = 0.02      # stop a campaign the moment bounces pass 2%
+BOUNCE_MIN_SENT = 25     # below this, one bounce says nothing about the list
+
+
+async def _bounce_guard_loop():
+    """Every 10 minutes: any campaign whose Instantly bounce rate passes 2%
+    is stopped at once, in Instantly and here, and the people running it
+    are told on the Today page."""
+    while True:
+        await asyncio.sleep(600)
+        try:
+            await _bounce_guard()
+        except Exception as e:
+            logger.warning(f"Bounce guard: {e}")
+
+
+async def _campaign_instantly_ids(state, req: dict) -> list[str]:
+    from harvey import team
+    name = team.campaign_name(req.get("owner") or "", req.get("name") or "")
+    async with state._connect() as db:
+        async with db.execute(
+            "SELECT instantly_campaign_id FROM campaigns WHERE name = ? "
+            "AND COALESCE(instantly_campaign_id, '') != ''", (name,)) as cur:
+            ids = [r[0] for r in await cur.fetchall()]
+    return list(dict.fromkeys(ids + ([req["instantly_campaign_id"]] if req.get("instantly_campaign_id") else [])))
+
+
+async def _instantly_totals(client, ids: list[str]) -> dict:
+    """Sent, opened, replied and bounced across a campaign's Instantly campaigns."""
+    t = {"sent": 0, "opened": 0, "replied": 0, "bounced": 0}
+    for cid in ids:
+        a = await client.get_campaign_analytics(cid) or {}
+        t["sent"] += int(a.get("emails_sent_count") or 0)
+        t["opened"] += int(a.get("open_count_unique") or a.get("open_count") or 0)
+        t["replied"] += int(a.get("reply_count_unique") or a.get("reply_count") or 0)
+        t["bounced"] += int(a.get("bounced_count") or 0)
+    return t
+
+
+async def _bounce_totals(client, ids: list[str]) -> tuple[int, int]:
+    t = await _instantly_totals(client, ids)
+    return t["sent"], t["bounced"]
+
+
+async def _bounce_guard():
+    from harvey import team
+    from harvey.integrations.instantly import InstantlyClient
+    key = _instantly_key()
+    if not key:
+        return
+    client = InstantlyClient(key)
+    state = _state()
+    await state.init_db()
+    for r in await team.load_requests(state):
+        if r.get("status") != "active":
+            continue
+        ids = await _campaign_instantly_ids(state, r)
+        if not ids:
+            continue
+        totals = await _instantly_totals(client, ids)
+        # The campaign card shows these: sent, open rate, replies, bounces.
+        await team.update_request(state, r["id"], instantly_stats={
+            **totals, "at": datetime.now().isoformat(timespec="minutes")})
+        sent, bounced = totals["sent"], totals["bounced"]
+        base = r.get("bounce_baseline") or {}
+        sent -= int(base.get("sent") or 0)
+        bounced -= int(base.get("bounced") or 0)
+        if sent < BOUNCE_MIN_SENT or bounced / max(sent, 1) <= BOUNCE_LIMIT:
+            continue
+        rate = round(100 * bounced / sent, 1)
+        for cid in ids:
+            try:
+                await client.pause_campaign(cid)
+            except Exception as e:
+                logger.warning(f"Bounce guard: couldn't pause {cid}: {e}")
+        note = (f"Stopped automatically: {rate}% of emails bounced ({bounced} of {sent}), "
+                "over the 2% safety limit. Check the list before resuming.")
+        await team.update_request(state, r["id"], status="stopped", stop_reason=note)
+        # Published-but-unconfirmed inboxes are the likeliest cause: off again.
+        from harvey.agents.sender import PUBLISHED_RISKY_KEY
+        await state.set_setting(PUBLISHED_RISKY_KEY, "")
+        await state.log_action(action_type="escalation", agent="sender", details={
+            "campaign_name": team.campaign_name(r.get("owner") or "", r.get("name") or ""),
+            "reason": note})
+        logger.warning(f"Bounce guard: {r.get('owner')} · {r.get('name')}: {note}")
+
+
 async def _keep_campaigns_supplied():
     """Every 30 minutes: a live campaign with nobody left to write to, and
     still short of its target, searches again wider, so sending keeps going
@@ -889,6 +976,7 @@ async def _autostart_agent():
     """Bring the agent back after the dashboard restarts (a deploy, a reboot),
     unless someone stopped it on purpose."""
     asyncio.get_running_loop().create_task(_keep_campaigns_supplied())
+    asyncio.get_running_loop().create_task(_bounce_guard_loop())
     # A restart stops any company search mid-way: run those again.
     try:
         from harvey import team
@@ -1330,6 +1418,46 @@ async def _with_context(items: list[dict]) -> list[dict]:
             "signals": signals.get(p.get("company_id"), {}),
         }
     return items
+
+
+@app.get("/api/outbox/instantly")
+async def outbox_instantly():
+    """Everything sent through Instantly: each campaign, its leads, and the
+    emails each lead gets (their own batch's copy, personalised for them)."""
+    from harvey import team
+    from harvey.agents.sender import Sender
+    state = _state()
+    await state.init_db()
+    sc = _scope()
+    out = []
+    for r in await team.load_requests(state):
+        if sc is not None and not _owns(r, sc.member):
+            continue
+        name = team.campaign_name(r.get("owner") or "", r.get("name") or "")
+        leads = []
+        batches = [c for st in ("active", "paused", "completed")
+                   for c in await state.get_campaigns_by_status(st) if c.name == name]
+        for c in sorted(batches, key=lambda c: c.created_at, reverse=True):
+            for pid in c.prospect_ids:
+                p = await state.get_prospect(pid)
+                if not p or p.status == "new":
+                    continue  # held back (unverified) or not sent yet
+                day, emails = 0, []
+                for step in c.sequence:
+                    day += int(step.delay_days or 0)
+                    emails.append({"step": step.step, "day": day,
+                                   "subject": Sender._render(None, step.subject, p),
+                                   "body": Sender._render(None, step.body, p)})
+                leads.append({"id": p.id, "name": p.full_name(), "email": p.email,
+                              "company": p.company, "title": p.title, "status": p.status,
+                              "sent_at": c.created_at.isoformat() if c.created_at else "",
+                              "emails": emails})
+        if leads or r.get("instantly_campaign_id"):
+            out.append({"id": r.get("id"), "name": name, "owner": r.get("owner"),
+                        "campaign": r.get("name"), "status": r.get("status"),
+                        "timezone": team.ZONE_LABELS.get(team.request_timezone(r), ""),
+                        "stats": r.get("instantly_stats") or {}, "leads": leads})
+    return {"campaigns": out}
 
 
 @app.get("/api/outbox")
@@ -1899,7 +2027,7 @@ async def team_overview(request: Request):
         view = {k: r.get(k) for k in (
             "id", "owner", "name", "accounts", "industries", "regions", "headcount",
             "provider", "max_leads", "daily_limit", "titles", "written", "status", "discovery",
-            "discovery_note", "created_at")}
+            "discovery_note", "created_at", "stop_reason", "instantly_stats")}
         view["service"] = (r.get("service") or {}).get("name", "")
         view["timezone"] = team.ZONE_LABELS.get(team.request_timezone(r), "")
         view["can_edit"] = _may_change(r, caller)
@@ -1910,7 +2038,7 @@ async def team_overview(request: Request):
             # Someone else's campaign: who runs it and what it targets, never
             # its progress, contacts, mailbox or numbers.
             for k in ("accounts", "max_leads", "daily_limit", "written", "discovery",
-                      "discovery_note", "provider"):
+                      "discovery_note", "provider", "stop_reason", "instantly_stats"):
                 view.pop(k, None)
             view["private"] = True
         out.append(view)
@@ -2166,7 +2294,22 @@ async def team_campaign_action(request_id: str, action: str, request: Request,
     if action == "stop":
         await team.update_request(state, request_id, status="stopped")
     elif action == "resume":
-        await team.update_request(state, request_id, status="active")
+        # Count bounces afresh from here, and start its Instantly campaigns again.
+        req = next((r for r in await team.load_requests(state) if r.get("id") == request_id), None) or {}
+        ids = await _campaign_instantly_ids(state, req) if req else []
+        baseline = {}
+        if ids and _instantly_key():
+            from harvey.integrations.instantly import InstantlyClient
+            client = InstantlyClient(_instantly_key())
+            sent, bounced = await _bounce_totals(client, ids)
+            baseline = {"sent": sent, "bounced": bounced}
+            for cid in ids:
+                try:
+                    await client.activate_campaign(cid)
+                except Exception as e:
+                    logger.warning(f"Team: couldn't restart Instantly campaign {cid}: {e}")
+        await team.update_request(state, request_id, status="active", stop_reason="",
+                                  bounce_baseline=baseline)
     elif action == "delete":
         await team.remove_request(state, request_id)
     elif action == "find-more":
