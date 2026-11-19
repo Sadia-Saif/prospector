@@ -454,7 +454,7 @@ class Sender:
         per_lead = team_req is not None
         sequences = [
             {
-                "subject": ("{{s%d_subject}}" % i) if per_lead else step.subject.strip(),
+                "subject": ("{{s%d_subject}}" % i) if per_lead else self._cap(step.subject),
                 "body": self._with_footer(
                     (("{{s%d_body}}" % i) if per_lead else step.body.strip()) + "\n\n" + ACCOUNT_SIGNATURE),
                 "wait": step.delay_days,
@@ -682,7 +682,7 @@ class Sender:
         out = {}
         for i, step in enumerate(campaign.sequence, start=1):
             body = self._render(step.body.strip(), prospect)
-            out[f"s{i}_subject"] = self._render(step.subject.strip(), prospect)
+            out[f"s{i}_subject"] = self._subject(step.subject.strip(), prospect)
             out[f"s{i}_body"] = body.replace("\r\n", "\n").replace("\n", "<br>")
         return out
 
@@ -705,7 +705,20 @@ class Sender:
         for key, value in replacements.items():
             text = text.replace("{{" + key + "}}", value or "")
             text = text.replace("{{ " + key + " }}", value or "")
+        if prospect.is_company_inbox and not prospect.first_name and company:
+            # A general inbox (info@) has no person: greet the business by name.
+            text = re.sub(r"^(\s*(?:hi|hello|hey|dear))\s+there\b",
+                          lambda m: f"{m.group(1)} {company} team", text, count=1, flags=re.IGNORECASE)
         return text.strip()
+
+    @staticmethod
+    def _cap(subject: str) -> str:
+        """A subject line starts with a capital letter."""
+        s = (subject or "").strip()
+        return s[:1].upper() + s[1:] if s[:1].isalpha() else s
+
+    def _subject(self, text: str, prospect) -> str:
+        return self._cap(self._render(text, prospect))
 
     async def _stage_campaign_native(self, campaign):
         """Render + schedule a draft campaign's emails into the outbox."""
@@ -762,7 +775,7 @@ class Sender:
                     campaign_id=campaign.id,
                     step=step.step,
                     to_email=email,
-                    subject=self._render(step.subject, prospect),
+                    subject=self._subject(step.subject, prospect),
                     body=self._render(step.body, prospect),
                     send_at=send_at.isoformat(),
                     status=initial_status,

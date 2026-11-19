@@ -1540,7 +1540,7 @@ async def outbox_instantly():
                         body += "\n\n" + footer
                         markup += "<br><br>" + text_to_html(footer)
                     emails.append({"step": step.step, "day": day, "sent": False, "html": markup,
-                                   "subject": Sender._render(None, step.subject, p), "body": body})
+                                   "subject": Sender._cap(Sender._render(None, step.subject, p)), "body": body})
                 leads.append({"id": p.id, "name": p.full_name(), "email": p.email,
                               "company": p.company, "title": p.title, "status": p.status,
                               "sent_at": c.created_at.isoformat() if c.created_at else "",

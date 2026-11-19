@@ -189,7 +189,7 @@ async def test_stage_campaign_renders_and_respects_approval(state):
     pending = await state.get_outbox(status="pending_review")
     assert len(pending) == 2  # both steps staged
     step1 = next(i for i in pending if i["step"] == 1)
-    assert step1["subject"] == "hi Jane"
+    assert step1["subject"] == "Hi Jane"
     assert "Acme" in step1["body"]
     # Nothing sent while awaiting approval
     assert sender.provider.sent == []
@@ -225,7 +225,7 @@ async def test_drain_sends_approved_due_items(state):
     sent = await state.get_outbox(status="sent")
     assert len(sent) == 1                     # step 1 due now; step 2 in 3 days
     assert provider.sent[0]["to"] == "jane@acme.com"
-    assert provider.sent[0]["subject"] == "hi Jane"
+    assert provider.sent[0]["subject"] == "Hi Jane"
     prospect = await state.get_prospect(pid)
     assert prospect.status == "contacted"
     approved_left = await state.get_outbox(status="approved")

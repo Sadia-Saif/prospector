@@ -33,7 +33,7 @@ async def test_approving_a_week_late_sends_step_one_only(state):
 
     provider = FakeProvider()
     await make_sender(state, provider)._drain_due()
-    assert [m["subject"] for m in provider.sent] == ["hi Jane"]   # step 1 only
+    assert [m["subject"] for m in provider.sent] == ["Hi Jane"]   # step 1 only
     step2 = next(i for i in await state.get_outbox(status="approved") if i["step"] == 2)
     assert step2  # waits its 3 days after step 1 actually went out
 

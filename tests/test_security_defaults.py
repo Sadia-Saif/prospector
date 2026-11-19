@@ -213,7 +213,7 @@ async def test_a_team_campaign_adds_every_batch_to_its_one_instantly_campaign(st
     assert sender.instantly.add_leads.await_args.args[0] == "inst-1"
     lead = sender.instantly.add_leads.await_args.args[1][0]
     assert lead["variables"]["s1_body"].startswith("Would this help?")  # this batch's own copy
-    assert lead["variables"]["s1_subject"] == "a note"
+    assert lead["variables"]["s1_subject"] == "A note"
 
 
 @pytest.mark.asyncio
@@ -336,7 +336,7 @@ async def test_outbox_lists_each_instantly_lead_with_their_emails(state, monkeyp
     [camp] = out["campaigns"]
     [lead] = camp["leads"]
     assert lead["email"] == "jo@cafe.example"
-    assert [(e["subject"], e["day"]) for e in lead["emails"]] == [("hi Cafe Uno", 0), ("again", 3)]
+    assert [(e["subject"], e["day"]) for e in lead["emails"]] == [("Hi Cafe Uno", 0), ("Again", 3)]
     assert lead["emails"][0]["body"].startswith("Hi Jo\n\n[signature of the sending mailbox]")
     assert lead["emails"][0]["sent"] is False
 
@@ -474,3 +474,13 @@ async def test_each_team_campaign_counts_only_its_own_sends_today(state):
     sender.state = state
     assert await sender._count_sends_today("Ann · Cafes") == 1      # not Bo's send too
     assert await sender._count_sends_today() == 2
+
+
+def test_general_inbox_is_greeted_by_business_name_and_subjects_are_capitalised():
+    from harvey.agents.sender import Sender
+    from harvey.models.prospect import COMPANY_INBOX_SOURCE
+    p = Prospect(first_name="", company="Cafe Uno", email="info@cafe.example", source=COMPANY_INBOX_SOURCE)
+    assert Sender._render(None, "Hi {{first_name}},\n\nA note.", p) == "Hi Cafe Uno team,\n\nA note."
+    named = Prospect(first_name="Jo", company="Cafe Uno", email="jo@cafe.example")
+    assert Sender._render(None, "Hi {{first_name}},", named) == "Hi Jo,"
+    assert Sender._cap("boosted posts and tables") == "Boosted posts and tables"
