@@ -36,11 +36,14 @@ def to_instantly_vars(text: str) -> str:
 # common names. These are other names for the same local time; the fixed
 # GMT offset is the last resort (it ignores daylight saving).
 _ZONE_ALIASES = {
-    "America/Los_Angeles": ["America/Los_Angeles", "America/Tijuana", "America/Vancouver", "Etc/GMT+8"],
-    "America/Denver": ["America/Denver", "America/Boise", "America/Edmonton", "Etc/GMT+7"],
-    "America/Phoenix": ["America/Phoenix", "America/Creston", "Etc/GMT+7"],
-    "America/Chicago": ["America/Chicago", "America/Winnipeg", "America/Regina", "Etc/GMT+6"],
-    "America/New_York": ["America/New_York", "America/Detroit", "America/Toronto", "Etc/GMT+5"],
+    # Instantly's own names for each US zone come first (checked against its
+    # API: it refuses America/Los_Angeles, America/New_York, America/Denver
+    # and America/Phoenix).
+    "America/Los_Angeles": ["America/Dawson", "America/Los_Angeles", "America/Tijuana"],
+    "America/Denver": ["America/Boise", "America/Denver", "America/Edmonton"],
+    "America/Phoenix": ["America/Creston", "America/Phoenix"],
+    "America/Chicago": ["America/Chicago", "America/Winnipeg"],
+    "America/New_York": ["America/Detroit", "America/New_York", "America/Toronto"],
 }
 
 

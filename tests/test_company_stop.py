@@ -251,7 +251,7 @@ async def test_instantly_campaigns_carry_the_schedule_instantly_requires():
         return None if len(tried) == 1 else {"id": "c1"}  # first zone refused
     client._request = fake_request
     assert (await client.create_campaign("x", timezone="America/Los_Angeles")) == {"id": "c1"}
-    assert tried == ["America/Los_Angeles", "America/Tijuana"]  # same zone, never Eastern
+    assert tried == ["America/Dawson", "America/Los_Angeles"]  # Pacific names only, never Eastern
 
 
 def test_team_campaign_time_zone_follows_its_region():
