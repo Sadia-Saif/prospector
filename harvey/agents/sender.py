@@ -369,9 +369,12 @@ class Sender:
             if campaign.sending_accounts:
                 # A team campaign sends only from its owner's own mailbox(es).
                 from harvey import team
-                limit = team.daily_limit_for(
-                    await team.load_requests(self.state), campaign.name)
+                requests = await team.load_requests(self.state)
+                limit = team.daily_limit_for(requests, campaign.name)
                 kwargs = {"email_list": campaign.sending_accounts}
+                tz = team.timezone_for(requests, campaign.name)
+                if tz:
+                    kwargs["timezone"] = tz
                 if limit:
                     # The limit is per mailbox; Instantly rotates between
                     # them, so the campaign may send that many from each.

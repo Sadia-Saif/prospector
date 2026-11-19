@@ -21,6 +21,16 @@ RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 TIMEOUT = httpx.Timeout(connect=10.0, read=30.0, write=30.0, pool=10.0)
 
 
+def campaign_schedule(timezone: str) -> dict:
+    """Weekdays, 9am to 5pm in ``timezone``: the schedule Instantly requires."""
+    return {"schedules": [{
+        "name": "Weekdays",
+        "timing": {"from": "09:00", "to": "17:00"},
+        "days": {"0": False, "1": True, "2": True, "3": True, "4": True, "5": True, "6": False},
+        "timezone": timezone,
+    }]}
+
+
 class InstantlyClient:
     def __init__(self, api_key: str):
         self.api_key = api_key or ""
@@ -151,11 +161,14 @@ class InstantlyClient:
 
     async def create_campaign(self, name: str,
                               email_list: list[str] | None = None,
-                              daily_limit: int | None = None) -> dict | None:
+                              daily_limit: int | None = None,
+                              timezone: str | None = None) -> dict | None:
         """Create a new campaign. Returns campaign data with id.
 
         ``email_list`` limits sending to those Instantly accounts (a team
         member's own mailbox domain); empty means Instantly's default.
+        Instantly's v2 API refuses a campaign without a sending schedule, so
+        one is always sent: weekdays, 9am to 5pm in the prospects' time zone.
         """
         # stop_for_company: a reply from anyone at a company stops the
         # sequence to everyone there, as on Xorora Prospector's own providers.
@@ -164,7 +177,16 @@ class InstantlyClient:
             payload["email_list"] = list(email_list)
         if daily_limit:
             payload["daily_limit"] = int(daily_limit)
-        result = await self._request("POST", "/campaigns", payload)
+        # Instantly accepts only time zones from its own list; fall back
+        # through common US ones if the first is refused.
+        zones = list(dict.fromkeys(z for z in (timezone, "America/New_York",
+                                               "America/Detroit", "America/Chicago") if z))
+        result = None
+        for tz in zones:
+            payload["campaign_schedule"] = campaign_schedule(tz)
+            result = await self._request("POST", "/campaigns", payload)
+            if isinstance(result, dict):
+                break
         if isinstance(result, dict):
             logger.info(f"Created campaign: {name} (id={result.get('id')})")
             return result

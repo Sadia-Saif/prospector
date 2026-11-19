@@ -400,6 +400,11 @@ async def heartbeat(stop_event: asyncio.Event | None = None):
             has_open_convos = (summary.get("open_conversations", 0)
                                + summary.get("auto_reply_handoffs", 0)) > 0
 
+            if action == "send_campaign":
+                # Deploying is one API call: never let it take the whole
+                # cycle. Finding people keeps going alongside it, so a draft
+                # that keeps failing to deploy can't stall the pipeline.
+                tasks.append(("prospect", scout.run()))
             if action == "prospect":
                 tasks.append(("prospect", scout.run()))
                 # Analyst is cheap (no Claude calls) — keep analytics fresh

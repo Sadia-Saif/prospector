@@ -238,3 +238,25 @@ async def test_instantly_campaigns_stop_for_the_whole_company():
     client._request = fake_request
     await client.create_campaign("x")
     assert sent["stop_for_company"] is True
+
+
+@pytest.mark.asyncio
+async def test_instantly_campaigns_carry_the_schedule_instantly_requires():
+    from harvey.integrations.instantly import InstantlyClient
+    client = InstantlyClient.__new__(InstantlyClient)
+    tried = []
+
+    async def fake_request(method, path, body=None, **kw):
+        tried.append(body["campaign_schedule"]["schedules"][0]["timezone"])
+        return None if len(tried) == 1 else {"id": "c1"}  # first zone refused
+    client._request = fake_request
+    assert (await client.create_campaign("x", timezone="America/Los_Angeles")) == {"id": "c1"}
+    assert tried == ["America/Los_Angeles", "America/New_York"]
+
+
+def test_team_campaign_time_zone_follows_its_region():
+    from harvey import team
+    reqs = [{"owner": "Ann", "name": "A", "regions": ["California"]},
+            {"owner": "Bo", "name": "B", "regions": ["Miami, FL"]}]
+    assert team.timezone_for(reqs, team.campaign_name("Ann", "A")) == "America/Los_Angeles"
+    assert team.timezone_for(reqs, team.campaign_name("Bo", "B")) == "America/New_York"

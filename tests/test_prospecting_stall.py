@@ -311,7 +311,9 @@ async def test_replies_are_read_before_a_campaign_deploys_with_a_conversation_op
     calls, stop = [], asyncio.Event()
     main_mod = _instantly_with_a_draft_and_an_open_conversation(monkeypatch, state, calls, stop, True)
     await asyncio.wait_for(main_mod.heartbeat(stop), timeout=30)
-    assert calls == ["replies", "send"]
+    # Finding people runs alongside a deploy; the order that matters is
+    # replies before sending.
+    assert [c for c in calls if c != "prospect"] == ["replies", "send"]
 
 
 @pytest.mark.asyncio
@@ -321,4 +323,4 @@ async def test_a_campaign_waits_when_replies_could_not_be_read(state, monkeypatc
     calls, stop = [], asyncio.Event()
     main_mod = _instantly_with_a_draft_and_an_open_conversation(monkeypatch, state, calls, stop, False)
     await asyncio.wait_for(main_mod.heartbeat(stop), timeout=30)
-    assert calls == ["replies"]
+    assert [c for c in calls if c != "prospect"] == ["replies"]

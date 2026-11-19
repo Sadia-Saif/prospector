@@ -47,6 +47,27 @@ def clean_daily_limit(raw) -> int:
     return max(1, min(n, MAX_DAILY_LIMIT))
 
 
+_PACIFIC = ("california", ", ca", "los angeles", "san diego", "san francisco", "san jose",
+            "sacramento", "seattle", "washington state", "oregon", "portland", "nevada", "las vegas")
+_CENTRAL = ("texas", ", tx", "houston", "dallas", "austin", "san antonio", "chicago", "illinois")
+_MOUNTAIN = ("arizona", "phoenix", "colorado", "denver", "utah")
+
+
+def timezone_for(requests: list[dict], campaign_name_: str) -> str | None:
+    """The US time zone a team campaign's prospects are in, for its schedule."""
+    for r in requests:
+        if campaign_name(r.get("owner") or "", r.get("name") or "") == campaign_name_:
+            where = " ".join(r.get("regions") or []).lower()
+            if any(k in where for k in _PACIFIC):
+                return "America/Los_Angeles"
+            if any(k in where for k in _MOUNTAIN):
+                return "America/Denver"
+            if any(k in where for k in _CENTRAL):
+                return "America/Chicago"
+            return "America/New_York"
+    return None
+
+
 def daily_limit_for(requests: list[dict], campaign_name_: str) -> int | None:
     """The daily limit of the team campaign an Instantly campaign belongs to."""
     for r in requests:
