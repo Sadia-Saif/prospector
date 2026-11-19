@@ -450,8 +450,8 @@ class Sender:
         sequences = [
             {
                 "subject": ("{{s%d_subject}}" % i) if per_lead else step.subject.strip(),
-                "body": (("{{s%d_body}}" % i) + SIGNATURE_HTML + self._footer_html()) if per_lead
-                        else self._with_footer(step.body.strip() + "\n\n" + ACCOUNT_SIGNATURE),
+                "body": self._with_footer(
+                    (("{{s%d_body}}" % i) if per_lead else step.body.strip()) + "\n\n" + ACCOUNT_SIGNATURE),
                 "wait": step.delay_days,
             }
             for i, step in enumerate(campaign.sequence, start=1)

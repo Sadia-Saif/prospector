@@ -26,12 +26,26 @@ TIMEOUT = httpx.Timeout(connect=10.0, read=30.0, write=30.0, pool=10.0)
 _INSTANTLY_VARS = {"first_name": "firstName", "last_name": "lastName", "company": "companyName"}
 
 
-def to_html_breaks(body: str) -> str:
-    """Instantly collapses plain newlines, so paragraphs need <br> tags."""
-    text = (body or "").replace("\r\n", "\n")
-    if "<br" in text.lower() or "<p" in text.lower():
-        return text
-    return text.replace("\n", "<br>")
+def to_instantly_html(body: str) -> str:
+    """An email body the way Instantly's own editor stores it: one <div> a
+    line, an empty <div><br></div> between paragraphs.
+
+    Plain newlines collapse in Instantly, and plain text mixed with <br>
+    tags is thrown away when the sequence is saved, which left every step
+    empty. Wrapped in divs, the text, the greeting and the spacing all keep.
+    """
+    import html as _html
+    import re
+    text = (body or "").replace("\r\n", "\n").strip("\n")
+    if re.search(r"(?i)<(div|p)\b", text):
+        return text  # already in Instantly's own format
+    text = re.sub(r"(?i)<br\s*/?>", "\n", text)
+    return "".join(
+        "<div>" + (_html.escape(line, quote=False) if line.strip() else "<br>") + "</div>"
+        for line in text.split("\n"))
+
+
+to_html_breaks = to_instantly_html  # older name
 
 
 def to_instantly_vars(text: str) -> str:
@@ -319,7 +333,7 @@ class InstantlyClient:
                 "type": "email",
                 "delay": int(nxt or 0),
                 "variants": [{"subject": to_instantly_vars(s.get("subject", "")),
-                              "body": to_html_breaks(to_instantly_vars(s.get("body", "")))}],
+                              "body": to_instantly_html(to_instantly_vars(s.get("body", "")))}],
             })
         result = await self._request(
             "PATCH",
