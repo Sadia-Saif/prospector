@@ -32,6 +32,22 @@ def to_instantly_vars(text: str) -> str:
                   lambda m: "{{" + _INSTANTLY_VARS[m.group(1)] + "}}", text or "")
 
 
+# Instantly validates time zones against its own list, which leaves out some
+# common names. These are other names for the same local time; the fixed
+# GMT offset is the last resort (it ignores daylight saving).
+_ZONE_ALIASES = {
+    "America/Los_Angeles": ["America/Los_Angeles", "America/Tijuana", "America/Vancouver", "Etc/GMT+8"],
+    "America/Denver": ["America/Denver", "America/Boise", "America/Edmonton", "Etc/GMT+7"],
+    "America/Phoenix": ["America/Phoenix", "America/Creston", "Etc/GMT+7"],
+    "America/Chicago": ["America/Chicago", "America/Winnipeg", "America/Regina", "Etc/GMT+6"],
+    "America/New_York": ["America/New_York", "America/Detroit", "America/Toronto", "Etc/GMT+5"],
+}
+
+
+def zone_candidates(timezone: str) -> list[str]:
+    return list(dict.fromkeys(_ZONE_ALIASES.get(timezone, [timezone, "America/Detroit"])))
+
+
 def campaign_schedule(timezone: str) -> dict:
     """Weekdays, 9am to 5pm in ``timezone``: the schedule Instantly requires."""
     return {"schedules": [{
@@ -188,10 +204,9 @@ class InstantlyClient:
             payload["email_list"] = list(email_list)
         if daily_limit:
             payload["daily_limit"] = int(daily_limit)
-        # Instantly accepts only time zones from its own list; fall back
-        # through common US ones if the first is refused.
-        zones = list(dict.fromkeys(z for z in (timezone, "America/New_York",
-                                               "America/Detroit", "America/Chicago") if z))
+        # Instantly accepts only time zones from its own list; try the
+        # names it may know for the SAME zone, never a different one.
+        zones = zone_candidates(timezone or "America/New_York")
         result = None
         for tz in zones:
             payload["campaign_schedule"] = campaign_schedule(tz)
@@ -230,16 +245,15 @@ class InstantlyClient:
         result = await self._request("GET", "/campaigns", params={"limit": limit})
         return self._extract_items(result)
 
-    async def update_campaign_schedule(
-        self,
-        campaign_id: str,
-        schedule: dict,
-    ) -> dict | None:
-        """Update campaign sending schedule."""
-        result = await self._request(
-            "PATCH", f"/campaigns/{campaign_id}", {"schedule": schedule}
-        )
-        return result if isinstance(result, dict) else None
+    async def update_campaign_schedule(self, campaign_id: str, timezone: str) -> str | None:
+        """Send on weekdays, 9 to 5 in the leads' time zone. Returns the zone
+        name Instantly accepted, or None."""
+        for tz in zone_candidates(timezone):
+            result = await self._request(
+                "PATCH", f"/campaigns/{campaign_id}", {"campaign_schedule": campaign_schedule(tz)})
+            if isinstance(result, dict):
+                return tz
+        return None
 
     async def activate_campaign(self, campaign_id: str) -> dict | None:
         """Start a campaign."""

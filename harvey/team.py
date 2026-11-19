@@ -50,7 +50,8 @@ def clean_daily_limit(raw) -> int:
 _PACIFIC = ("california", ", ca", "los angeles", "san diego", "san francisco", "san jose",
             "sacramento", "seattle", "washington state", "oregon", "portland", "nevada", "las vegas")
 _CENTRAL = ("texas", ", tx", "houston", "dallas", "austin", "san antonio", "chicago", "illinois")
-_MOUNTAIN = ("arizona", "phoenix", "colorado", "denver", "utah")
+_MOUNTAIN = ("colorado", "denver", "utah", "salt lake", "idaho", "boise")
+_ARIZONA = ("arizona", "phoenix", "tucson", "scottsdale")
 
 
 def timezone_for(requests: list[dict], campaign_name_: str) -> str | None:
@@ -60,6 +61,8 @@ def timezone_for(requests: list[dict], campaign_name_: str) -> str | None:
             where = " ".join(r.get("regions") or []).lower()
             if any(k in where for k in _PACIFIC):
                 return "America/Los_Angeles"
+            if any(k in where for k in _ARIZONA):
+                return "America/Phoenix"  # no daylight saving
             if any(k in where for k in _MOUNTAIN):
                 return "America/Denver"
             if any(k in where for k in _CENTRAL):
