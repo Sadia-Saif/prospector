@@ -199,3 +199,38 @@ def test_restaurant_reservations_count_as_online_booking(tmp_path, html):
         return await pc.profile_company("c-1", "examplegrill.example.com", "Example Grill")
     obs = asyncio.run(go())
     assert [o["value_num"] for o in obs if o["signal_code"] == "NO_ONLINE_BOOKING"] == [0]
+
+
+def test_site_audit_finds_checkable_seo_and_conversion_problems():
+    from harvey.collectors import site_audit
+    html = ("<html><head><title>Home</title></head><body>"
+            + "".join(f'<img src="/{i}.jpg">' for i in range(4))
+            + "<h1>A</h1><h1>B</h1><a href='/menu'>Menu</a></body></html>")
+    seo = site_audit.seo_problems(html, "http://examplegrill.example.com")
+    assert any("too short" in p for p in seo) and any("meta description" in p for p in seo)
+    assert any("2 H1" in p for p in seo) and any("4 of 4 images" in p for p in seo)
+    assert any("viewport" in p for p in seo) and any("https" in p for p in seo)
+    conv = site_audit.conversion_problems(html)
+    assert len(conv) == 3
+    good = ('<html><head><title>Example Grill, Cuban food in Example City</title>'
+            '<meta name="description" content="Family restaurant.">'
+            '<meta name="viewport" content="width=device-width"><link rel="canonical" href="/">'
+            '</head><body><h1>Example Grill</h1><a href="tel:+15550000000">Call</a>'
+            '<form></form><a href="/book">Book a table</a></body></html>')
+    assert site_audit.seo_problems(good, "https://examplegrill.example.com") == []
+    assert site_audit.conversion_problems(good) == []
+
+
+def test_pagespeed_reads_lab_and_field_data():
+    from harvey.collectors import site_audit
+    body = {"lighthouseResult": {"categories": {"performance": {"score": 0.41}, "seo": {"score": 0.83}}},
+            "loadingExperience": {"overall_category": "SLOW",
+                                  "metrics": {"LARGEST_CONTENTFUL_PAINT_MS": {"percentile": 4120}}}}
+    client = httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(200, json=body)))
+    ps = asyncio.run(site_audit.pagespeed(client, "https://examplegrill.example.com"))
+    assert ps == {"score": 41, "seo": 83, "field": "SLOW", "lcp_s": 4.1}
+    text = site_audit.speed_text(ps)
+    assert "41/100" in text and "poor" in text and "4.1s" in text
+    assert site_audit.pagespeed_url("https://a.example.com/").endswith("https%3A%2F%2Fa.example.com%2F")
+    bad = httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(429, json={})))
+    assert asyncio.run(site_audit.pagespeed(bad, "https://a.example.com")) is None

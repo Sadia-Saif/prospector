@@ -220,6 +220,7 @@ Every signal shows what it is in plain language, **what it costs**, and how many
 | **Profile** | `INCUMBENT_AGENCY` | Who currently has the account, credited in their own footer. Every detection builds a roster you can target as a whole book of business. |
 | | `RUNNING_GOOGLE_ADS` / `RUNNING_META_ADS` | They are spending on acquisition *today*, checked in Google Ads Transparency Center and Meta Ad Library (needs `SERPAPI_API_KEY`, 250 free searches a month; 2 per business). A tag or pixel on the site alone is never counted, and without the key no ads signal is written. |
 | | `NO_ONLINE_BOOKING` | Leads have to phone in, so after-hours demand is lost. |
+| | `SITE_SPEED` / `SEO_PROBLEMS` / `CONVERSION_GAPS` | A website audit made only of checks anyone can repeat: Google PageSpeed Insights (with real visitors' Core Web Vitals), on-page SEO, sitemap and robots.txt, tap-to-call, form and action button. Click-through and conversion rates are never estimated: only the business's own accounts know them. Optional `GOOGLE_PAGESPEED_API_KEY` raises Google's free quota. |
 | | `NO_SCHEMA_MARKUP` | A concrete, checkable SEO gap you can name in an email. |
 | | `BLOG_STALE` | Content marketing started and abandoned. |
 | | `SITE_PAGE_COUNT`, `TECH_STACK`, `BLOCKS_AI_CRAWLERS` | Size, platform, AI-search visibility. |

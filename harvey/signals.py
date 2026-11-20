@@ -180,6 +180,50 @@ SIGNAL_CATALOG: list[dict] = [
         "confidence_floor": 0.0,
     },
     {
+        "code": "SITE_SPEED",
+        "label": "Website speed (mobile)",
+        "description": (
+            "Google PageSpeed Insights score for the mobile homepage, plus real visitors' "
+            "Core Web Vitals when Google has them, with the link to re-run it. A slow "
+            "mobile site loses visitors before they book or call."
+        ),
+        "category": "profile",
+        "value_type": "num",
+        "collector": "profile",
+        "cost_note": "free (Google PageSpeed Insights)",
+        "confidence_floor": 0.0,
+    },
+    {
+        "code": "SEO_PROBLEMS",
+        "label": "SEO problems found",
+        "description": (
+            "On-page SEO problems on the homepage, each one checkable: page title, meta "
+            "description, H1, image alt text, mobile tag, noindex, canonical, https, "
+            "sitemap and robots.txt. Search rankings, clicks and traffic are not "
+            "guessed: only the business's own Google accounts know them."
+        ),
+        "category": "profile",
+        "value_type": "text",
+        "collector": "profile",
+        "cost_note": "free (homepage HTML, robots.txt, sitemap)",
+        "confidence_floor": 0.0,
+    },
+    {
+        "code": "CONVERSION_GAPS",
+        "label": "Conversion problems found",
+        "description": (
+            "Things on the homepage that lose a visitor before they act: no tap-to-call "
+            "link, no contact form, no clear action button. Click-through and conversion "
+            "rates are never estimated: they live in the business's own ads and analytics "
+            "accounts."
+        ),
+        "category": "profile",
+        "value_type": "text",
+        "collector": "profile",
+        "cost_note": "free (homepage HTML)",
+        "confidence_floor": 0.0,
+    },
+    {
         "code": "TECH_STACK",
         "label": "Website platform / tools",
         "description": "What the site is built on and which tools it runs (WordPress, Shopify, HubSpot, chat widgets, booking tools).",

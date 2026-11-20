@@ -471,6 +471,31 @@ class Writer:
                 lines.append(f"- Verified in the ad library: {row.get('value_text') or code}")
         return lines
 
+    async def _site_audit(self, company_id) -> list[str]:
+        """Fact lines from the website audit (speed, SEO and conversion
+        problems), newest check only, each one something the prospect can
+        check. Click and conversion rates are never among them."""
+        lines = []
+        state = getattr(self, "state", None)
+        if not (state and company_id):
+            return lines
+        words = {"SITE_SPEED": "Website speed (checked)",
+                 "SEO_PROBLEMS": "SEO problems on their homepage (checked)",
+                 "CONVERSION_GAPS": "Conversion problems on their homepage (checked)"}
+        for code, label in words.items():
+            try:
+                rows = await state.get_observations(company_id=company_id, signal_code=code,
+                                                    latest_only=True, limit=1)
+            except Exception:
+                continue
+            row = rows[0] if rows else None
+            if row and row.get("value_text") and (code == "SITE_SPEED" or (row.get("value_num") or 0) > 0):
+                lines.append(f"- {label}: {row['value_text']}")
+        if lines:
+            lines.append("- (Never state or guess their click-through, traffic or conversion "
+                         "rates: nobody outside their own accounts knows them.)")
+        return lines
+
     async def _startup(self, company_id) -> list[str] | None:
         """Fact lines when the company is a startup (YC, another accelerator,
         a raise it announced; see harvey.startups), else None."""
@@ -535,6 +560,7 @@ class Writer:
                 facts.append(f"- Tools detected on their website: {', '.join(company.tech_stack[:6])}"
                              " (a tag or pixel is not proof they run ads: never say they do from this)")
             facts.extend(await self._verified_ads(prospect.company_id))
+            facts.extend(await self._site_audit(prospect.company_id))
             for signal in company.signals[:3]:
                 facts.append(
                     f"- Signal ({signal.get('type', 'signal')}): {signal.get('detail', '')}"

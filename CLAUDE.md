@@ -176,7 +176,7 @@ Ask the user these questions and build `harvey.yaml` and `skills/product_knowled
 
 ### Step 4: Confirm Signals
 
-Prospector ships a catalog of 29 signals it knows how to collect, all **proposed** and
+Prospector ships a catalog of 32 signals it knows how to collect, all **proposed** and
 none active. Nothing is prospected against until the user confirms them.
 
 Send them to `xorora-prospector dashboard` → **Signals**, where each one shows a

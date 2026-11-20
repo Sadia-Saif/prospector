@@ -802,6 +802,20 @@ def _page_title(html: str) -> str:
     return html_unescape(re.sub(r"(?s)<[^>]+>", " ", " ".join(parts))).lower()
 
 
+def _setting(name: str) -> str:
+    """A key from the environment, or from .env when Settings saved it after
+    this process started."""
+    value = os.getenv(name, "").strip()
+    if value:
+        return value
+    try:
+        from dotenv import dotenv_values
+        from harvey.paths import PROJECT_ROOT
+        return (dotenv_values(PROJECT_ROOT / ".env").get(name) or "").strip()
+    except Exception:
+        return ""
+
+
 class ProfileCollector:
     """Fetches a business's public pages and emits observations.
 
@@ -1140,6 +1154,25 @@ class ProfileCollector:
         # Booking gap
         add("NO_ONLINE_BOOKING", num=0 if self._any(home, BOOKING_HINTS) else 1)
 
+        # Website audit: only checks anyone can repeat (harvey.collectors.site_audit).
+        from harvey.collectors import site_audit
+        if self.wants("SEO_PROBLEMS"):
+            probs = site_audit.seo_problems(home, site) + await site_audit.site_files(self._client, site)
+            add("SEO_PROBLEMS", num=len(probs),
+                text="; ".join(probs) if probs else
+                "none found (checked page title, meta description, H1, image alt text, mobile tag, "
+                "noindex, canonical, https, sitemap, robots.txt)")
+        if self.wants("CONVERSION_GAPS"):
+            gaps = site_audit.conversion_problems(home)
+            add("CONVERSION_GAPS", num=len(gaps),
+                text="; ".join(gaps) if gaps else
+                "none found (checked tap-to-call link, contact form, action button)")
+        if self.wants("SITE_SPEED"):
+            ps = await site_audit.pagespeed(self._client, site, _setting("GOOGLE_PAGESPEED_API_KEY"))
+            if ps:
+                add("SITE_SPEED", num=ps["score"], text=site_audit.speed_text(ps),
+                    url=site_audit.pagespeed_url(site))
+
         # The About page, fetched once for the startup signals below.
         about_page: list[tuple[str, str]] = []
 
@@ -1343,15 +1376,7 @@ async def profile_companies(state, companies: list[dict], config=None) -> tuple[
     try:
         keywords = role_keywords(getattr(config, "icp", None))
         ads = None
-        key = os.getenv("SERPAPI_API_KEY", "").strip()
-        if not key:
-            # Saved from Settings after this process started.
-            try:
-                from dotenv import dotenv_values
-                from harvey.paths import PROJECT_ROOT
-                key = (dotenv_values(PROJECT_ROOT / ".env").get("SERPAPI_API_KEY") or "").strip()
-            except Exception:
-                key = ""
+        key = _setting("SERPAPI_API_KEY")
         if key and confirmed & {"RUNNING_GOOGLE_ADS", "RUNNING_META_ADS"}:
             from harvey.integrations.ad_library import AdLibrary, DEFAULT_MONTHLY
             try:
