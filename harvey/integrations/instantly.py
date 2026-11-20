@@ -439,6 +439,10 @@ class InstantlyClient:
             if after:
                 params["starting_after"] = after
             result = await self._request("GET", "/emails", params=params)
+            if result is None:
+                # A failed read (rate limit, timeout) is not "nothing sent":
+                # raise so the caller keeps what it already had.
+                raise RuntimeError("Instantly didn't answer the sent-emails read")
             for item in self._extract_items(result):
                 if not isinstance(item, dict):
                     continue
@@ -466,7 +470,10 @@ class InstantlyClient:
     async def account_signatures(self) -> dict:
         """Each sending mailbox's own signature, by address: {"text", "html"}."""
         sigs = {}
-        for a in await self.list_accounts():
+        accounts = await self.list_accounts()
+        if not accounts:
+            raise RuntimeError("Instantly didn't answer the mailbox read")
+        for a in accounts:
             if isinstance(a, dict) and a.get("email"):
                 sig = a.get("signature") or ""
                 sigs[a["email"].lower()] = {"text": _html_to_text(sig) if sig else "", "html": sig}

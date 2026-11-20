@@ -484,3 +484,19 @@ def test_general_inbox_is_greeted_by_business_name_and_subjects_are_capitalised(
     named = Prospect(first_name="Jo", company="Cafe Uno", email="jo@cafe.example")
     assert Sender._render(None, "Hi {{first_name}},", named) == "Hi Jo,"
     assert Sender._cap("boosted posts and tables") == "Boosted posts and tables"
+
+
+@pytest.mark.asyncio
+async def test_outbox_keeps_sent_emails_when_instantly_fails_or_answers_short():
+    from harvey import dashboard as D
+    D._OUTBOX_CACHE.clear()
+    first = [{"lead_email": "a@x.example", "sent_at": "2026-01-01T10:00", "subject": "Hi"}]
+    async def ok(): return list(first)
+    async def boom(): raise RuntimeError("429")
+    async def short(): return []
+    assert await D._cached("sent:c1", ok) == first
+    D._OUTBOX_CACHE["sent:c1"] = (0, D._OUTBOX_CACHE["sent:c1"][1])      # expired
+    assert await D._cached("sent:c1", boom) == first                    # failure keeps them
+    D._OUTBOX_CACHE["sent:c1"] = (0, D._OUTBOX_CACHE["sent:c1"][1])
+    assert await D._cached("sent:c1", short) == first                   # a short read keeps them
+    D._OUTBOX_CACHE.clear()

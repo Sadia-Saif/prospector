@@ -1473,7 +1473,18 @@ async def _cached(key: str, fetch, seconds: int = 300):
         value = await fetch()
     except Exception as e:
         logger.warning(f"Outbox: reading Instantly failed ({key}): {e}")
-        value = hit[1] if hit else ({} if key == "sigs" else "" if key.startswith("img:") else [])
+        if hit:
+            # Keep showing what was there; try again sooner than a full wait.
+            _OUTBOX_CACHE[key] = (time.time() - seconds + 60, hit[1])
+            return hit[1]
+        return {} if key == "sigs" else "" if key.startswith("img:") else []
+    if key.startswith("sent:") and hit:
+        # An email that went out never "un-sends": keep every one seen before,
+        # even if a later read comes back short.
+        seen = {(e.get("lead_email"), e.get("sent_at"), e.get("subject")) for e in value}
+        value = value + [e for e in hit[1]
+                         if (e.get("lead_email"), e.get("sent_at"), e.get("subject")) not in seen]
+        value.sort(key=lambda e: e.get("sent_at") or "")
     _OUTBOX_CACHE[key] = (time.time(), value)
     return value
 
