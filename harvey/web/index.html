@@ -413,6 +413,9 @@
             <input type="checkbox" id="published-risky" onchange="setPublishedRisky(this.checked)">
             Also send to a business's own published inbox when it can't be confirmed</label>
           <p class="desc" style="margin-top:6px">For example info@ shown on the restaurant's own contact page. Guessed addresses are never sent. Turn this on only after a week or two of bounces under 2% in Instantly.</p></div>
+        <div class="form-group"><label class="form-label" for="serpapi-key">SerpApi key, for the ad-library check <span id="serpapi-status" class="email-tag"></span></label>
+          <input type="password" class="form-input" id="serpapi-key" placeholder="250 free searches a month, serpapi.com" autocomplete="off">
+          <p class="desc" style="margin-top:6px">"Running Google Ads" and "Running Meta ads" are written only when Google Ads Transparency Center or Meta Ad Library shows their live ads (2 searches per business). Without this key, no ads signal is written at all.</p></div>
         <button class="btn btn-primary btn-sm" onclick="saveVerifiers()">Save verification keys</button>
       </div>
     </div>

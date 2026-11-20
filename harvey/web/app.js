@@ -1297,6 +1297,7 @@ async function loadSettings() {
   savedPh('hunter-key', data.hunter_api_key_set, '50 free/mo + email-pattern lookup');
   savedPh('prospeo-key', data.prospeo_api_key_set, 'Free monthly credits, prospeo.io');
   savedPh('apollo-key', data.apollo_api_key_set, 'Finds a verified work email when the guess can’t be verified');
+  savedPh('serpapi-key', data.serpapi_api_key_set, '250 free searches a month, serpapi.com');
   savedPh('linkedin-password', data.linkedin_password_set, 'Enter password');
   savedPh('cf-api-token', data.cloudflare_api_token_set, 'Your Cloudflare API Token');
 
@@ -1318,6 +1319,7 @@ async function loadSettings() {
   tag('hunter-status', data.hunter_api_key_set, 'set');
   tag('prospeo-status', data.prospeo_api_key_set, 'set');
   tag('apollo-status', data.apollo_api_key_set, 'set');
+  tag('serpapi-status', data.serpapi_api_key_set, 'set');
   const ac = document.getElementById('apollo-credits');
   if (ac) ac.value = data.apollo_monthly_credits || '50';
   const au = document.getElementById('apollo-usage');
@@ -1373,6 +1375,8 @@ function saveVerifiers() {
   const ak = document.getElementById('apollo-key').value;
   if (pk) payload.PROSPEO_API_KEY = pk;
   if (ak) payload.APOLLO_API_KEY = ak;
+  const sk = (document.getElementById('serpapi-key') || {}).value;
+  if (sk) payload.SERPAPI_API_KEY = sk;
   const acr = (document.getElementById('apollo-credits') || {}).value;
   if (acr !== undefined && acr !== '') payload.APOLLO_MONTHLY_CREDITS = String(Math.max(0, parseInt(acr, 10) || 0));
   if (!Object.keys(payload).length) { showToast('Enter at least one key first.', 'error'); return; }
@@ -2197,7 +2201,23 @@ function companyInfoCard(company, profile) {
   const people = by('DECISION_MAKER_TITLE').length ? by('DECISION_MAKER_TITLE') : by('CONTACT_FOUND');
   const form = by('CONTACT_FORM_URL')[0];
   const shown = new Set(['DECISION_MAKER_TITLE', 'CONTACT_FOUND', 'CONTACT_FORM_URL', 'HIRING_ROLE', 'FOUND_IN_SERP', 'TECH_STACK']);
-  const other = Object.values(latest).filter(o => !shown.has(o.signal_code));
+  // Only facts that are true and checked: a 0 / "no" result isn't a signal,
+  // and "running ads" counts only when an ad library showed the ads.
+  const ADS = new Set(['RUNNING_GOOGLE_ADS', 'RUNNING_META_ADS']);
+  const positive = o => (o.value_num !== null && o.value_num !== undefined && Number(o.value_num) > 0) ||
+    (o.value_text && o.value_num === null);
+  // A yes/no signal is only as true as its newest check.
+  const newest = {};
+  for (const o of obs) if (!newest[o.signal_code]) newest[o.signal_code] = o;
+  const current = o => o.value_type !== 'bool' || newest[o.signal_code] === o;
+  const other = Object.values(latest).filter(o => !shown.has(o.signal_code) && positive(o) && current(o) &&
+    (!ADS.has(o.signal_code) || o.collector === 'ad_library'));
+  const otherLine = o => {
+    const bool = o.value_type === 'bool';
+    const detail = o.value_text || (bool ? '' : String(o.value_num));
+    const text = escHtml(o.label) + (detail ? ': ' + escHtml(detail) : '');
+    return o.evidence_url && o.evidence_url !== website ? text + ' (' + link(o.evidence_url, 'proof') + ')' : text;
+  };
   let html = '<div class="card" style="margin-bottom:16px"><div class="card-head"><h3>' + escHtml(c.name || c.domain) + '</h3>' +
     '<span class="meta">' + (typeof company.fit === 'number' ? 'Fit ' + company.fit + ' / 100' : '') + '</span></div>' +
     '<table><tbody>' +
@@ -2211,8 +2231,7 @@ function companyInfoCard(company, profile) {
     row('Contact form', form ? link(form.value_text, form.value_text) : '') +
     row('Hiring', list(by('HIRING_ROLE'), 6)) +
     row('Tech on website', escHtml(by('TECH_STACK').map(o => o.value_text).slice(0, 1).join(''))) +
-    row('Other signals', other.slice(0, 8).map(o => escHtml(o.label) + ': ' +
-      escHtml(o.value_text || String(o.value_num))).join('<br>')) +
+    row('Other signals', other.slice(0, 8).map(otherLine).join('<br>')) +
     row('Found via', c.source_url ? link(c.source_url, 'search result') + ' · ' + escHtml(c.source || '') : escHtml(c.source || '')) +
     row('First found', escHtml((c.created_at || '').slice(0, 10))) +
     '</tbody></table></div>';

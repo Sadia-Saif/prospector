@@ -452,6 +452,25 @@ class Writer:
                 f"({'awaiting approval' if require_approval else 'approved'})."
             )
 
+    async def _verified_ads(self, company_id) -> list[str]:
+        """Fact lines for ads an ad library showed (Google Ads Transparency
+        Center, Meta Ad Library), newest check only. Nothing else may be
+        written as "you're running ads"."""
+        lines = []
+        state = getattr(self, "state", None)
+        if not (state and company_id):
+            return lines
+        for code in ("RUNNING_GOOGLE_ADS", "RUNNING_META_ADS"):
+            try:
+                rows = await state.get_observations(company_id=company_id, signal_code=code,
+                                                    latest_only=True, limit=1)
+            except Exception:
+                continue
+            row = rows[0] if rows else None
+            if row and row.get("collector") == "ad_library" and (row.get("value_num") or 0) > 0:
+                lines.append(f"- Verified in the ad library: {row.get('value_text') or code}")
+        return lines
+
     async def _startup(self, company_id) -> list[str] | None:
         """Fact lines when the company is a startup (YC, another accelerator,
         a raise it announced; see harvey.startups), else None."""
@@ -513,7 +532,9 @@ class Writer:
             if company.description:
                 facts.append(f"- What the company says about itself: {company.description}")
             if company.tech_stack:
-                facts.append(f"- Tools detected on their website: {', '.join(company.tech_stack[:6])}")
+                facts.append(f"- Tools detected on their website: {', '.join(company.tech_stack[:6])}"
+                             " (a tag or pixel is not proof they run ads: never say they do from this)")
+            facts.extend(await self._verified_ads(prospect.company_id))
             for signal in company.signals[:3]:
                 facts.append(
                     f"- Signal ({signal.get('type', 'signal')}): {signal.get('detail', '')}"

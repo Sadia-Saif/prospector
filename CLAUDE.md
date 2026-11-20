@@ -99,6 +99,7 @@ DATAFORSEO_SANDBOX=                       # any value routes to the free sandbox
 LINKEDIN_EMAIL=  LINKEDIN_PASSWORD=   # LinkedIn prospecting
 CLOUDFLARE_ACCOUNT_ID=  CLOUDFLARE_API_TOKEN=   # deep JS crawling for training
 SERPER_API_KEY=            # web search + discovery (2,500 free, then a $50 prepaid pack)
+SERPAPI_API_KEY=           # ad-library check for RUNNING_*_ADS (250 free/mo, 2 per business)
 PRECLEARED_API_KEY=        # cold-email check before first sends (see Step 7)
 TRULYINBOX_API_KEY=        # warmup: set by 'xorora-prospector trulyinbox connect' (see Step 2b)
 ```

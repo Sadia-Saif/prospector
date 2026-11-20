@@ -218,7 +218,7 @@ Every signal shows what it is in plain language, **what it costs**, and how many
 | | `UNCLAIMED_LISTING` | Nobody has claimed their Google Business Profile. |
 | | `REVIEW_RATING` / `REVIEW_COUNT` | Good but invisible, or visible but struggling. |
 | **Profile** | `INCUMBENT_AGENCY` | Who currently has the account, credited in their own footer. Every detection builds a roster you can target as a whole book of business. |
-| | `RUNNING_GOOGLE_ADS` / `RUNNING_META_ADS` | They are spending on acquisition *today*. The strongest budget signal available for free. |
+| | `RUNNING_GOOGLE_ADS` / `RUNNING_META_ADS` | They are spending on acquisition *today*, checked in Google Ads Transparency Center and Meta Ad Library (needs `SERPAPI_API_KEY`, 250 free searches a month; 2 per business). A tag or pixel on the site alone is never counted, and without the key no ads signal is written. |
 | | `NO_ONLINE_BOOKING` | Leads have to phone in, so after-hours demand is lost. |
 | | `NO_SCHEMA_MARKUP` | A concrete, checkable SEO gap you can name in an email. |
 | | `BLOG_STALE` | Content marketing started and abandoned. |

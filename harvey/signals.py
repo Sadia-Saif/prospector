@@ -154,21 +154,29 @@ SIGNAL_CATALOG: list[dict] = [
     {
         "code": "RUNNING_GOOGLE_ADS",
         "label": "Running Google Ads",
-        "description": "Google Ads tag on the site, they are spending on acquisition TODAY. Strong budget signal.",
+        "description": (
+            "Live ads found for their own domain in Google Ads Transparency Center "
+            "(shown in the last 30 days), with the link to check it. A Google tag on "
+            "the site alone is not counted. Needs a SerpApi key (Settings)."
+        ),
         "category": "profile",
         "value_type": "bool",
         "collector": "profile",
-        "cost_note": "free (homepage HTML)",
+        "cost_note": "1 SerpApi search per business (250 free a month)",
         "confidence_floor": 0.0,
     },
     {
         "code": "RUNNING_META_ADS",
         "label": "Running Meta/Facebook Ads",
-        "description": "Meta Pixel on the site, actively spending on paid social.",
+        "description": (
+            "Active ads in Meta Ad Library that link to their own website or run from "
+            "a Page with exactly their name, with the link to check it. A Meta Pixel on "
+            "the site alone is not counted. Needs a SerpApi key (Settings)."
+        ),
         "category": "profile",
         "value_type": "bool",
         "collector": "profile",
-        "cost_note": "free (homepage HTML)",
+        "cost_note": "1 SerpApi search per business (250 free a month)",
         "confidence_floor": 0.0,
     },
     {

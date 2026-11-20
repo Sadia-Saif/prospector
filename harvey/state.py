@@ -525,6 +525,14 @@ MIGRATIONS: list[str] = [
     ALTER TABLE campaigns ADD COLUMN owner TEXT DEFAULT '';
     ALTER TABLE campaigns ADD COLUMN sending_accounts_json TEXT DEFAULT '[]';
     """,
+    # 16: "running ads" used to be read off a tag or pixel on the homepage,
+    # which proves nothing. Those unverified rows go; from now on the ads
+    # signals come only from the ad libraries (collector 'ad_library').
+    """
+    DELETE FROM observations
+     WHERE signal_code IN ('RUNNING_GOOGLE_ADS', 'RUNNING_META_ADS')
+       AND collector <> 'ad_library';
+    """,
 ]
 
 BRAIN_PROVIDERS = ("claude", "codex")

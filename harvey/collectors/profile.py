@@ -10,6 +10,7 @@ whether they're spending on ads today, what's missing from their site.
 """
 
 import asyncio
+import os
 import logging
 from html import unescape as html_unescape
 import random
@@ -805,8 +806,10 @@ class ProfileCollector:
     """
 
     def __init__(self, state, confirmed: set[str] | None = None, timeout: float = 12.0,
-                 role_keywords: list[str] | None = None):
+                 role_keywords: list[str] | None = None, ads=None):
         self.state = state
+        # harvey.integrations.ad_library.AdLibrary, or None: no ads check at all.
+        self.ads = ads
         self.confirmed = confirmed if confirmed is not None else set()
         self.timeout = timeout
         # icp.hiring_signals (or icp.titles): which open roles are worth a row.
@@ -1085,7 +1088,7 @@ class ProfileCollector:
 
     # ── the stage itself ──
 
-    async def profile_company(self, company_id: str, domain: str) -> list[dict]:
+    async def profile_company(self, company_id: str, domain: str, name: str = "") -> list[dict]:
         """Collect every confirmed profile signal for one business."""
         obs: list[dict] = []
         domain = domain.lower().replace("www.", "").strip("/")
@@ -1112,9 +1115,13 @@ class ProfileCollector:
             return obs
         self.site_names[company_id] = site_name_from_html(home, domain)
 
-        # Ads (they are spending TODAY — the strongest budget signal here)
-        add("RUNNING_GOOGLE_ADS", num=1 if self._any(home, GOOGLE_ADS) else 0)
-        add("RUNNING_META_ADS", num=1 if self._any(home, META_PIXEL) else 0)
+        # Ads: only the ad libraries can say a business is running ads today.
+        # A tag or pixel on the site proves nothing on its own (it stays in
+        # TECH_STACK as a tool), so without a verified check nothing is written.
+        if getattr(self, "ads", None) is not None:
+            from harvey.integrations.ad_library import check as check_ads
+            obs.extend(await check_ads(self.ads, company_id, domain,
+                                       name or self.site_names.get(company_id, ""), self.wants))
 
         # Platform + tooling
         tech = self.detect_tech(home)
@@ -1295,7 +1302,7 @@ class ProfileCollector:
             if not domain:
                 continue
             try:
-                obs = await self.profile_company(company["id"], domain)
+                obs = await self.profile_company(company["id"], domain, company.get("name") or "")
             except Exception as e:
                 logger.warning(f"profile failed for {domain}: {e}")
                 await self._mark_checked(company["id"])
@@ -1331,7 +1338,24 @@ async def profile_companies(state, companies: list[dict], config=None) -> tuple[
     run_id = await state.start_run("profile", provider="http")
     try:
         keywords = role_keywords(getattr(config, "icp", None))
-        async with ProfileCollector(state, confirmed, role_keywords=keywords) as collector:
+        ads = None
+        key = os.getenv("SERPAPI_API_KEY", "").strip()
+        if not key:
+            # Saved from Settings after this process started.
+            try:
+                from dotenv import dotenv_values
+                from harvey.paths import PROJECT_ROOT
+                key = (dotenv_values(PROJECT_ROOT / ".env").get("SERPAPI_API_KEY") or "").strip()
+            except Exception:
+                key = ""
+        if key and confirmed & {"RUNNING_GOOGLE_ADS", "RUNNING_META_ADS"}:
+            from harvey.integrations.ad_library import AdLibrary, DEFAULT_MONTHLY
+            try:
+                monthly = int(os.getenv("SERPAPI_MONTHLY_SEARCHES", "") or DEFAULT_MONTHLY)
+            except ValueError:
+                monthly = DEFAULT_MONTHLY
+            ads = AdLibrary(key, state=state, monthly=monthly)
+        async with ProfileCollector(state, confirmed, role_keywords=keywords, ads=ads) as collector:
             n = await collector.run(companies, run_id=run_id)
         await state.finish_run(run_id, records=n, cost_usd=0.0)
         return n, run_id

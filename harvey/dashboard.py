@@ -468,7 +468,7 @@ async def get_settings():
         "IMAP_HOST", "IMAP_PORT", "IMAP_USERNAME", "IMAP_PASSWORD",
         "M365_CLIENT_ID", "M365_TENANT_ID",
         "REOON_API_KEY", "ZEROBOUNCE_API_KEY", "HUNTER_API_KEY",
-        "PROSPEO_API_KEY", "APOLLO_API_KEY", "APOLLO_MONTHLY_CREDITS",
+        "PROSPEO_API_KEY", "APOLLO_API_KEY", "APOLLO_MONTHLY_CREDITS", "SERPAPI_API_KEY",
     ]
     for key in all_keys:
         if key not in env_vars:
@@ -510,6 +510,7 @@ async def get_settings():
         "hunter_api_key_set": is_set("HUNTER_API_KEY"),
         "prospeo_api_key_set": is_set("PROSPEO_API_KEY"),
         "apollo_api_key_set": is_set("APOLLO_API_KEY"),
+        "serpapi_api_key_set": is_set("SERPAPI_API_KEY"),
         "apollo_monthly_credits": env_vars.get("APOLLO_MONTHLY_CREDITS", "") or "50",
         "apollo_used": await _apollo_used(),
         "send_published_risky": await _published_risky(),
@@ -590,7 +591,7 @@ async def save_env_settings(request: Request):
                      "IMAP_HOST", "IMAP_PORT", "IMAP_USERNAME", "IMAP_PASSWORD",
                      "M365_CLIENT_ID", "M365_TENANT_ID",
                      "REOON_API_KEY", "ZEROBOUNCE_API_KEY", "HUNTER_API_KEY",
-                     "PROSPEO_API_KEY", "APOLLO_API_KEY", "APOLLO_MONTHLY_CREDITS"]:
+                     "PROSPEO_API_KEY", "APOLLO_API_KEY", "APOLLO_MONTHLY_CREDITS", "SERPAPI_API_KEY"]:
             if key in data and data[key] is not None:
                 value = data[key]
                 if isinstance(value, bool) or not isinstance(value, (str, int, float)):
@@ -756,8 +757,9 @@ async def get_company_profile(company_id: str):
     if not rows or not _mine_company(company_id):
         return JSONResponse({"error": "not found"}, status_code=404)
     observations = await query_db(
-        "SELECT o.signal_code, o.value_text, o.value_num, o.evidence_url, o.observed_at, "
-        "COALESCE(s.label, o.signal_code) AS label FROM observations o "
+        "SELECT o.signal_code, o.value_text, o.value_num, o.evidence_url, o.observed_at, o.collector, "
+        "COALESCE(s.label, o.signal_code) AS label, COALESCE(s.value_type, '') AS value_type "
+        "FROM observations o "
         "LEFT JOIN signal_codes s ON s.code = o.signal_code "
         "WHERE o.company_id = ? AND o.prospect_id = '' ORDER BY o.observed_at DESC LIMIT 200",
         (company_id,),
