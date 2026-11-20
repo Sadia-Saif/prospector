@@ -1671,6 +1671,9 @@ function outboxTab(t) {
 
 async function loadInstantlySent() {
   const el = document.getElementById('outbox-instantly');
+  if (!el.innerHTML.trim()) {
+    el.innerHTML = '<p class="desc" style="padding:24px 0">Loading what was sent through Instantly…</p>';
+  }
   const data = await api('/api/outbox/instantly');
   if (!data || data.error) { el.innerHTML = emptyState(icon('alert'), 'Couldn\'t read what was sent', escHtml((data && data.error) || '')); return; }
   const people = data.people || [];

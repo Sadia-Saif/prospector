@@ -1011,6 +1011,7 @@ async def _autostart_agent():
     unless someone stopped it on purpose."""
     asyncio.get_running_loop().create_task(_keep_campaigns_supplied())
     asyncio.get_running_loop().create_task(_bounce_guard_loop())
+    asyncio.get_running_loop().create_task(_outbox_warm_loop())
     # A restart stops any company search mid-way: run those again.
     try:
         from harvey import team
@@ -1463,11 +1464,28 @@ def _outbox_client():
     return InstantlyClient(key) if key else None
 
 
-async def _cached(key: str, fetch, seconds: int = 300):
-    """Instantly reads for the Outbox, kept a few minutes so the page stays fast."""
+_REFRESHING: set = set()
+
+
+async def _cached(key: str, fetch, seconds: int = 300, wait: bool = False):
+    """Instantly reads for the Outbox, kept a few minutes so the page stays fast.
+
+    Past its age, a read already held is returned at once and refreshed in
+    the background, so the page never waits on Instantly once it has data."""
     import time
     hit = _OUTBOX_CACHE.get(key)
     if hit and time.time() - hit[0] < seconds:
+        return hit[1]
+    if hit and not wait:
+        if key not in _REFRESHING:
+            _REFRESHING.add(key)
+
+            async def refresh():
+                try:
+                    await _cached(key, fetch, seconds, wait=True)
+                finally:
+                    _REFRESHING.discard(key)
+            asyncio.get_running_loop().create_task(refresh())
         return hit[1]
     try:
         value = await fetch()
@@ -1487,6 +1505,18 @@ async def _cached(key: str, fetch, seconds: int = 300):
         value.sort(key=lambda e: e.get("sent_at") or "")
     _OUTBOX_CACHE[key] = (time.time(), value)
     return value
+
+
+async def _outbox_warm_loop():
+    """Keep the Outbox's Instantly reads warm: right after start, then every
+    4 minutes, so opening the Outbox never waits on Instantly."""
+    await asyncio.sleep(20)
+    while True:
+        try:
+            await outbox_instantly()
+        except Exception as e:
+            logger.warning(f"Outbox: warming failed: {e}")
+        await asyncio.sleep(240)
 
 
 @app.get("/api/outbox/instantly")
