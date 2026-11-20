@@ -179,3 +179,23 @@ def test_writer_gets_only_verified_ads_as_facts(tmp_path):
         w.state = state
         return await w._verified_ads("c-1")
     assert asyncio.run(go()) == ["- Verified in the ad library: 2 active ad(s) in Meta Ad Library"]
+
+
+@pytest.mark.parametrize("html", ['<a href="https://www.opentable.com/r/example-grill">Book</a>',
+                                  '<a href="https://resy.com/cities/mia/example-grill">Reserve</a>',
+                                  '<a href="/reservations">Reservations</a>'])
+def test_restaurant_reservations_count_as_online_booking(tmp_path, html):
+    from harvey.collectors.profile import ProfileCollector
+    from harvey.state import StateManager
+
+    async def go():
+        state = StateManager(db_path=str(tmp_path / "b.db"))
+        await state.init_db()
+        pc = ProfileCollector(state, confirmed={"NO_ONLINE_BOOKING"})
+
+        async def fake_resolve(domain):
+            return "https://examplegrill.example.com", "<html>" + html + "</html>"
+        pc._resolve_site = fake_resolve
+        return await pc.profile_company("c-1", "examplegrill.example.com", "Example Grill")
+    obs = asyncio.run(go())
+    assert [o["value_num"] for o in obs if o["signal_code"] == "NO_ONLINE_BOOKING"] == [0]

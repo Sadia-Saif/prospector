@@ -105,7 +105,11 @@ META_PIXEL = (r"connect\.facebook\.net/[^\"']*fbevents\.js", r"fbq\s*\(\s*['\"]i
 BOOKING_HINTS = (r"calendly\.com", r"acuityscheduling", r"schedulicity",
                  r"squareup\.com/appointments", r"setmore", r"book(ing)?[-_]?now",
                  r"schedule[-_]?(an?[-_])?(appointment|estimate|consultation)",
-                 r"housecallpro", r"getjobber\.com", r"servicetitan")
+                 r"housecallpro", r"getjobber\.com", r"servicetitan",
+                 # Restaurant reservations and online ordering count too.
+                 r"opentable\.com", r"resy\.com", r"exploretock\.com", r"sevenrooms\.com",
+                 r"yelp\.com/reservations", r"toasttab\.com", r"order\.online",
+                 r"reservations?[-_ ]?(now|online)?", r"order[-_ ]online")
 
 AI_CRAWLERS = ("gptbot", "google-extended", "ccbot", "anthropic-ai", "claudebot",
                "perplexitybot", "bytespider")
