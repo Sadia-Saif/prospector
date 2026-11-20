@@ -1495,7 +1495,11 @@ async def _cached(key: str, fetch, seconds: int = 300, wait: bool = False):
             # Keep showing what was there; try again sooner than a full wait.
             _OUTBOX_CACHE[key] = (time.time() - seconds + 60, hit[1])
             return hit[1]
-        return {} if key == "sigs" else "" if key.startswith("img:") else []
+        empty = {} if key == "sigs" else "" if key.startswith("img:") else []
+        # Remember the miss for a minute: retrying at once against a busy
+        # Instantly only makes every page load wait on its back-off.
+        _OUTBOX_CACHE[key] = (time.time() - seconds + 60, empty)
+        return empty
     if key.startswith("sent:") and hit:
         # An email that went out never "un-sends": keep every one seen before,
         # even if a later read comes back short.
