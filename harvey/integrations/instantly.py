@@ -418,7 +418,8 @@ class InstantlyClient:
             uid = str(item.get("id") or "")
             reply = {
                 "id": uid,
-                "lead_email": item.get("from_address_email") or item.get("lead") or "",
+                # The lead the thread belongs to, even when a colleague answers.
+                "lead_email": item.get("lead") or item.get("from_address_email") or "",
                 "body": text,
                 "subject": item.get("subject") or "",
                 "eaccount": item.get("eaccount") or "",

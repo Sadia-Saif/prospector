@@ -558,8 +558,17 @@ class Handler:
         if self.is_native:
             return await self._run_native()
 
-        # 1. Fetch active campaigns
-        active_campaigns = await self.state.get_campaigns_by_status("active")
+        # 1. Every Instantly campaign Xorora Prospector has put leads into, once
+        # each: a reply can come weeks later, after a batch is marked
+        # completed or paused, and a team campaign shares one Instantly
+        # campaign across many batches.
+        active_campaigns, seen_ids = [], set()
+        for status in ("active", "paused", "completed", "draft"):
+            for c in await self.state.get_campaigns_by_status(status):
+                cid = c.instantly_campaign_id
+                if cid and cid not in seen_ids:
+                    seen_ids.add(cid)
+                    active_campaigns.append(c)
         if not active_campaigns:
             logger.info("Handler: No active campaigns to monitor.")
             return True
@@ -568,8 +577,6 @@ class Handler:
         complete = True
 
         for campaign in active_campaigns:
-            if not campaign.instantly_campaign_id:
-                continue
 
             # 2. Get replies from Instantly
             try:

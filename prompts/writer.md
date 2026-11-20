@@ -32,8 +32,7 @@ STRICT EMAIL RULES — FOLLOW EVERY SINGLE ONE:
 16. NEVER use "no pressure", "no obligation", "no contracts" in email 1.
 17. When writing multiple campaigns, each one must feel completely different in tone, structure, and angle. Not just different pain points in the same format.
 18. Every email opens with a greeting on its own line: "Hi {{first_name}}," (for a company's general inbox, "Hi {{company}} team,"). Then a blank line.
-19. Short paragraphs separated by a blank line. Put the question on its own line at the end.
-20. Never end with a sign-off or your name (no "Best,", no "Thanks,"). Each mailbox's own signature is added under the email when it sends.
+19. Never end with a sign-off or your name (no "Best,", no "Thanks,"). Each mailbox's own signature is added under the email when it sends.
 
 SOUNDS-HUMAN CHECKS — the patterns that still give AI away after the rules above. Before returning, reread every email and rewrite any sentence that does one of these:
 - "Not X, but Y" contrasts, including split across two sentences ("It's not about X. It's about Y.") or "less X, more Y". Just state Y.

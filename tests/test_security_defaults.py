@@ -420,8 +420,9 @@ def test_email_tidy_greets_by_name_and_keeps_paragraphs():
     assert tidy_subject("{{company}} orders") == "{{company}} orders"
     body = tidy_body("Hi there, Noticed the new shop. Orders pile up. Who answers them?")
     assert body.startswith("Hi {{first_name}},\n\n")
-    assert body.endswith("\n\nWho answers them?")
-    assert tidy_body("Hello,\nA.\nB?", inbox=True) == "Hi {{company}} team,\n\nA.\n\nB?"
+    # The wording and line breaks stay exactly as written.
+    assert body == "Hi {{first_name}},\n\nNoticed the new shop. Orders pile up. Who answers them?"
+    assert tidy_body("Hello,\nA.\nB?", inbox=True) == "Hi {{company}} team,\n\nA.\nB?"
     assert to_html_breaks("Hi,\n\nA") == "<div>Hi,</div><div><br></div><div>A</div>"
     assert to_html_breaks("Hi {{firstName}},<br><br>A & B") == \
         "<div>Hi {{firstName}},</div><div><br></div><div>A &amp; B</div>"
@@ -500,3 +501,21 @@ async def test_outbox_keeps_sent_emails_when_instantly_fails_or_answers_short():
     D._OUTBOX_CACHE["sent:c1"] = (0, D._OUTBOX_CACHE["sent:c1"][1])
     assert await D._cached("sent:c1", short) == first                   # a short read keeps them
     D._OUTBOX_CACHE.clear()
+
+
+@pytest.mark.asyncio
+async def test_replies_are_read_from_every_instantly_campaign_once(state):
+    from harvey.agents.handler import Handler
+    for i, (status, cid) in enumerate((("active", "i1"), ("completed", "i2"), ("paused", "i1"))):
+        c = await state.add_campaign(Campaign(id="", name=f"c{i}", instantly_campaign_id=cid,
+                                             sequence=[EmailStep(step=1, subject="s", body="b")]))
+        await state.update_campaign(c, status=status)
+    h = Handler.__new__(Handler)
+    h.state, h.config = state, legacy_config(False)
+    h.brain = SimpleNamespace(load_skills_for_agent=lambda a: "")
+    asked = []
+    async def get_replies(cid):
+        asked.append(cid); return []
+    h.instantly = SimpleNamespace(get_replies=get_replies)
+    await h.run()
+    assert sorted(asked) == ["i1", "i2"]     # a completed batch is still read; i1 only once

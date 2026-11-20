@@ -49,8 +49,7 @@ LEGACY_BATCH_CAP = 50
 # and a question, with no pitch. Operator email rules replace exactly these.
 PERSONAL_SHAPE = """- Under 75 words. One specific observation from the FACTS above, one
   question. No pitch, no product name.
-- Open with "Hi <their first name>," on its own line, then a blank line. Short
-  paragraphs separated by a blank line; the question on its own line.
+- Open with "Hi <their first name>," on its own line.
 - Write the actual text (no merge variables — you know their name/company).
 - Subject: 2-5 words, first letter capitalised."""
 SEQUENCE_SHAPE = """- Email 1: Personalized cold observation + one question. Under 75 words. No pitch.
@@ -58,8 +57,7 @@ SEQUENCE_SHAPE = """- Email 1: Personalized cold observation + one question. Und
 - Emails 3, 4 and 5: Short follow-ups 4, 5 and 6 days after the one before. Each
   a new, brief angle. Under 50 words.
 - Email 6: Break-up email 7 days after that. Under 40 words. Gracious, not guilt-tripping.
-- Formatting only: every email opens with the greeting line, then a blank line,
-  then short paragraphs separated by blank lines, the question on its own line.
+- Every email opens with the greeting line.
 - No sign-off or name at the end: each mailbox's own signature is added when it sends."""
 SEQUENCE_STYLE = """- Never be pushy or salesy. Be consultative and value-driven.
 - Subject lines: 2-5 words, first letter capitalised."""
@@ -133,21 +131,14 @@ def tidy_subject(subject: str) -> str:
 
 
 def tidy_body(body: str, inbox: bool = False) -> str:
-    """Every email reads like a person wrote it: a greeting by name on its own
-    line, then short paragraphs with a blank line between them."""
+    """The email exactly as it was written, with only a greeting by name on
+    top and no sign-off underneath (the mailbox's signature is added). The
+    wording and line breaks are left as they are."""
     text = (body or "").replace("\r\n", "\n").strip()
     text = _GREETING.sub("", text, count=1).strip()
     if text[:1].isalpha():
         text = text[0].upper() + text[1:]
     greeting = "Hi {{company}} team," if inbox else "Hi {{first_name}},"
-    if "\n\n" not in text:
-        # One block: give the closing question its own paragraph.
-        lines = [l.strip() for l in text.split("\n") if l.strip()]
-        text = "\n\n".join(lines) if len(lines) > 1 else text
-        if "\n\n" not in text:
-            parts = re.split(r"(?<=[.!?])\s+", text)
-            if len(parts) > 2:
-                text = " ".join(parts[:-1]) + "\n\n" + parts[-1]
     text = _SIGN_OFF.sub("", text).strip()
     text = _NAME_LINE.sub("", text).strip()
     text = re.sub(r"\n{3,}", "\n\n", text)
