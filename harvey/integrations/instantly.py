@@ -379,6 +379,22 @@ class InstantlyClient:
         )
         return result if isinstance(result, dict) else None
 
+    async def list_leads(self, campaign_id: str, max_pages: int = 20) -> list:
+        """Every lead in a campaign, with its status (-1 means bounced)."""
+        out, after = [], None
+        for _ in range(max_pages):
+            body = {"campaign": campaign_id, "limit": 100}
+            if after:
+                body["starting_after"] = after
+            result = await self._request("POST", "/leads/list", body)
+            if result is None:
+                raise RuntimeError("Instantly didn't answer the leads read")
+            out.extend(i for i in self._extract_items(result) if isinstance(i, dict))
+            after = result.get("next_starting_after") if isinstance(result, dict) else None
+            if not after:
+                break
+        return out
+
     async def get_lead(self, email: str) -> dict | None:
         """Get lead details by email."""
         result = await self._request("GET", "/leads", params={"email": email})
@@ -467,6 +483,80 @@ class InstantlyClient:
                 break
         out.sort(key=lambda e: e["sent_at"] or "")
         return out
+
+    async def list_emails(self, campaign_id: str, email_type: str = "received",
+                          max_pages: int = 3) -> list:
+        """A campaign's emails of one type ("received" or "manual"), newest
+        first, every one Instantly's Unibox shows: replies, auto-replies,
+        out-of-office notes and bounce notices alike (mode emode_all)."""
+        out, after = [], None
+        for _ in range(max_pages):
+            params = {"campaign_id": campaign_id, "email_type": email_type,
+                      "mode": "emode_all", "sort_order": "desc", "limit": 100}
+            if after:
+                params["starting_after"] = after
+            result = await self._request("GET", "/emails", params=params)
+            if result is None:
+                raise RuntimeError("Instantly didn't answer the inbox read")
+            for item in self._extract_items(result):
+                if isinstance(item, dict):
+                    out.append(self._inbox_item(item, campaign_id))
+            after = result.get("next_starting_after") if isinstance(result, dict) else None
+            if not after:
+                break
+        return out
+
+    @staticmethod
+    def _inbox_item(item: dict, campaign_id: str = "") -> dict:
+        body = item.get("body")
+        if isinstance(body, dict):
+            raw = body.get("html") or ""
+            text = body.get("text") or _html_to_text(raw)
+        else:
+            raw, text = "", str(body or "")
+        ue = item.get("ue_type")
+        received = ue == 2
+        frm = (item.get("from_address_email") or "").lower()
+        to = (item.get("to_address_email_list") or "").split(",")[0].strip().lower()
+        lead = str(item.get("lead") or "").lower()
+        if "@" not in lead:
+            lead = frm if received else to
+        return {
+            "id": str(item.get("id") or ""),
+            "thread_id": str(item.get("thread_id") or ""),
+            "campaign_id": str(item.get("campaign_id") or campaign_id or ""),
+            "lead_email": lead,
+            "from": frm, "to": to,
+            "subject": item.get("subject") or "",
+            "html": raw, "text": text,
+            "preview": item.get("content_preview") or text[:160],
+            "eaccount": (item.get("eaccount") or "").lower(),
+            "at": item.get("timestamp_email") or item.get("timestamp_created") or "",
+            "received": received,
+            "auto": bool(item.get("is_auto_reply")),
+            "unread": bool(item.get("is_unread")),
+            "i_status": item.get("i_status"),
+        }
+
+    async def reply_to(self, email_id: str, eaccount: str, subject: str,
+                       text: str, html: str) -> dict | None:
+        """Answer one email in its thread, from the given mailbox."""
+        result = await self._request("POST", "/emails/reply", {
+            "reply_to_uuid": email_id, "eaccount": eaccount, "subject": subject,
+            "body": {"text": text, "html": html}})
+        return result if isinstance(result, dict) else None
+
+    async def set_interest(self, lead_email: str, value, campaign_id: str = "") -> bool:
+        """A lead's Unibox status (Interested, Not interested, ...); None clears it."""
+        data = {"lead_email": lead_email, "interest_value": value}
+        if campaign_id:
+            data["campaign_id"] = campaign_id
+        result = await self._request("POST", "/leads/update-interest-status", data)
+        return result is not None
+
+    async def mark_thread_read(self, thread_id: str) -> bool:
+        result = await self._request("POST", f"/emails/threads/{thread_id}/mark-as-read", {})
+        return result is not None
 
     async def account_signatures(self) -> dict:
         """Each sending mailbox's own signature, by address: {"text", "html"}."""

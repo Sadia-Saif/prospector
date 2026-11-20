@@ -2677,7 +2677,163 @@ const CONVO_FILTERS = [
   ['all', 'All', () => true],
 ];
 
+// ── Inbox: every email that came back to a campaign, like Instantly's Unibox ──
+let _inbox = null, _ibFilter = 'all', _ibCampaign = '', _ibSearch = '', _ibOpen = null;
+const IB_KINDS = {reply: 'Reply', auto: 'Auto-reply', bounce: 'Bounced'};
+
 async function loadConversations() {
+  const el = document.getElementById('conversations-list');
+  const data = await api('/api/inbox');
+  if (data && data.connected) { _inbox = data; renderInbox(); return; }
+  return loadOldConversations();
+}
+
+function ibStatusLabel(k) {
+  const s = ((_inbox && _inbox.statuses) || []).find(x => x.key === k);
+  return s ? s.label : k;
+}
+
+function ibMatches(t) {
+  if (_ibCampaign && t.campaign !== _ibCampaign) return false;
+  if (_ibSearch) {
+    const q = _ibSearch.toLowerCase();
+    if (![t.name, t.company, t.lead_email, t.subject, t.preview].some(v => (v || '').toLowerCase().includes(q))) return false;
+  }
+  if (_ibFilter === 'all') return true;
+  if (_ibFilter === 'unread') return t.unread;
+  if (_ibFilter === 'replies') return t.kind === 'reply';
+  if (_ibFilter === 'auto') return t.kind === 'auto';
+  if (_ibFilter === 'bounce') return t.kind === 'bounce';
+  return t.status === _ibFilter;
+}
+
+function renderInbox() {
+  const el = document.getElementById('conversations-list');
+  const all = _inbox.threads || [];
+  const count = f => { const keep = _ibFilter; _ibFilter = f; const n = all.filter(ibMatches).length; _ibFilter = keep; return n; };
+  const side = [['all', 'All'], ['unread', 'Unread'], ['replies', 'Replies'], ['auto', 'Auto-replies'], ['bounce', 'Bounced']]
+    .concat((_inbox.statuses || []).map(s => [s.key, s.label]));
+  const campaigns = [...new Set(all.map(t => t.campaign))].sort();
+  const shown = all.filter(ibMatches);
+  el.innerHTML = '<div class="ib">' +
+    '<aside class="ib-side"><div class="ib-side-h">Status</div>' +
+      side.map((f, i) => (i === 5 ? '<div class="ib-side-h">Lead status</div>' : '') +
+        '<button class="ib-f' + (f[0] === _ibFilter ? ' on' : '') + '" onclick="ibSetFilter(' + jsq(f[0]) + ')"><span>' +
+        escHtml(f[1]) + '</span><span class="n">' + count(f[0]) + '</span></button>').join('') +
+      '<div class="ib-side-h">Campaign</div><select class="ib-camp" onchange="ibSetCampaign(this.value)"><option value="">All campaigns</option>' +
+        campaigns.map(c => '<option' + (c === _ibCampaign ? ' selected' : '') + '>' + escHtml(c) + '</option>').join('') + '</select>' +
+    '</aside>' +
+    '<section class="ib-list"><div class="ib-list-h"><b>Inbox</b>' +
+      '<input class="ib-search" type="search" placeholder="Search…" value="' + escHtml(_ibSearch) + '" oninput="ibSetSearch(this.value)">' +
+      '<button class="btn btn-ghost btn-sm" onclick="ibRefresh()" title="Refresh">↻</button></div>' +
+      '<div class="ib-items" id="ib-items">' + (shown.length ? shown.map(ibRow).join('') :
+        '<p class="muted ib-empty">' + (all.length ? 'Nothing matches this filter.' : 'No replies yet. Every reply, auto-reply and bounce from your campaigns lands here.') + '</p>') +
+      '</div></section>' +
+    '<section class="ib-read" id="ib-read">' + (_ibOpen ? '<p class="muted ib-empty">Loading…</p>' :
+      '<p class="muted ib-empty">Pick a conversation to read it.</p>') + '</section></div>';
+  if (_ibOpen) {
+    const t = all.find(x => x.key === _ibOpen);
+    if (t) ibOpen(t.key, true); else _ibOpen = null;
+  }
+}
+
+function ibRow(t) {
+  const who = t.name || t.lead_email;
+  const tag = t.kind !== 'reply' ? '<span class="ib-kind k-' + t.kind + '">' + IB_KINDS[t.kind] + '</span>' : '';
+  return '<button class="ib-row' + (t.key === _ibOpen ? ' on' : '') + (t.unread ? ' unread' : '') + '" data-key="' + escHtml(t.key) + '" onclick="ibOpen(' + jsq(t.key) + ')">' +
+    '<span class="avatar">' + initials(...(who.split(' ').concat(['']).slice(0, 2))) + '</span>' +
+    '<span class="ib-row-main"><span class="ib-row-top"><b>' + escHtml(who) + '</b>' +
+      (t.company ? '<span class="ib-co"> · ' + escHtml(t.company) + '</span>' : '') +
+      '<span class="ib-when">' + relTime(t.last_at) + '</span></span>' +
+      '<span class="ib-subj">' + tag + escHtml(t.subject || '(no subject)') + '</span>' +
+      '<span class="ib-prev">' + escHtml(t.preview || '') + '</span></span></button>';
+}
+
+function ibSetFilter(f) { _ibFilter = f; renderInbox(); }
+function ibSetCampaign(c) { _ibCampaign = c; renderInbox(); }
+function ibSetSearch(q) {
+  _ibSearch = q;
+  const shown = (_inbox.threads || []).filter(ibMatches);
+  document.getElementById('ib-items').innerHTML = shown.length ? shown.map(ibRow).join('') : '<p class="muted ib-empty">Nothing matches.</p>';
+}
+async function ibRefresh() { const d = await api('/api/inbox'); if (d && d.connected) { _inbox = d; renderInbox(); } }
+
+async function ibOpen(key, keepList) {
+  const t = (_inbox.threads || []).find(x => x.key === key);
+  if (!t) return;
+  _ibOpen = key;
+  if (!keepList) {
+    t.unread = false;
+    document.querySelectorAll('.ib-row').forEach(b => { b.classList.toggle('on', b.dataset.key === key); if (b.dataset.key === key) b.classList.remove('unread'); });
+  }
+  const pane = document.getElementById('ib-read');
+  pane.innerHTML = '<p class="muted ib-empty">Loading…</p>';
+  const data = await api('/api/inbox/thread?campaign=' + encodeURIComponent(t.campaign_id) + '&lead=' + encodeURIComponent(t.lead_email));
+  if (_ibOpen !== key) return;
+  if (!data) { pane.innerHTML = '<p class="muted ib-empty">Couldn’t load this conversation. Try again in a minute.</p>'; return; }
+  const who = t.name || t.lead_email;
+  const msgs = data.messages || [];
+  pane.innerHTML = '<div class="ib-read-h"><span class="avatar">' + initials(...(who.split(' ').concat(['']).slice(0, 2))) + '</span>' +
+      '<div class="ib-read-who"><b>' + escHtml(who) + '</b><span class="muted">' + escHtml([t.company, t.lead_email].filter(Boolean).join(' · ')) +
+      ' · ' + escHtml(t.campaign) + '</span></div>' +
+      '<select class="ib-status" onchange="ibSetStatus(' + jsq(key) + ', this.value)">' +
+        (_inbox.statuses || []).map(s => '<option value="' + s.key + '"' + (s.key === t.status ? ' selected' : '') + '>' + escHtml(s.label) + '</option>').join('') +
+      '</select></div>' +
+    '<div class="ib-msgs">' + msgs.map((m, i) => ibMsg(m, i === msgs.length - 1)).join('') + '</div>' +
+    (msgs.some(m => m.received && m.id) ?
+      '<div class="ib-reply"><textarea id="ib-text" rows="5" placeholder="Write your reply to ' + escHtml(t.name ? t.name.split(' ')[0] : who) +
+        '… (your mailbox signature is added)"></textarea>' +
+        '<div class="ib-reply-a"><span class="muted" id="ib-from">Sends from ' + escHtml((msgs.filter(m => m.received).pop() || {}).eaccount || 'the mailbox it came into') + '</span>' +
+        '<button class="btn btn-primary btn-sm" id="ib-send" onclick="ibSend(' + jsq(key) + ')">Reply</button></div></div>' : '');
+  const last = pane.querySelector('.ib-msg:last-child');
+  if (last) last.scrollIntoView({block: 'nearest'});
+}
+
+function ibMsg(m, open) {
+  const label = m.received ? (m.kind === 'reply' ? '' : '<span class="ib-kind k-' + m.kind + '">' + IB_KINDS[m.kind] + '</span>')
+    : '<span class="ib-kind k-sent">' + (m.campaign_email ? 'Campaign email' : 'Your reply') + '</span>';
+  return '<details class="ib-msg ' + (m.received ? 'in' : 'out') + '"' + (open || m.received ? ' open' : '') + '><summary>' +
+    '<b>' + escHtml(m.received ? m.from : m.eaccount || m.from) + '</b>' + label +
+    '<span class="ib-msg-subj">' + escHtml(m.subject || '') + '</span>' +
+    '<span class="ib-when">' + escHtml(fmtWhen(m.at)) + '</span></summary>' +
+    '<div class="ob-mail-body ib-body">' + (m.html || '') + '</div></details>';
+}
+
+function fmtWhen(ts) {
+  const d = parseTs(ts);
+  if (isNaN(+d)) return '';
+  return d.toLocaleString(undefined, {month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'});
+}
+
+async function ibSetStatus(key, status) {
+  const t = (_inbox.threads || []).find(x => x.key === key);
+  if (!t) return;
+  const data = await api('/api/inbox/status', {method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({campaign: t.campaign_id, lead: t.lead_email, status: status})});
+  if (data && data.success) {
+    t.status = status;
+    showToast('Marked ' + ibStatusLabel(status) + (data.synced ? ', in Instantly too.' : '. Instantly didn’t take it, so it shows here only.'), 'success');
+  } else showToast(failMsg(data, 'Couldn’t change the status.'), 'error');
+}
+
+async function ibSend(key) {
+  const t = (_inbox.threads || []).find(x => x.key === key);
+  const box = document.getElementById('ib-text');
+  const text = (box.value || '').trim();
+  if (!t || !text) { showToast('Write a reply first.', 'error'); return; }
+  const btn = document.getElementById('ib-send');
+  btn.disabled = true; btn.textContent = 'Sending…';
+  const data = await api('/api/inbox/reply', {method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({campaign: t.campaign_id, lead: t.lead_email, text: text})});
+  btn.disabled = false; btn.textContent = 'Reply';
+  if (data && data.success) {
+    showToast('Sent from ' + data.from + '.', 'success');
+    box.value = '';
+    setTimeout(() => ibOpen(key, true), 4000);
+  } else showToast(failMsg(data, 'Couldn’t send that reply.'), 'error');
+}
+
+async function loadOldConversations() {
   const el = document.getElementById('conversations-list');
   const data = await api('/api/conversations?awaiting=1');
   if (!data) { el.innerHTML = offlineState(); return; }
@@ -3092,7 +3248,10 @@ async function loadTeamPanel(force) {
         '<div><b>' + (c.written || 0) + ' / ' + (c.max_leads || 0) + '</b><span>emailed</span></div>' +
       '</div>' +
       '<div class="tc-bar"><i style="width:' + pct + '%"></i></div>' +
-      (c.instantly_stats && c.instantly_stats.sent ? '<div class="tc-note">In Instantly: ' + c.instantly_stats.sent + ' sent · ' + Math.round(100 * c.instantly_stats.opened / c.instantly_stats.sent) + '% opened · ' + c.instantly_stats.replied + ' replies · ' + (Math.round(1000 * c.instantly_stats.bounced / c.instantly_stats.sent) / 10) + '% bounced</div>' : '') +
+      (c.instantly_stats && c.instantly_stats.sent ? '<div class="tc-note">In Instantly: ' + c.instantly_stats.sent + ' sent · ' + Math.round(100 * c.instantly_stats.opened / c.instantly_stats.sent) + '% opened · ' + c.instantly_stats.replied + ' replies · ' + (Math.round(1000 * c.instantly_stats.bounced / c.instantly_stats.sent) / 10) + '% bounced (' + (c.instantly_stats.bounced || 0) + ')' +
+        ((c.instantly_stats.bounced_emails || []).length ? '<br>Bounced: ' + c.instantly_stats.bounced_emails.map(b =>
+          escHtml(b.email) + (b.company ? ' (' + escHtml(b.company) + ')' : '') + (b.was ? ' · was ' + escHtml(b.was) : '')).join(', ') : '') +
+        '</div>' : '') +
       (c.stop_reason ? '<div class="tc-note" style="color:var(--danger,#d93025);font-weight:600">' + escHtml(c.stop_reason) + '</div>' : '') +
       (c.discovery_note && c.discovery !== 'running' && c.discovery !== 'queued' ? '<div class="tc-note">' + escHtml(c.discovery_note) + '</div>' : '') +
       (!c.can_edit ? '<div class="tc-actions"><span class="team-hint">Run by ' + escHtml(personName(c.owner)) + '. Only they or an admin can change it.</span></div></div>' :

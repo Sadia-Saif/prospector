@@ -293,6 +293,9 @@ async def test_a_campaign_over_two_percent_bounces_is_stopped(state, monkeypatch
                     "ok": {"emails_sent_count": 100, "bounced_count": 2}}[cid]
         async def pause_campaign(self, cid):
             paused.append(cid)
+        async def list_leads(self, cid):
+            return [{"email": "x@bad.example", "status": -1, "company_name": "Bad Co"},
+                    {"email": "y@bad.example", "status": 1}]
     monkeypatch.setattr(D, "_state", lambda: state)
     monkeypatch.setattr(D, "_instantly_key", lambda: "k")
     monkeypatch.setattr("harvey.integrations.instantly.InstantlyClient", FakeInstantly)
@@ -301,6 +304,28 @@ async def test_a_campaign_over_two_percent_bounces_is_stopped(state, monkeypatch
     assert paused == ["bad"]
     assert reqs["r1"]["status"] == "stopped" and "3.0%" in reqs["r1"]["stop_reason"]
     assert reqs["r2"]["status"] == "active"  # exactly 2% is still within the limit
+    # The card lists which addresses bounced.
+    assert reqs["r1"]["instantly_stats"]["bounced_emails"][0]["email"] == "x@bad.example"
+
+
+@pytest.mark.asyncio
+async def test_one_bounce_alone_never_stops_a_campaign(state, monkeypatch):
+    from harvey import dashboard as D, team
+    await team.save_requests(state, [{"id": "r1", "owner": "Ann", "name": "A", "status": "active",
+                                      "instantly_campaign_id": "c"}])
+    class FakeInstantly:
+        def __init__(self, key): pass
+        async def get_campaign_analytics(self, cid):
+            return {"emails_sent_count": 26, "bounced_count": 1}       # 3.8%, but one address
+        async def pause_campaign(self, cid):
+            raise AssertionError("must not pause")
+        async def list_leads(self, cid):
+            return []
+    monkeypatch.setattr(D, "_state", lambda: state)
+    monkeypatch.setattr(D, "_instantly_key", lambda: "k")
+    monkeypatch.setattr("harvey.integrations.instantly.InstantlyClient", FakeInstantly)
+    await D._bounce_guard()
+    assert (await team.load_requests(state))[0]["status"] == "active"
 
 
 @pytest.mark.asyncio

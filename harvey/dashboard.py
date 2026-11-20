@@ -5,6 +5,7 @@ import ipaddress
 import json
 import logging
 import os
+import re
 import shutil
 import signal
 import stat
@@ -858,6 +859,7 @@ AUTOSTART_FILE = PROJECT_ROOT / "data" / "autostart"
 
 BOUNCE_LIMIT = 0.02      # stop a campaign the moment bounces pass 2%
 BOUNCE_MIN_SENT = 25     # below this, one bounce says nothing about the list
+BOUNCE_MIN_COUNT = 2     # one bounce alone never stops a campaign
 
 
 async def _bounce_guard_loop():
@@ -895,6 +897,39 @@ async def _instantly_totals(client, ids: list[str]) -> dict:
     return t
 
 
+async def _bounced_leads(client, state, ids: list[str]) -> list[dict]:
+    """The addresses Instantly says bounced, with how Xorora Prospector had
+    rated each one (verified / risky / guess), so the card shows the cause.
+    Each is marked invalid so it is never emailed again."""
+    out = []
+    for cid in ids:
+        try:
+            leads = await client.list_leads(cid)
+        except Exception as e:
+            logger.warning(f"Bounce list: couldn't read leads of {cid}: {e}")
+            continue
+        for l in leads:
+            if l.get("status") != -1:      # Instantly's "bounced" lead status
+                continue
+            email = (l.get("email") or "").strip().lower()
+            if not email:
+                continue
+            rated = ""
+            async with state._connect() as db:
+                async with db.execute("SELECT email_status FROM prospects WHERE lower(email) = ?",
+                                      (email,)) as cur:
+                    row = await cur.fetchone()
+                    rated = (row[0] if row else "") or ""
+                if row and rated != "invalid":
+                    await db.execute("UPDATE prospects SET email_status = 'invalid' WHERE lower(email) = ?",
+                                     (email,))
+                    await db.commit()
+            out.append({"email": email, "company": l.get("company_name")
+                        or (l.get("payload") or {}).get("companyName") or "",
+                        "was": "invalid" if rated == "invalid" else rated})
+    return out
+
+
 async def _bounce_totals(client, ids: list[str]) -> tuple[int, int]:
     t = await _instantly_totals(client, ids)
     return t["sent"], t["bounced"]
@@ -916,14 +951,17 @@ async def _bounce_guard():
         if not ids:
             continue
         totals = await _instantly_totals(client, ids)
-        # The campaign card shows these: sent, open rate, replies, bounces.
+        bounced_list = await _bounced_leads(client, state, ids) if totals.get("bounced") else []
+        # The campaign card shows these: sent, open rate, replies, bounces
+        # and which addresses bounced.
         await team.update_request(state, r["id"], instantly_stats={
-            **totals, "at": datetime.now().isoformat(timespec="minutes")})
+            **totals, "bounced_emails": bounced_list,
+            "at": datetime.now().isoformat(timespec="minutes")})
         sent, bounced = totals["sent"], totals["bounced"]
         base = r.get("bounce_baseline") or {}
         sent -= int(base.get("sent") or 0)
         bounced -= int(base.get("bounced") or 0)
-        if sent < BOUNCE_MIN_SENT or bounced / max(sent, 1) <= BOUNCE_LIMIT:
+        if sent < BOUNCE_MIN_SENT or bounced < BOUNCE_MIN_COUNT or bounced / max(sent, 1) <= BOUNCE_LIMIT:
             continue
         rate = round(100 * bounced / sent, 1)
         for cid in ids:
@@ -1524,6 +1562,7 @@ async def _outbox_warm_loop():
     while True:
         try:
             await outbox_instantly()
+            await get_inbox()
         except Exception as e:
             logger.warning(f"Outbox: warming failed: {e}")
         await asyncio.sleep(240)
@@ -1608,6 +1647,259 @@ async def outbox_instantly():
     order = sorted(people, key=lambda n: (n != me, n.lower()))   # you first
     return {"campaigns": out, "admin_view": see_all and sc is not None,
             "people": [{"name": n, "you": n == me, "campaigns": people[n]} for n in order]}
+
+
+# ── Inbox: every email that came back to a Prospector campaign ──
+# Replies, auto-replies, out-of-office notes and bounce notices, read from
+# Instantly's Unibox for the campaigns Prospector runs, shown as threads
+# with the cold emails they answer. Replying sends from the mailbox the
+# email came into, in the same thread, with that mailbox's signature.
+
+INBOX_STATUSES = [  # key, label, Instantly interest value
+    ("lead", "Lead", None),
+    ("interested", "Interested", 1),
+    ("meeting_booked", "Meeting booked", 2),
+    ("meeting_completed", "Meeting completed", 3),
+    ("won", "Won", 4),
+    ("out_of_office", "Out of office", 0),
+    ("wrong_person", "Wrong person", -2),
+    ("not_interested", "Not interested", -1),
+    ("lost", "Lost", -3),
+]
+_STATUS_BY_VALUE = {v: k for k, _, v in INBOX_STATUSES if v not in (None, 0)}
+_BOUNCE = re.compile(r"(?i)undeliver|delivery status|delivery has failed|failure notice|returned mail|"
+                     r"mail delivery (failed|subsystem)|could not be delivered|address not found")
+_AUTO = re.compile(r"(?i)automatic reply|auto[- ]?reply|autoreply|out of (the )?office|"
+                   r"away from (the )?office|on leave|on vacation|currently (unavailable|travelling|traveling|away)")
+
+
+def _inbox_kind(m: dict) -> str:
+    who = m.get("from") or ""
+    if who.startswith(("mailer-daemon@", "postmaster@")) or _BOUNCE.search(m.get("subject") or ""):
+        return "bounce"
+    if m.get("auto") or _AUTO.search((m.get("subject") or "") + " " + (m.get("text") or "")[:300]):
+        return "auto"
+    return "reply"
+
+
+async def _inbox_campaigns(state) -> list[tuple[dict, list[str]]]:
+    """The team campaigns the caller may read, each with its Instantly ids."""
+    from harvey import team, members
+    sc = _scope()
+    see_all = sc is None or members.is_admin(sc.member)
+    out = []
+    for r in await team.load_requests(state):
+        if not see_all and not _owns(r, sc.member):
+            continue
+        ids = await _campaign_instantly_ids(state, r)
+        if ids:
+            out.append((r, ids))
+    return out
+
+
+async def _inbox_raw(client, cid: str) -> list[dict]:
+    """Everything that came back to one Instantly campaign, plus the answers
+    sent by hand from the Unibox or from here."""
+    got = await _cached("recv:" + cid, lambda: client.list_emails(cid, "received"), seconds=120)
+    mine = await _cached("manual:" + cid, lambda: client.list_emails(cid, "manual", max_pages=1), seconds=120)
+    return list(got) + list(mine)
+
+
+async def _inbox_statuses(state) -> dict:
+    try:
+        return json.loads(await state.get_setting("inbox_status", "{}") or "{}")
+    except (ValueError, TypeError):
+        return {}
+
+
+@app.get("/api/inbox")
+async def get_inbox():
+    from harvey import team
+    client = _outbox_client()
+    if not client:
+        return {"connected": False, "threads": [], "statuses": []}
+    state = _state()
+    await state.init_db()
+    marks = await _inbox_statuses(state)
+    threads: dict[str, dict] = {}
+    for r, ids in await _inbox_campaigns(state):
+        name = team.campaign_name(r.get("owner") or "", r.get("name") or "")
+        for cid in ids:
+            for m in await _inbox_raw(client, cid):
+                lead = m.get("lead_email") or ""
+                if not lead:
+                    continue
+                key = cid + "|" + lead
+                t = threads.setdefault(key, {
+                    "key": key, "lead_email": lead, "campaign_id": cid, "campaign": name,
+                    "owner": r.get("owner") or "", "messages": 0, "unread": False,
+                    "last_at": "", "kinds": set(), "i_status": None, "has_received": False})
+                t["messages"] += 1
+                if m.get("received"):
+                    t["has_received"] = True
+                    t["kinds"].add(_inbox_kind(m))
+                    t["unread"] = t["unread"] or m.get("unread")
+                    if m.get("i_status") not in (None, 0):
+                        t["i_status"] = m.get("i_status")
+                if (m.get("at") or "") >= t["last_at"]:
+                    t["last_at"] = m.get("at") or ""
+                    t["subject"] = m.get("subject") or ""
+                    t["preview"] = (m.get("preview") or "")[:180]
+                    t["last_from_them"] = bool(m.get("received"))
+    shown = [t for t in threads.values() if t.pop("has_received")]
+    emails = sorted({t["lead_email"] for t in shown})
+    people = {}
+    if emails:
+        async with state._connect() as db:
+            async with db.execute(
+                    "SELECT email, first_name, last_name, company FROM prospects "
+                    f"WHERE LOWER(email) IN ({_in(emails)})", tuple(emails)) as cur:
+                for e, f, l, co in await cur.fetchall():
+                    people[(e or "").lower()] = {"first_name": f, "last_name": l, "company": co}
+    for t in shown:
+        kinds = t.pop("kinds")
+        t["kind"] = "bounce" if "bounce" in kinds else "reply" if "reply" in kinds else "auto"
+        p = people.get(t["lead_email"], {})
+        t["name"] = " ".join(x for x in (p.get("first_name"), p.get("last_name")) if x) or ""
+        t["company"] = p.get("company") or ""
+        status = marks.get(t["key"]) or _STATUS_BY_VALUE.get(t.pop("i_status"))
+        if not status:
+            status = "out_of_office" if t["kind"] == "auto" else "lead"
+        t["status"] = status
+    shown.sort(key=lambda t: t["last_at"], reverse=True)
+    return {"connected": True, "threads": shown,
+            "statuses": [{"key": k, "label": l} for k, l, _ in INBOX_STATUSES]}
+
+
+async def _inbox_thread_messages(client, cid: str, lead: str) -> list[dict]:
+    lead = lead.lower()
+    msgs = [dict(m, sent=False) for m in await _inbox_raw(client, cid) if m.get("lead_email") == lead]
+    for e in await _cached("sent:" + cid, lambda: client.get_sent_emails(cid)):
+        if (e.get("lead_email") or "").lower() == lead:
+            msgs.append({"id": "", "received": False, "from": e.get("eaccount") or "", "to": lead,
+                         "subject": e.get("subject") or "", "html": e.get("html") or "",
+                         "text": e.get("body") or "", "at": e.get("sent_at") or "",
+                         "eaccount": (e.get("eaccount") or "").lower(), "campaign_email": True})
+    msgs.sort(key=lambda m: m.get("at") or "")
+    return msgs
+
+
+async def _inbox_allowed(state, cid: str) -> dict | None:
+    for r, ids in await _inbox_campaigns(state):
+        if cid in ids:
+            return r
+    return None
+
+
+@app.get("/api/inbox/thread")
+async def get_inbox_thread(campaign: str, lead: str):
+    from harvey.mailhtml import fetch_image, safe_email_html, text_to_html
+    client = _outbox_client()
+    state = _state()
+    await state.init_db()
+    if not client or not await _inbox_allowed(state, campaign):
+        return _refuse("unknown conversation", 404)
+
+    async def _image(url):
+        return await _cached("img:" + url, lambda: fetch_image(url), seconds=86400)
+    out = []
+    thread_ids = set()
+    for m in await _inbox_thread_messages(client, campaign, lead):
+        markup = m.get("html") or ""
+        # Replies carry the whole earlier thread quoted below them: show it
+        # folded, the way a mail app does.
+        html_out = (await safe_email_html(markup, _image)) if markup else text_to_html(m.get("text") or "")
+        if m.get("thread_id"):
+            thread_ids.add(m["thread_id"])
+        out.append({"id": m.get("id") or "", "received": bool(m.get("received")),
+                    "kind": _inbox_kind(m) if m.get("received") else "sent",
+                    "from": m.get("from") or "", "to": m.get("to") or "",
+                    "subject": m.get("subject") or "", "at": m.get("at") or "",
+                    "eaccount": m.get("eaccount") or "", "html": html_out,
+                    "campaign_email": bool(m.get("campaign_email"))})
+    # Opening a thread reads it, here and in Instantly's Unibox.
+    if any(m.get("received") for m in out):
+        for tid in thread_ids:
+            asyncio.get_running_loop().create_task(client.mark_thread_read(tid))
+    return {"messages": out}
+
+
+@app.post("/api/inbox/reply")
+async def inbox_reply(request: Request):
+    """Send the owner's answer in the thread, from the mailbox it came into,
+    signed with that mailbox's Instantly signature."""
+    import html as _html
+    from harvey.integrations.instantly import to_instantly_html
+    try:
+        body = await request.json()
+    except ValueError:
+        body = None
+    if not isinstance(body, dict):
+        return _refuse("expected JSON", 400)
+    cid, lead = str(body.get("campaign") or ""), str(body.get("lead") or "").lower()
+    text = str(body.get("text") or "").strip()
+    if not text:
+        return _refuse("Write a reply first.", 400)
+    if len(text) > 20000:
+        return _refuse("That reply is too long.", 400)
+    client = _outbox_client()
+    state = _state()
+    await state.init_db()
+    if not client or not await _inbox_allowed(state, cid):
+        return _refuse("unknown conversation", 404)
+    msgs = await _inbox_thread_messages(client, cid, lead)
+    last = next((m for m in reversed(msgs) if m.get("received") and m.get("id")), None)
+    if not last:
+        return _refuse("There's no email from them to answer.")
+    eaccount = last.get("eaccount") or ""
+    if not eaccount:
+        return _refuse("Couldn't tell which mailbox this came into.")
+    subject = last.get("subject") or ""
+    if not subject.lower().startswith("re:"):
+        subject = "Re: " + subject
+    sigs = await _cached("sigs", lambda: client.account_signatures())
+    sig = (sigs or {}).get(eaccount) or {}
+    when = (last.get("at") or "")[:16].replace("T", " ")
+    quote_head = f"On {when} UTC, {last.get('from') or lead} wrote:"
+    html_body = to_instantly_html(text)
+    if sig.get("html"):
+        html_body += "<div><br></div>" + sig["html"]
+    html_body += ("<div><br></div><div>" + _html.escape(quote_head) + "</div>"
+                  "<blockquote style=\"margin:0 0 0 .8ex;border-left:1px solid #ccc;padding-left:1ex\">"
+                  + (last.get("html") or to_instantly_html(last.get("text") or "")) + "</blockquote>")
+    plain = text + ("\n\n" + sig["text"] if sig.get("text") else "") + "\n\n" + quote_head + "\n" + "\n".join(
+        "> " + line for line in (last.get("text") or "").splitlines())
+    sent = await client.reply_to(last["id"], eaccount, subject, plain, html_body)
+    if not sent:
+        return _refuse("Instantly didn't take the reply. Try again in a minute.", 502)
+    _OUTBOX_CACHE.pop("manual:" + cid, None)
+    await state.log_action("inbox_reply", "dashboard", {"campaign": cid, "from": eaccount})
+    return {"success": True, "from": eaccount}
+
+
+@app.post("/api/inbox/status")
+async def inbox_status(request: Request):
+    try:
+        body = await request.json()
+    except ValueError:
+        body = None
+    if not isinstance(body, dict):
+        return _refuse("expected JSON", 400)
+    cid, lead = str(body.get("campaign") or ""), str(body.get("lead") or "").lower()
+    status = str(body.get("status") or "")
+    value = next((v for k, _, v in INBOX_STATUSES if k == status), "missing")
+    if value == "missing":
+        return _refuse("unknown status", 400)
+    client = _outbox_client()
+    state = _state()
+    await state.init_db()
+    if not client or not await _inbox_allowed(state, cid):
+        return _refuse("unknown conversation", 404)
+    marks = await _inbox_statuses(state)
+    marks[cid + "|" + lead] = status
+    await state.set_setting("inbox_status", json.dumps(marks))
+    synced = await client.set_interest(lead, value, cid)
+    return {"success": True, "synced": synced}
 
 
 @app.get("/api/outbox")

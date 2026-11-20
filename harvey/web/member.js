@@ -380,7 +380,10 @@ async function loadCampaigns() {
       '</div>' +
       '<div class="m-bar"><i style="width:' + pct + '%"></i></div>' +
       (stage(c) ? '<div class="m-stage">' + esc(stage(c)) + '…</div>' : '') +
-      (c.instantly_stats && c.instantly_stats.sent ? '<div class="m-note">In Instantly: ' + c.instantly_stats.sent + ' sent · ' + Math.round(100 * c.instantly_stats.opened / c.instantly_stats.sent) + '% opened · ' + c.instantly_stats.replied + ' replies · ' + (Math.round(1000 * c.instantly_stats.bounced / c.instantly_stats.sent) / 10) + '% bounced</div>' : '') +
+      (c.instantly_stats && c.instantly_stats.sent ? '<div class="m-note">In Instantly: ' + c.instantly_stats.sent + ' sent · ' + Math.round(100 * c.instantly_stats.opened / c.instantly_stats.sent) + '% opened · ' + c.instantly_stats.replied + ' replies · ' + (Math.round(1000 * c.instantly_stats.bounced / c.instantly_stats.sent) / 10) + '% bounced (' + (c.instantly_stats.bounced || 0) + ')' +
+        ((c.instantly_stats.bounced_emails || []).length ? '<br>Bounced: ' + c.instantly_stats.bounced_emails.map(b =>
+          esc(b.email) + (b.company ? ' (' + esc(b.company) + ')' : '') + (b.was ? ' · was ' + esc(b.was) : '')).join(', ') : '') +
+        '</div>' : '') +
       (c.stop_reason ? '<div class="m-note" style="color:var(--danger,#d93025);font-weight:600">' + esc(c.stop_reason) + '</div>' : '') +
       (c.discovery_note && c.discovery === 'failed' ? '<div class="m-note">' + esc(c.discovery_note) + '</div>' : '') +
       '<div class="m-camp-actions">' +
