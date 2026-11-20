@@ -2201,23 +2201,43 @@ function companyInfoCard(company, profile) {
   const people = by('DECISION_MAKER_TITLE').length ? by('DECISION_MAKER_TITLE') : by('CONTACT_FOUND');
   const form = by('CONTACT_FORM_URL')[0];
   const shown = new Set(['DECISION_MAKER_TITLE', 'CONTACT_FOUND', 'CONTACT_FORM_URL', 'HIRING_ROLE', 'FOUND_IN_SERP', 'TECH_STACK']);
-  // Only facts that are true and checked: a 0 / "no" result isn't a signal,
-  // and "running ads" counts only when an ad library showed the ads.
+  // Every confirmed signal, said plainly: Yes (with what was found and the
+  // proof), Not found (checked, nothing there), or Not checked yet.
+  // "Running ads" counts only from an ad library, never from a tag on the site.
   const ADS = new Set(['RUNNING_GOOGLE_ADS', 'RUNNING_META_ADS']);
-  const positive = o => (o.value_num !== null && o.value_num !== undefined && Number(o.value_num) > 0) ||
-    (o.value_text && o.value_num === null);
-  // A yes/no signal is only as true as its newest check.
+  const trusted = o => !ADS.has(o.signal_code) || o.collector === 'ad_library';
   const newest = {};
-  for (const o of obs) if (!newest[o.signal_code]) newest[o.signal_code] = o;
-  const current = o => o.value_type !== 'bool' || newest[o.signal_code] === o;
-  const other = Object.values(latest).filter(o => !shown.has(o.signal_code) && positive(o) && current(o) &&
-    (!ADS.has(o.signal_code) || o.collector === 'ad_library'));
-  const otherLine = o => {
-    const bool = o.value_type === 'bool';
-    const detail = o.value_text || (bool ? '' : String(o.value_num));
-    const text = escHtml(o.label) + (detail ? ': ' + escHtml(detail) : '');
-    return o.evidence_url && o.evidence_url !== website ? text + ' (' + link(o.evidence_url, 'proof') + ')' : text;
+  for (const o of obs) if (trusted(o) && !newest[o.signal_code]) newest[o.signal_code] = o;
+  const proof = (o, word) => !o.evidence_url ? ''
+    : o.evidence_url === website || o.evidence_url.replace(/\/$/, '') === website.replace(/\/$/, '')
+      ? ' (checked on ' + link(o.evidence_url, 'their website') + ')'
+      : ' (' + link(o.evidence_url, word) + ')';
+  const signalLine = (code, label, type) => {
+    const o = newest[code];
+    const name = escHtml(label || code) + ': ';
+    if (!o) return name + '<span class="muted">Not checked yet' +
+      (ADS.has(code) ? ' (needs the SerpApi key in Settings)' : '') + '</span>';
+    const num = o.value_num === null || o.value_num === undefined ? null : Number(o.value_num);
+    if ((type || o.value_type) === 'bool') {
+      return num > 0
+        ? name + '<b>Yes</b>' + (o.value_text ? ', ' + escHtml(o.value_text) : '') + proof(o, 'proof')
+        : name + 'Not found' + (o.value_text ? ', ' + escHtml(o.value_text) : '') + proof(o, 'where we checked');
+    }
+    if (o.value_text) return name + escHtml(o.value_text) + proof(o, 'source');
+    return num === null ? name + 'Not found' : name + escHtml(String(num)) + proof(o, 'source');
   };
+  const listed = new Set();
+  const lines = [];
+  for (const sig of (profile && profile.confirmed_signals) || []) {
+    if (shown.has(sig.code) || sig.category === 'discovery') continue;
+    listed.add(sig.code);
+    lines.push(signalLine(sig.code, sig.label, sig.value_type));
+  }
+  for (const o of Object.values(newest)) {
+    if (listed.has(o.signal_code) || shown.has(o.signal_code) || !trusted(o)) continue;
+    listed.add(o.signal_code);
+    lines.push(signalLine(o.signal_code, o.label, o.value_type));
+  }
   let html = '<div class="card" style="margin-bottom:16px"><div class="card-head"><h3>' + escHtml(c.name || c.domain) + '</h3>' +
     '<span class="meta">' + (typeof company.fit === 'number' ? 'Fit ' + company.fit + ' / 100' : '') + '</span></div>' +
     '<table><tbody>' +
@@ -2231,7 +2251,7 @@ function companyInfoCard(company, profile) {
     row('Contact form', form ? link(form.value_text, form.value_text) : '') +
     row('Hiring', list(by('HIRING_ROLE'), 6)) +
     row('Tech on website', escHtml(by('TECH_STACK').map(o => o.value_text).slice(0, 1).join(''))) +
-    row('Other signals', other.slice(0, 8).map(otherLine).join('<br>')) +
+    row('Signals', lines.join('<br>')) +
     row('Found via', c.source_url ? link(c.source_url, 'search result') + ' · ' + escHtml(c.source || '') : escHtml(c.source || '')) +
     row('First found', escHtml((c.created_at || '').slice(0, 10))) +
     '</tbody></table></div>';

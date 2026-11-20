@@ -771,7 +771,11 @@ async def get_company_profile(company_id: str):
         register = next(iter(await build_register(query_db, load_config(), company_id)), {})
     except Exception as e:
         logger.warning(f"Company profile register unavailable: {e}")
-    return {"company": rows[0], "register": register, "observations": observations}
+    confirmed = await query_db(
+        "SELECT code, label, value_type, category FROM signal_codes "
+        "WHERE status = 'confirmed' ORDER BY category, code")
+    return {"company": rows[0], "register": register, "observations": observations,
+            "confirmed_signals": confirmed}
 
 
 @app.get("/api/companies/{company_id}/contacts")

@@ -175,7 +175,9 @@ async def check(library: AdLibrary, company_id: str, domain: str, name: str,
             g = await library.google(domain)
             add("RUNNING_GOOGLE_ADS", 1 if g["count"] else 0,
                 (f"{g['count']} ad(s) shown in the last {RECENT_DAYS} days in Google Ads "
-                 f"Transparency Center (checked {today})") if g["count"] else "", g["url"])
+                 f"Transparency Center (checked {today})") if g["count"] else
+                (f"no ads for {domain} in the last {RECENT_DAYS} days in Google Ads "
+                 f"Transparency Center (checked {today})"), g["url"])
         except OutOfSearches as e:
             logger.info(f"ad library: {e}")
         except Exception as e:
@@ -186,7 +188,9 @@ async def check(library: AdLibrary, company_id: str, domain: str, name: str,
             add("RUNNING_META_ADS", 1 if m["count"] else 0,
                 (f"{m['count']} active ad(s) in Meta Ad Library"
                  + (f" from the Page '{m['page']}'" if m["page"] else "")
-                 + f" (checked {today})") if m["count"] else "", m["url"])
+                 + f" (checked {today})") if m["count"] else
+                (f"no active ads for '{name}' or {domain} in Meta Ad Library (checked {today})"),
+                m["url"])
         except OutOfSearches as e:
             logger.info(f"ad library: {e}")
         except Exception as e:
