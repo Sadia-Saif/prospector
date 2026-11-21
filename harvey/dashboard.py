@@ -470,6 +470,7 @@ async def get_settings():
         "M365_CLIENT_ID", "M365_TENANT_ID",
         "REOON_API_KEY", "ZEROBOUNCE_API_KEY", "HUNTER_API_KEY",
         "PROSPEO_API_KEY", "APOLLO_API_KEY", "APOLLO_MONTHLY_CREDITS", "SERPAPI_API_KEY",
+        "HEYREACH_API_KEY",
     ]
     for key in all_keys:
         if key not in env_vars:
@@ -486,6 +487,7 @@ async def get_settings():
         # Non-secret values echo back so fields repopulate; secrets are
         # presence-only so keys never leave the box.
         "instantly_api_key_set": is_set("INSTANTLY_API_KEY"),
+        "heyreach_api_key_set": is_set("HEYREACH_API_KEY"),
         "linkedin_email": env_vars.get("LINKEDIN_EMAIL", ""),
         "linkedin_password_set": is_set("LINKEDIN_PASSWORD"),
         "cloudflare_account_id": env_vars.get("CLOUDFLARE_ACCOUNT_ID", ""),
@@ -592,7 +594,8 @@ async def save_env_settings(request: Request):
                      "IMAP_HOST", "IMAP_PORT", "IMAP_USERNAME", "IMAP_PASSWORD",
                      "M365_CLIENT_ID", "M365_TENANT_ID",
                      "REOON_API_KEY", "ZEROBOUNCE_API_KEY", "HUNTER_API_KEY",
-                     "PROSPEO_API_KEY", "APOLLO_API_KEY", "APOLLO_MONTHLY_CREDITS", "SERPAPI_API_KEY"]:
+                     "PROSPEO_API_KEY", "APOLLO_API_KEY", "APOLLO_MONTHLY_CREDITS", "SERPAPI_API_KEY",
+                     "HEYREACH_API_KEY"]:
             if key in data and data[key] is not None:
                 value = data[key]
                 if isinstance(value, bool) or not isinstance(value, (str, int, float)):
@@ -1563,6 +1566,8 @@ async def _outbox_warm_loop():
         try:
             await outbox_instantly()
             await get_inbox()
+            if _heyreach_client():
+                await get_linkedin_inbox()
         except Exception as e:
             logger.warning(f"Outbox: warming failed: {e}")
         await asyncio.sleep(240)
@@ -1682,27 +1687,52 @@ def _inbox_kind(m: dict) -> str:
     return "reply"
 
 
-async def _inbox_campaigns(state) -> list[tuple[dict, list[str]]]:
-    """The team campaigns the caller may read, each with its Instantly ids."""
+async def _inbox_scope(state) -> tuple[bool, dict, set]:
+    """(sees everything, {Instantly campaign id: Prospector campaign name},
+    {ids this caller may read}). Admins read the whole Instantly inbox, like
+    Instantly's own Unibox; everyone else only their own campaigns."""
     from harvey import team, members
     sc = _scope()
     see_all = sc is None or members.is_admin(sc.member)
-    out = []
+    names, mine = {}, set()
     for r in await team.load_requests(state):
-        if not see_all and not _owns(r, sc.member):
-            continue
+        name = team.campaign_name(r.get("owner") or "", r.get("name") or "")
         ids = await _campaign_instantly_ids(state, r)
-        if ids:
-            out.append((r, ids))
-    return out
+        for cid in ids:
+            names[cid] = name
+        if see_all or _owns(r, sc.member):
+            mine.update(ids)
+    return see_all, names, mine
 
 
 async def _inbox_raw(client, cid: str) -> list[dict]:
-    """Everything that came back to one Instantly campaign, plus the answers
-    sent by hand from the Unibox or from here."""
-    got = await _cached("recv:" + cid, lambda: client.list_emails(cid, "received"), seconds=120)
-    mine = await _cached("manual:" + cid, lambda: client.list_emails(cid, "manual", max_pages=1), seconds=120)
+    """Everything that came back to one Instantly campaign ("*": the whole
+    workspace), plus the answers sent by hand from the Unibox or from here."""
+    whole = cid == "*"
+    camp = None if whole else cid
+    got = await _cached("recv:" + cid, lambda: client.list_emails(camp, "received", max_pages=5 if whole else 3),
+                        seconds=120)
+    mine = await _cached("manual:" + cid, lambda: client.list_emails(camp, "manual", max_pages=2 if whole else 1),
+                         seconds=120)
     return list(got) + list(mine)
+
+
+async def _inbox_messages(client, state) -> tuple[bool, dict, list[dict]]:
+    see_all, names, mine = await _inbox_scope(state)
+    msgs = []
+    if see_all:
+        msgs = await _inbox_raw(client, "*")
+    else:
+        for cid in sorted(mine):
+            msgs += await _inbox_raw(client, cid)
+    return see_all, names, msgs
+
+
+async def _instantly_campaign_names(client) -> dict:
+    async def fetch():
+        return {str(c.get("id")): c.get("name") or "" for c in await client.list_campaigns(limit=100)
+                if isinstance(c, dict)}
+    return await _cached("campaign_names", fetch, seconds=1800)
 
 
 async def _inbox_statuses(state) -> dict:
@@ -1714,38 +1744,37 @@ async def _inbox_statuses(state) -> dict:
 
 @app.get("/api/inbox")
 async def get_inbox():
-    from harvey import team
     client = _outbox_client()
     if not client:
         return {"connected": False, "threads": [], "statuses": []}
     state = _state()
     await state.init_db()
     marks = await _inbox_statuses(state)
+    see_all, names, msgs = await _inbox_messages(client, state)
+    other = await _instantly_campaign_names(client) if see_all else {}
     threads: dict[str, dict] = {}
-    for r, ids in await _inbox_campaigns(state):
-        name = team.campaign_name(r.get("owner") or "", r.get("name") or "")
-        for cid in ids:
-            for m in await _inbox_raw(client, cid):
-                lead = m.get("lead_email") or ""
-                if not lead:
-                    continue
-                key = cid + "|" + lead
-                t = threads.setdefault(key, {
-                    "key": key, "lead_email": lead, "campaign_id": cid, "campaign": name,
-                    "owner": r.get("owner") or "", "messages": 0, "unread": False,
-                    "last_at": "", "kinds": set(), "i_status": None, "has_received": False})
-                t["messages"] += 1
-                if m.get("received"):
-                    t["has_received"] = True
-                    t["kinds"].add(_inbox_kind(m))
-                    t["unread"] = t["unread"] or m.get("unread")
-                    if m.get("i_status") not in (None, 0):
-                        t["i_status"] = m.get("i_status")
-                if (m.get("at") or "") >= t["last_at"]:
-                    t["last_at"] = m.get("at") or ""
-                    t["subject"] = m.get("subject") or ""
-                    t["preview"] = (m.get("preview") or "")[:180]
-                    t["last_from_them"] = bool(m.get("received"))
+    for m in msgs:
+        lead = m.get("lead_email") or ""
+        if not lead:
+            continue
+        cid = m.get("campaign_id") or ""
+        key = cid + "|" + lead
+        t = threads.setdefault(key, {
+            "key": key, "lead_email": lead, "campaign_id": cid,
+            "campaign": names.get(cid) or other.get(cid) or ("No campaign" if not cid else "Other campaign"),
+            "prospector": cid in names, "messages": 0, "unread": False,
+            "last_at": "", "kinds": set(), "i_status": None, "has_received": False})
+        t["messages"] += 1
+        if m.get("received"):
+            t["has_received"] = True
+            t["kinds"].add(_inbox_kind(m))
+            t["unread"] = t["unread"] or m.get("unread")
+            if m.get("i_status") not in (None, 0):
+                t["i_status"] = m.get("i_status")
+        if (m.get("at") or "") >= t["last_at"]:
+            t["last_at"] = m.get("at") or ""
+            t["subject"] = m.get("subject") or ""
+            t["preview"] = (m.get("preview") or "")[:180]
     shown = [t for t in threads.values() if t.pop("has_received")]
     emails = sorted({t["lead_email"] for t in shown})
     people = {}
@@ -1767,28 +1796,28 @@ async def get_inbox():
             status = "out_of_office" if t["kind"] == "auto" else "lead"
         t["status"] = status
     shown.sort(key=lambda t: t["last_at"], reverse=True)
-    return {"connected": True, "threads": shown,
+    return {"connected": True, "threads": shown, "admin_view": see_all,
             "statuses": [{"key": k, "label": l} for k, l, _ in INBOX_STATUSES]}
 
 
-async def _inbox_thread_messages(client, cid: str, lead: str) -> list[dict]:
+async def _inbox_thread_messages(client, state, cid: str, lead: str) -> list[dict]:
     lead = lead.lower()
-    msgs = [dict(m, sent=False) for m in await _inbox_raw(client, cid) if m.get("lead_email") == lead]
-    for e in await _cached("sent:" + cid, lambda: client.get_sent_emails(cid)):
-        if (e.get("lead_email") or "").lower() == lead:
-            msgs.append({"id": "", "received": False, "from": e.get("eaccount") or "", "to": lead,
-                         "subject": e.get("subject") or "", "html": e.get("html") or "",
-                         "text": e.get("body") or "", "at": e.get("sent_at") or "",
-                         "eaccount": (e.get("eaccount") or "").lower(), "campaign_email": True})
+    _, _, raw = await _inbox_messages(client, state)
+    msgs = [dict(m) for m in raw if m.get("lead_email") == lead and (m.get("campaign_id") or "") == cid]
+    if cid:
+        for e in await _cached("sent:" + cid, lambda: client.get_sent_emails(cid)):
+            if (e.get("lead_email") or "").lower() == lead:
+                msgs.append({"id": "", "received": False, "from": e.get("eaccount") or "", "to": lead,
+                             "subject": e.get("subject") or "", "html": e.get("html") or "",
+                             "text": e.get("body") or "", "at": e.get("sent_at") or "",
+                             "eaccount": (e.get("eaccount") or "").lower(), "campaign_email": True})
     msgs.sort(key=lambda m: m.get("at") or "")
     return msgs
 
 
-async def _inbox_allowed(state, cid: str) -> dict | None:
-    for r, ids in await _inbox_campaigns(state):
-        if cid in ids:
-            return r
-    return None
+async def _inbox_allowed(state, cid: str) -> bool:
+    see_all, _, mine = await _inbox_scope(state)
+    return see_all or (bool(cid) and cid in mine)
 
 
 @app.get("/api/inbox/thread")
@@ -1804,10 +1833,8 @@ async def get_inbox_thread(campaign: str, lead: str):
         return await _cached("img:" + url, lambda: fetch_image(url), seconds=86400)
     out = []
     thread_ids = set()
-    for m in await _inbox_thread_messages(client, campaign, lead):
+    for m in await _inbox_thread_messages(client, state, campaign, lead):
         markup = m.get("html") or ""
-        # Replies carry the whole earlier thread quoted below them: show it
-        # folded, the way a mail app does.
         html_out = (await safe_email_html(markup, _image)) if markup else text_to_html(m.get("text") or "")
         if m.get("thread_id"):
             thread_ids.add(m["thread_id"])
@@ -1847,7 +1874,7 @@ async def inbox_reply(request: Request):
     await state.init_db()
     if not client or not await _inbox_allowed(state, cid):
         return _refuse("unknown conversation", 404)
-    msgs = await _inbox_thread_messages(client, cid, lead)
+    msgs = await _inbox_thread_messages(client, state, cid, lead)
     last = next((m for m in reversed(msgs) if m.get("received") and m.get("id")), None)
     if not last:
         return _refuse("There's no email from them to answer.")
@@ -1872,7 +1899,8 @@ async def inbox_reply(request: Request):
     sent = await client.reply_to(last["id"], eaccount, subject, plain, html_body)
     if not sent:
         return _refuse("Instantly didn't take the reply. Try again in a minute.", 502)
-    _OUTBOX_CACHE.pop("manual:" + cid, None)
+    for k in [k for k in _OUTBOX_CACHE if k.startswith("manual:")]:
+        _OUTBOX_CACHE.pop(k, None)
     await state.log_action("inbox_reply", "dashboard", {"campaign": cid, "from": eaccount})
     return {"success": True, "from": eaccount}
 
@@ -1900,6 +1928,161 @@ async def inbox_status(request: Request):
     await state.set_setting("inbox_status", json.dumps(marks))
     synced = await client.set_interest(lead, value, cid)
     return {"success": True, "synced": synced}
+
+
+# ── LinkedIn replies (HeyReach) ──
+
+def _heyreach_client():
+    from harvey.integrations.heyreach import HeyReachClient
+    key = (_read_env_file().get("HEYREACH_API_KEY", "") or os.getenv("HEYREACH_API_KEY", "")).strip()
+    return HeyReachClient(key) if key else None
+
+
+async def _linkedin_visible(client) -> list[dict]:
+    """HeyReach conversations this caller may read: admins every sender's,
+    a team member those of the LinkedIn account signed up with their email."""
+    from harvey import members
+    convos = await _cached("li:convos", lambda: client.conversations(), seconds=120)
+    sc = _scope()
+    if sc is None or members.is_admin(sc.member):
+        return convos
+    me = (sc.member.get("email") or "").lower()
+    return [c for c in convos if c.get("account_email") == me]
+
+
+@app.get("/api/inbox/linkedin")
+async def get_linkedin_inbox():
+    client = _heyreach_client()
+    if not client:
+        return {"connected": False, "threads": []}
+    convos = await _linkedin_visible(client)
+    names = await _cached("li:campaigns", lambda: client.campaigns(), seconds=1800)
+    threads = []
+    for c in convos:
+        if not any(not m["mine"] for m in c["messages"]) and c["last_from_me"]:
+            continue  # only conversations where they wrote back
+        threads.append({k: v for k, v in c.items() if k != "messages"} | {
+            "key": f"{c['account_id']}|{c['id']}",
+            "campaign": (names or {}).get(c.get("campaign_id")) or "",
+            "unread": not c.get("read")})
+    threads.sort(key=lambda t: t.get("last_at") or "", reverse=True)
+    return {"connected": True, "threads": threads}
+
+
+async def _linkedin_find(client, account: str, cid: str) -> dict | None:
+    for c in await _linkedin_visible(client):
+        if str(c.get("account_id")) == str(account) and c.get("id") == cid:
+            return c
+    return None
+
+
+@app.get("/api/inbox/linkedin/thread")
+async def get_linkedin_thread(account: str, id: str):
+    client = _heyreach_client()
+    c = await _linkedin_find(client, account, id) if client else None
+    if not c:
+        return _refuse("unknown conversation", 404)
+    return {"messages": c["messages"], "account_name": c.get("account_name") or ""}
+
+
+@app.post("/api/inbox/linkedin/reply")
+async def linkedin_reply(request: Request):
+    try:
+        body = await request.json()
+    except ValueError:
+        body = None
+    if not isinstance(body, dict):
+        return _refuse("expected JSON", 400)
+    text = str(body.get("text") or "").strip()
+    if not text:
+        return _refuse("Write a message first.", 400)
+    if len(text) > 8000:
+        return _refuse("That message is too long for LinkedIn.", 400)
+    client = _heyreach_client()
+    c = await _linkedin_find(client, str(body.get("account") or ""), str(body.get("id") or "")) if client else None
+    if not c:
+        return _refuse("unknown conversation", 404)
+    try:
+        await client.send(c["account_id"], c["id"], text)
+    except Exception as e:
+        logger.warning(f"LinkedIn reply failed: {e}")
+        return _refuse("HeyReach didn't take the message. Try again in a minute.", 502)
+    _OUTBOX_CACHE.pop("li:convos", None)
+    state = _state()
+    await state.init_db()
+    await state.log_action("linkedin_reply", "dashboard", {"account": str(c["account_id"])})
+    return {"success": True, "from": c.get("account_name") or "your LinkedIn account"}
+
+
+@app.post("/api/settings/test-heyreach")
+async def test_heyreach(request: Request):
+    if (denied := await _admins_only(request)) is not None:
+        return denied
+    client = _heyreach_client()
+    if not client:
+        return {"success": False, "message": "Save a HeyReach API key first."}
+    ok = await client.check()
+    return {"success": ok, "message": "Connected to HeyReach." if ok else "HeyReach refused that key."}
+
+
+# ── Calls: outcomes logged by hand ──
+
+CALL_OUTCOMES = [
+    ("interested", "Interested"), ("meeting_booked", "Meeting booked"),
+    ("call_back", "Call back later"), ("not_interested", "Not interested"),
+    ("voicemail", "Left voicemail"), ("no_answer", "No answer"),
+    ("wrong_number", "Wrong number"), ("gatekeeper", "Reached gatekeeper"),
+]
+_CALL_FIELDS = {"name": 120, "company": 160, "phone": 40, "email": 200, "notes": 4000}
+
+
+async def _calls(state) -> list[dict]:
+    try:
+        rows = json.loads(await state.get_setting("call_log", "[]") or "[]")
+    except (ValueError, TypeError):
+        rows = []
+    return [r for r in rows if isinstance(r, dict)]
+
+
+@app.get("/api/inbox/calls")
+async def get_calls():
+    from harvey import members
+    state = _state()
+    await state.init_db()
+    rows = await _calls(state)
+    sc = _scope()
+    if sc is not None and not members.is_admin(sc.member):
+        rows = [r for r in rows if r.get("member_id") == sc.member.get("id")]
+    rows.sort(key=lambda r: r.get("at") or "", reverse=True)
+    return {"calls": rows, "outcomes": [{"key": k, "label": l} for k, l in CALL_OUTCOMES]}
+
+
+@app.post("/api/inbox/calls")
+async def log_call(request: Request):
+    import uuid as _uuid
+    try:
+        body = await request.json()
+    except ValueError:
+        body = None
+    if not isinstance(body, dict):
+        return _refuse("expected JSON", 400)
+    outcome = str(body.get("outcome") or "")
+    if outcome not in dict(CALL_OUTCOMES):
+        return _refuse("Pick how the call went.", 400)
+    row = {k: str(body.get(k) or "").strip()[:n] for k, n in _CALL_FIELDS.items()}
+    if not (row["name"] or row["company"] or row["phone"]):
+        return _refuse("Add who you called.", 400)
+    sc = _scope()
+    row.update(id=_uuid.uuid4().hex[:12], outcome=outcome,
+               at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+               by=(sc.member.get("name") if sc is not None else "") or "",
+               member_id=(sc.member.get("id") if sc is not None else "") or "")
+    state = _state()
+    await state.init_db()
+    rows = (await _calls(state))[-1999:] + [row]
+    await state.set_setting("call_log", json.dumps(rows))
+    await state.log_action("call_logged", "dashboard", {"outcome": outcome})
+    return {"success": True, "call": row}
 
 
 @app.get("/api/outbox")

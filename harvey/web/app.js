@@ -1292,6 +1292,7 @@ async function loadSettings() {
   savedPh('imap-pass', data.imap_password_set, 'Same as SMTP password');
   document.getElementById('imap-same-pass').checked = !data.imap_password_set;
   savedPh('instantly-key', data.instantly_api_key_set, 'Enter your Instantly API key');
+  savedPh('heyreach-key', data.heyreach_api_key_set, 'Enter your HeyReach API key');
   savedPh('reoon-key', data.reoon_api_key_set, '600 free/mo, reoon.com/email-verifier');
   savedPh('zerobounce-key', data.zerobounce_api_key_set, '100 free/mo, best for M365/Workspace catch-alls');
   savedPh('hunter-key', data.hunter_api_key_set, '50 free/mo + email-pattern lookup');
@@ -1419,6 +1420,20 @@ function saveCloudflare() {
   const token = document.getElementById('cf-api-token').value.trim();
   if (token) payload.CLOUDFLARE_API_TOKEN = token;
   saveEnv(payload, 'Cloudflare credentials saved.');
+}
+
+function saveHeyReach() {
+  const key = document.getElementById('heyreach-key').value.trim();
+  if (!key) { showToast('Enter a new key first. The saved one is kept.', 'error'); return; }
+  saveEnv({HEYREACH_API_KEY: key}, 'HeyReach API key saved.');
+}
+
+async function testHeyReach() {
+  const el = document.getElementById('heyreach-test-result');
+  el.innerHTML = '<div class="test-result pending">Testing&hellip;</div>';
+  const data = await api('/api/settings/test-heyreach', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'});
+  if (!data) { el.innerHTML = '<div class="test-result error">Could not reach the dashboard server.</div>'; return; }
+  el.innerHTML = '<div class="test-result ' + (data.success ? 'success' : 'error') + '">' + escHtml(failMsg(data, '')) + '</div>';
 }
 
 async function testInstantly() {
@@ -2681,11 +2696,163 @@ const CONVO_FILTERS = [
 let _inbox = null, _ibFilter = 'all', _ibCampaign = '', _ibSearch = '', _ibOpen = null;
 const IB_KINDS = {reply: 'Reply', auto: 'Auto-reply', bounce: 'Bounced'};
 
+let _ibChannel = 'email', _li = null, _liOpen = null, _liFilter = 'all', _liSearch = '', _calls = null;
+
+function ibTabs() {
+  const n = (arr, f) => (arr || []).filter(f).length;
+  const tab = (k, label, count) => '<button class="ib-tab' + (k === _ibChannel ? ' on' : '') + '" onclick="ibChannel(' + jsq(k) + ')">' +
+    label + (count ? ' <span class="n">' + count + '</span>' : '') + '</button>';
+  return '<div class="ib-tabs" role="tablist">' +
+    tab('email', 'Email', n(_inbox && _inbox.threads, t => t.unread)) +
+    tab('linkedin', 'LinkedIn', n(_li && _li.threads, t => t.unread)) +
+    tab('calls', 'Calls', 0) + '</div>';
+}
+
+function ibChannel(k) { _ibChannel = k; loadConversations(); }
+
 async function loadConversations() {
   const el = document.getElementById('conversations-list');
+  if (!_inbox && !el.innerHTML) el.innerHTML = '<p class="muted">Loading…</p>';
+  if (_ibChannel === 'linkedin') {
+    _li = await api('/api/inbox/linkedin');
+    return renderLinkedIn();
+  }
+  if (_ibChannel === 'calls') {
+    _calls = await api('/api/inbox/calls');
+    return renderCalls();
+  }
   const data = await api('/api/inbox');
   if (data && data.connected) { _inbox = data; renderInbox(); return; }
-  return loadOldConversations();
+  await loadOldConversations();
+  el.innerHTML = ibTabs() + el.innerHTML;
+}
+
+// ── LinkedIn (HeyReach) ──
+function liMatches(t) {
+  if (_liFilter === 'unread' && !t.unread) return false;
+  if (_liSearch) {
+    const q = _liSearch.toLowerCase();
+    if (![t.name, t.company, t.headline, t.preview, t.campaign].some(v => (v || '').toLowerCase().includes(q))) return false;
+  }
+  return true;
+}
+
+function renderLinkedIn() {
+  const el = document.getElementById('conversations-list');
+  if (!_li) { el.innerHTML = ibTabs() + offlineState(); return; }
+  if (!_li.connected) {
+    el.innerHTML = ibTabs() + '<div class="card">' + emptyState(icon('conversations'), 'Connect HeyReach to see LinkedIn replies',
+      'Add your HeyReach API key in Settings → HeyReach. Every LinkedIn reply then shows here, and you can answer from here.') + '</div>';
+    return;
+  }
+  const all = _li.threads || [];
+  const shown = all.filter(liMatches);
+  el.innerHTML = ibTabs() + '<div class="ib">' +
+    '<aside class="ib-side"><div class="ib-side-h">Status</div>' +
+      [['all', 'All'], ['unread', 'Unread']].map(f => '<button class="ib-f' + (f[0] === _liFilter ? ' on' : '') + '" onclick="liSetFilter(' + jsq(f[0]) + ')"><span>' +
+        f[1] + '</span><span class="n">' + all.filter(t => f[0] === 'all' || t.unread).length + '</span></button>').join('') + '</aside>' +
+    '<section class="ib-list"><div class="ib-list-h"><b>LinkedIn</b>' +
+      '<input class="ib-search" type="search" placeholder="Search…" value="' + escHtml(_liSearch) + '" oninput="liSetSearch(this.value)">' +
+      '<button class="btn btn-ghost btn-sm" onclick="loadConversations()" title="Refresh">↻</button></div>' +
+      '<div class="ib-items" id="li-items">' + liRows(shown, all.length) + '</div></section>' +
+    '<section class="ib-read" id="li-read"><p class="muted ib-empty">Pick a conversation to read it.</p></section></div>';
+  if (_liOpen && all.some(t => t.key === _liOpen)) liOpen(_liOpen);
+}
+
+function liRows(shown, total) {
+  if (!shown.length) return '<p class="muted ib-empty">' + (total ? 'Nothing matches.' : 'No LinkedIn replies yet.') + '</p>';
+  return shown.map(t => {
+    const parts = (t.name || '?').split(' ');
+    return '<button class="ib-row' + (t.key === _liOpen ? ' on' : '') + (t.unread ? ' unread' : '') + '" data-key="' + escHtml(t.key) + '" onclick="liOpen(' + jsq(t.key) + ')">' +
+      '<span class="avatar">' + initials(parts[0], parts[1] || '') + '</span>' +
+      '<span class="ib-row-main"><span class="ib-row-top"><b>' + escHtml(t.name || 'LinkedIn member') + '</b>' +
+        (t.company ? '<span class="ib-co"> · ' + escHtml(t.company) + '</span>' : '') +
+        '<span class="ib-when">' + relTime(t.last_at) + '</span></span>' +
+        '<span class="ib-subj">' + escHtml(t.headline || t.campaign || '') + '</span>' +
+        '<span class="ib-prev">' + escHtml(t.preview || '') + '</span></span></button>';
+  }).join('');
+}
+
+function liSetFilter(f) { _liFilter = f; renderLinkedIn(); }
+function liSetSearch(q) {
+  _liSearch = q;
+  const all = (_li && _li.threads) || [];
+  document.getElementById('li-items').innerHTML = liRows(all.filter(liMatches), all.length);
+}
+
+async function liOpen(key) {
+  const t = ((_li && _li.threads) || []).find(x => x.key === key);
+  if (!t) return;
+  _liOpen = key;
+  document.querySelectorAll('#li-items .ib-row').forEach(b => { b.classList.toggle('on', b.dataset.key === key); if (b.dataset.key === key) b.classList.remove('unread'); });
+  const pane = document.getElementById('li-read');
+  pane.innerHTML = '<p class="muted ib-empty">Loading…</p>';
+  const [account, id] = [key.split('|')[0], key.slice(key.indexOf('|') + 1)];
+  const data = await api('/api/inbox/linkedin/thread?account=' + encodeURIComponent(account) + '&id=' + encodeURIComponent(id));
+  if (_liOpen !== key) return;
+  if (!data) { pane.innerHTML = '<p class="muted ib-empty">Couldn’t load this conversation.</p>'; return; }
+  const parts = (t.name || '?').split(' ');
+  pane.innerHTML = '<div class="ib-read-h"><span class="avatar">' + initials(parts[0], parts[1] || '') + '</span>' +
+      '<div class="ib-read-who"><b>' + escHtml(t.name || 'LinkedIn member') + '</b><span class="muted">' +
+      escHtml([t.headline, t.company].filter(Boolean).join(' · ')) + (t.campaign ? ' · ' + escHtml(t.campaign) : '') + '</span></div>' +
+      (/^https:\/\/([a-z]+\.)?linkedin\.com\//.test(t.profile_url || '') && safeHref(t.profile_url) ? '<a class="btn btn-ghost btn-sm" href="' + safeHref(t.profile_url) + '" target="_blank" rel="noopener noreferrer">Profile</a>' : '') +
+    '</div><div class="ib-msgs li-msgs">' + (data.messages || []).map(m =>
+      '<div class="li-msg ' + (m.mine ? 'out' : 'in') + '"><div class="li-who">' + escHtml(m.mine ? (data.account_name || 'You') : (t.name || 'Them')) +
+      (m.inmail ? ' · InMail' : '') + ' · ' + escHtml(fmtWhen(m.at)) + '</div><div class="li-text">' + escHtml(m.text) + '</div></div>').join('') + '</div>' +
+    '<div class="ib-reply"><textarea id="li-text" rows="4" placeholder="Write your LinkedIn reply…"></textarea>' +
+      '<div class="ib-reply-a"><span class="muted">Sends from ' + escHtml(data.account_name || t.account_name || 'your LinkedIn account') + ' through HeyReach</span>' +
+      '<button class="btn btn-primary btn-sm" id="li-send" onclick="liSend(' + jsq(key) + ')">Send</button></div></div>';
+  const msgs = pane.querySelector('.li-msgs');
+  if (msgs) msgs.scrollTop = msgs.scrollHeight;
+}
+
+async function liSend(key) {
+  const box = document.getElementById('li-text');
+  const text = (box.value || '').trim();
+  if (!text) { showToast('Write a message first.', 'error'); return; }
+  const btn = document.getElementById('li-send');
+  btn.disabled = true; btn.textContent = 'Sending…';
+  const [account, id] = [key.split('|')[0], key.slice(key.indexOf('|') + 1)];
+  const data = await api('/api/inbox/linkedin/reply', {method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({account: account, id: id, text: text})});
+  btn.disabled = false; btn.textContent = 'Send';
+  if (data && data.success) { showToast('Sent on LinkedIn from ' + data.from + '.', 'success'); box.value = ''; }
+  else showToast(failMsg(data, 'Couldn’t send that message.'), 'error');
+}
+
+// ── Calls: outcomes you log after a call ──
+function renderCalls() {
+  const el = document.getElementById('conversations-list');
+  if (!_calls) { el.innerHTML = ibTabs() + offlineState(); return; }
+  const label = k => ((_calls.outcomes || []).find(o => o.key === k) || {}).label || k;
+  const good = {interested: 1, meeting_booked: 1};
+  el.innerHTML = ibTabs() + '<div class="ib ib-calls">' +
+    '<section class="ib-list"><div class="ib-list-h"><b>Calls</b><span class="muted">' + (_calls.calls || []).length + ' logged</span></div>' +
+      '<div class="ib-items">' + ((_calls.calls || []).length ? _calls.calls.map(c =>
+        '<div class="ib-row call-row"><span class="ib-row-main"><span class="ib-row-top"><b>' + escHtml(c.name || c.company || c.phone) + '</b>' +
+          (c.company && c.name ? '<span class="ib-co"> · ' + escHtml(c.company) + '</span>' : '') +
+          '<span class="ib-when">' + relTime(c.at) + '</span></span>' +
+          '<span class="ib-subj"><span class="ib-kind ' + (good[c.outcome] ? 'k-good' : 'k-sent') + '">' + escHtml(label(c.outcome)) + '</span>' +
+            escHtml([c.phone, c.email].filter(Boolean).join(' · ')) + (c.by ? ' · by ' + escHtml(c.by) : '') + '</span>' +
+          (c.notes ? '<span class="call-notes">' + escHtml(c.notes) + '</span>' : '') + '</span></div>').join('')
+        : '<p class="muted ib-empty">No calls logged yet. After each call, log how it went on the right.</p>') + '</div></section>' +
+    '<section class="ib-read"><div class="ib-read-h"><b>Log a call</b></div><div class="call-form">' +
+      '<label>Who you called<input id="call-name" class="form-input" placeholder="Name"></label>' +
+      '<label>Company<input id="call-company" class="form-input"></label>' +
+      '<div class="call-two"><label>Phone<input id="call-phone" class="form-input"></label><label>Email<input id="call-email" class="form-input" type="email"></label></div>' +
+      '<label>How it went<select id="call-outcome" class="form-input"><option value="">Choose…</option>' +
+        (_calls.outcomes || []).map(o => '<option value="' + o.key + '">' + escHtml(o.label) + '</option>').join('') + '</select></label>' +
+      '<label>What they said<textarea id="call-notes" class="form-input" rows="5" placeholder="Their words, objections, next step…"></textarea></label>' +
+      '<button class="btn btn-primary btn-sm" id="call-save" onclick="saveCall()">Save call</button></div></section></div>';
+}
+
+async function saveCall() {
+  const v = id => (document.getElementById(id).value || '').trim();
+  const body = {name: v('call-name'), company: v('call-company'), phone: v('call-phone'), email: v('call-email'),
+    outcome: v('call-outcome'), notes: v('call-notes')};
+  const data = await api('/api/inbox/calls', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+  if (data && data.success) { showToast('Call saved.', 'success'); loadConversations(); }
+  else showToast(failMsg(data, 'Couldn’t save that call.'), 'error');
 }
 
 function ibStatusLabel(k) {
@@ -2715,7 +2882,7 @@ function renderInbox() {
     .concat((_inbox.statuses || []).map(s => [s.key, s.label]));
   const campaigns = [...new Set(all.map(t => t.campaign))].sort();
   const shown = all.filter(ibMatches);
-  el.innerHTML = '<div class="ib">' +
+  el.innerHTML = ibTabs() + '<div class="ib">' +
     '<aside class="ib-side"><div class="ib-side-h">Status</div>' +
       side.map((f, i) => (i === 5 ? '<div class="ib-side-h">Lead status</div>' : '') +
         '<button class="ib-f' + (f[0] === _ibFilter ? ' on' : '') + '" onclick="ibSetFilter(' + jsq(f[0]) + ')"><span>' +

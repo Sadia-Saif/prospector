@@ -278,7 +278,7 @@
 
 <!-- Conversations -->
 <div id="conversations" class="section">
-  <div class="section-head"><div><h2>Conversations</h2><p>Every reply, auto-reply and bounce from your campaigns, in one inbox.</p></div></div>
+  <div class="section-head"><div><h2>Conversations</h2><p>Every email reply, LinkedIn reply and call, in one inbox.</p></div></div>
   <div id="conversations-list"></div>
 </div>
 
@@ -383,6 +383,20 @@
             <button class="btn btn-secondary" onclick="testInstantly()">Test</button></div>
           <div id="instantly-test-result"></div></div>
         <button class="btn btn-primary btn-sm" onclick="saveInstantly()">Save Instantly</button>
+      </div>
+    </div>
+    <div class="settings-row">
+      <div>
+        <h3>HeyReach</h3>
+        <p class="desc">Shows your LinkedIn replies in Conversations and lets you answer them there. Get the key from HeyReach → Integrations → API.</p>
+      </div>
+      <div class="fields">
+        <div class="form-group"><label class="form-label" for="heyreach-key">API key</label>
+          <div class="with-btn"><input type="password" class="form-input" id="heyreach-key" placeholder="Enter your HeyReach API key" autocomplete="off">
+            <button class="btn btn-secondary" onclick="toggleVisibility('heyreach-key')">Show</button>
+            <button class="btn btn-secondary" onclick="testHeyReach()">Test</button></div>
+          <div id="heyreach-test-result"></div></div>
+        <button class="btn btn-primary btn-sm" onclick="saveHeyReach()">Save HeyReach</button>
       </div>
     </div>
   </div>

@@ -484,15 +484,16 @@ class InstantlyClient:
         out.sort(key=lambda e: e["sent_at"] or "")
         return out
 
-    async def list_emails(self, campaign_id: str, email_type: str = "received",
+    async def list_emails(self, campaign_id: str | None, email_type: str = "received",
                           max_pages: int = 3) -> list:
         """A campaign's emails of one type ("received" or "manual"), newest
         first, every one Instantly's Unibox shows: replies, auto-replies,
         out-of-office notes and bounce notices alike (mode emode_all)."""
         out, after = [], None
         for _ in range(max_pages):
-            params = {"campaign_id": campaign_id, "email_type": email_type,
-                      "mode": "emode_all", "sort_order": "desc", "limit": 100}
+            params = {"email_type": email_type, "mode": "emode_all", "sort_order": "desc", "limit": 100}
+            if campaign_id:
+                params["campaign_id"] = campaign_id
             if after:
                 params["starting_after"] = after
             result = await self._request("GET", "/emails", params=params)

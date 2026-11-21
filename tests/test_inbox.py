@@ -45,6 +45,9 @@ class Client:
         self.interest.append((lead, value, cid))
         return True
 
+    async def list_campaigns(self, limit=100):
+        return [{"id": "i1", "name": "Cafes"}, {"id": "i9", "name": "Older campaign"}]
+
     async def mark_thread_read(self, tid):
         self.read.append(tid)
         return True
@@ -92,10 +95,16 @@ async def test_thread_holds_the_cold_email_and_the_reply_in_order(inbox):
 
 
 @pytest.mark.asyncio
-async def test_inbox_refuses_campaigns_it_does_not_run(inbox):
+async def test_team_members_only_reach_their_own_campaigns(inbox):
+    from types import SimpleNamespace
     D, _ = inbox
-    r = await D.get_inbox_thread("other", "jo@cafe.example")
-    assert r.status_code == 404
+    token = D._SCOPE.set(SimpleNamespace(member={"id": "m2", "name": "Bo", "email": "bo@send.example",
+                                                 "role": "member"}))
+    try:
+        assert (await D.get_inbox_thread("i1", "jo@cafe.example")).status_code == 404
+        assert (await D.get_inbox())["threads"] == []
+    finally:
+        D._SCOPE.reset(token)
 
 
 class _Req:
@@ -133,3 +142,92 @@ def test_instantly_item_reads_lead_and_kind():
                                      "lead": "jo@cafe.example", "is_auto_reply": True,
                                      "body": {"html": "<div>Away</div>"}, "subject": "Away"}, "i1")
     assert m["received"] and m["auto"] and m["lead_email"] == "jo@cafe.example" and m["text"] == "Away"
+
+
+@pytest.mark.asyncio
+async def test_admins_see_replies_from_every_instantly_campaign(inbox, monkeypatch):
+    D, client = inbox
+    orig = client.list_emails
+
+    async def more(cid, email_type="received", max_pages=3):
+        got = await orig(cid, email_type, max_pages)
+        if email_type == "received" and cid is None:
+            got.append(dict(_msg(9, "kim@shop.example", "Re: hello", "Sounds good", "2026-11-19T13:00:00Z"),
+                            campaign_id="i9"))
+        return got
+    client.list_emails = more
+    by = {t["lead_email"]: t for t in (await D.get_inbox())["threads"]}
+    assert by["kim@shop.example"]["campaign"] == "Older campaign" and not by["kim@shop.example"]["prospector"]
+
+
+class HR:
+    sent = []
+
+    async def conversations(self, pages=3):
+        return [
+            {"id": "c1", "account_id": 7, "account_email": "ann@send.example", "account_name": "Ann Lee",
+             "campaign_id": 3, "read": False, "last_at": "2026-11-20T10:00:00Z", "preview": "Sure, let's talk",
+             "last_from_me": False, "name": "Jo Lee", "headline": "Owner", "company": "Cafe Uno",
+             "profile_url": "https://www.linkedin.com/in/example", "image": "",
+             "messages": [{"at": "2026-11-19T10:00:00Z", "text": "Hi Jo", "subject": "", "mine": True, "inmail": False},
+                          {"at": "2026-11-20T10:00:00Z", "text": "Sure, let's talk", "subject": "", "mine": False,
+                           "inmail": False}]},
+            {"id": "c2", "account_id": 7, "account_email": "ann@send.example", "account_name": "Ann Lee",
+             "campaign_id": 3, "read": True, "last_at": "2026-11-18T10:00:00Z", "preview": "Hi Al",
+             "last_from_me": True, "name": "Al Roe", "headline": "", "company": "", "profile_url": "", "image": "",
+             "messages": [{"at": "2026-11-18T10:00:00Z", "text": "Hi Al", "subject": "", "mine": True, "inmail": False}]},
+        ]
+
+    async def campaigns(self):
+        return {3: "Cafes LinkedIn"}
+
+    async def send(self, account_id, conversation_id, message):
+        self.sent.append((account_id, conversation_id, message))
+
+
+@pytest.mark.asyncio
+async def test_linkedin_tab_shows_replies_and_answers_in_thread(inbox, monkeypatch):
+    D, _ = inbox
+    hr = HR()
+    monkeypatch.setattr(D, "_heyreach_client", lambda: hr)
+    out = await D.get_linkedin_inbox()
+    assert [t["name"] for t in out["threads"]] == ["Jo Lee"]          # only where they wrote back
+    t = out["threads"][0]
+    assert t["campaign"] == "Cafes LinkedIn" and t["unread"] and t["key"] == "7|c1"
+    thread = await D.get_linkedin_thread("7", "c1")
+    assert [m["mine"] for m in thread["messages"]] == [True, False]
+    assert (await D.get_linkedin_thread("7", "nope")).status_code == 404
+    r = await D.linkedin_reply(_Req({"account": "7", "id": "c1", "text": "Great, Tuesday?"}))
+    assert r["success"] and hr.sent == [(7, "c1", "Great, Tuesday?")]
+
+
+@pytest.mark.asyncio
+async def test_linkedin_tab_asks_for_a_key_without_one(inbox, monkeypatch):
+    D, _ = inbox
+    monkeypatch.setattr(D, "_heyreach_client", lambda: None)
+    assert (await D.get_linkedin_inbox())["connected"] is False
+
+
+@pytest.mark.asyncio
+async def test_calls_are_logged_and_listed(inbox):
+    D, _ = inbox
+    bad = await D.log_call(_Req({"name": "Jo", "outcome": "nope"}))
+    assert bad.status_code == 400
+    ok = await D.log_call(_Req({"name": "Jo Lee", "company": "Cafe Uno", "outcome": "interested",
+                                "notes": "Wants a call Tuesday"}))
+    assert ok["success"]
+    calls = (await D.get_calls())["calls"]
+    assert calls[0]["name"] == "Jo Lee" and calls[0]["outcome"] == "interested"
+
+
+def test_heyreach_conversation_is_read_into_a_thread():
+    from harvey.integrations.heyreach import HeyReachClient
+    c = HeyReachClient.conversation({
+        "id": "c1", "linkedInAccountId": 7, "read": False, "lastMessageAt": "2026-11-20T10:00:00Z",
+        "lastMessageText": "Yes", "lastMessageSender": "CORRESPONDENT", "campaignId": 3,
+        "correspondentProfile": {"firstName": "Jo", "lastName": "Lee", "companyName": "Cafe Uno"},
+        "linkedInAccount": {"emailAddress": "Ann@Send.example", "firstName": "Ann"},
+        "messages": [{"createdAt": "2026-11-20T10:00:00Z", "body": "Yes", "sender": "CORRESPONDENT"},
+                     {"createdAt": "2026-11-19T10:00:00Z", "body": "Hi Jo", "sender": "ME"}]})
+    assert c["name"] == "Jo Lee" and c["account_email"] == "ann@send.example" and not c["last_from_me"]
+    assert [m["mine"] for m in c["messages"]] == [True, False]
